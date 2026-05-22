@@ -9282,13 +9282,51 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
 };
 
 function DUBIApp() {
-  const [phase,setPhase] = useState(() => {
-  return localStorage.getItem("dubi_token") ? "onboarding" : "welcome";
-});
+  const [phase,setPhase] = useState("checking");
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
   const [plan,setPlan] = useState(null);
   const [activeTab,setActiveTab] = useState("today");
+  useEffect(() => {
+  const checkUserSession = async () => {
+    const token = localStorage.getItem("dubi_token");
+
+    if (!token) {
+      setPhase("welcome");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        if (data.onboarding) {
+          setUserData(data.onboarding);
+
+          const generatedPlan = generatePlan(data.onboarding);
+          setPlan(generatedPlan);
+
+          setPhase("app");
+          return;
+        }
+      }
+
+      setPhase("onboarding");
+    } catch (error) {
+      console.error("Session check failed:", error);
+      setPhase("welcome");
+    }
+  };
+
+  checkUserSession();
+}, []);
   const [showWrap,setShowWrap] = useState(false);
   const [isFirstAccess,setIsFirstAccess] = useState(true);
   const [safetyReview,setSafetyReview] = useState(null);
@@ -9347,6 +9385,11 @@ function DUBIApp() {
         ::-webkit-scrollbar{display:none;}
       `}</style>
       <div style={{width:"100%",maxWidth:430,background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
+        {phase==="checking" && (
+  <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg,color:T.text,fontWeight:700}}>
+    Loading DUBI...
+  </div>
+)}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
         {phase==="auth" && <AuthScreen onSuccess={() => setPhase("onboarding")} onBack={() => setPhase("welcome")} />}
         {phase==="onboarding" && <OnboardingScreen onComplete={handleComplete} isPremium={isPremium} onPremiumRequired={handlePremiumUpgrade}/>}
