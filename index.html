@@ -9282,7 +9282,9 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
 };
 
 function DUBIApp() {
-  const [phase,setPhase] = useState("welcome");
+  const [phase,setPhase] = useState(() => {
+  return localStorage.getItem("dubi_token") ? "onboarding" : "welcome";
+});
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
   const [plan,setPlan] = useState(null);
@@ -9292,6 +9294,12 @@ function DUBIApp() {
   const [safetyReview,setSafetyReview] = useState(null);
   const [isPremium,setIsPremium] = useState(false);
   const handlePremiumUpgrade = () => setIsPremium(true);
+  const handleLogout = () => {
+  localStorage.removeItem("dubi_token");
+  setUserData(null);
+  setPlan(null);
+  setPhase("welcome");
+};
   const [swaps, setSwaps] = useState({});
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
