@@ -9393,6 +9393,24 @@ function DUBIApp() {
               {activeTab==="sources"  && <SourcesScreen />}
               {activeTab==="settings" && <SettingsScreen userData={userData} plan={plan} isPremium={isPremium} onUpgrade={handlePremiumUpgrade} />}
             </div>
+            <button
+  onClick={handleLogout}
+  style={{
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 20,
+    border: `1px solid ${T.border}`,
+    background: T.card,
+    color: T.text,
+    borderRadius: 999,
+    padding: "8px 12px",
+    fontSize: 12,
+    fontWeight: 700
+  }}
+>
+  Logout
+</button>
             <BottomNav active={activeTab} onChange={setActiveTab} />
             {showWrap && <WrapScreen userData={userData} plan={plan} onClose={()=>setShowWrap(false)} />}
           </>
