@@ -5519,7 +5519,195 @@ const WelcomeScreen = ({onStart}) => {
     </div>
   </div>
 );};
+    const AuthScreen = ({ onSuccess, onBack }) => {
+  const { t } = useT();
+  const [mode, setMode] = useState("register");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  const handleAuth = async () => {
+    setError("");
+
+    if (!email || !password) {
+      setError("Please enter email and password.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let response = await fetch(`${API_BASE_URL}/auth/${mode === "register" ? "register" : "login"}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          age: 25,
+          weight: 75,
+          height: 180,
+          goal: "fitness"
+        })
+      });
+
+      let data = await response.json();
+
+      if (!response.ok && mode === "register") {
+        response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email,
+            password
+          })
+        });
+
+        data = await response.json();
+      }
+
+      if (data.token) {
+        localStorage.setItem("dubi_token", data.token);
+        onSuccess();
+        return;
+      }
+
+      setError(data.error || "Authentication failed.");
+    } catch (err) {
+      console.error("Auth error:", err);
+      setError("Connection error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column",justifyContent:"center",padding:"28px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:42}}>
+        <DUBILogo size={52} variant="dark"/>
+        <div>
+          <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:32,fontWeight:800,color:T.text,margin:0}}>DUBI</h1>
+          <p style={{fontSize:9,color:T.muted,letterSpacing:1.8,textTransform:"uppercase",margin:0}}>Create your account</p>
+        </div>
+      </div>
+
+      <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:34,fontWeight:800,color:T.text,lineHeight:1.05,margin:"0 0 12px"}}>
+        {mode === "register" ? "Start your personalized plan." : "Welcome back."}
+      </h2>
+
+      <p style={{fontSize:15,color:T.muted,lineHeight:1.6,margin:"0 0 28px"}}>
+        {mode === "register"
+          ? "Create an account to save your onboarding, profile and nutrition plan."
+          : "Log in to continue with your DUBI profile."}
+      </p>
+
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        <button onClick={() => setMode("register")} style={{
+          flex:1,
+          padding:"12px",
+          borderRadius:20,
+          border:`1px solid ${T.border}`,
+          background:mode==="register"?T.text:T.card,
+          color:mode==="register"?T.bg:T.text,
+          fontWeight:700
+        }}>
+          Sign up
+        </button>
+
+        <button onClick={() => setMode("login")} style={{
+          flex:1,
+          padding:"12px",
+          borderRadius:20,
+          border:`1px solid ${T.border}`,
+          background:mode==="login"?T.text:T.card,
+          color:mode==="login"?T.bg:T.text,
+          fontWeight:700
+        }}>
+          Login
+        </button>
+      </div>
+
+      <input
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        type="email"
+        style={{
+          width:"100%",
+          padding:"16px",
+          borderRadius:18,
+          border:`1px solid ${T.border}`,
+          background:T.card,
+          color:T.text,
+          fontSize:15,
+          marginBottom:12,
+          boxSizing:"border-box"
+        }}
+      />
+
+      <input
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        type="password"
+        style={{
+          width:"100%",
+          padding:"16px",
+          borderRadius:18,
+          border:`1px solid ${T.border}`,
+          background:T.card,
+          color:T.text,
+          fontSize:15,
+          marginBottom:12,
+          boxSizing:"border-box"
+        }}
+      />
+
+      {error && (
+        <div style={{color:"#B91C1C",fontSize:13,marginBottom:14}}>
+          {error}
+        </div>
+      )}
+
+      <button onClick={handleAuth} disabled={loading} style={{
+        width:"100%",
+        padding:"16px 22px",
+        borderRadius:50,
+        border:"none",
+        background:T.text,
+        color:T.bg,
+        fontWeight:800,
+        fontSize:15,
+        marginTop:8,
+        opacity:loading ? 0.7 : 1
+      }}>
+        {loading ? "Loading..." : mode === "register" ? "Create account" : "Login"}
+      </button>
+
+      <button onClick={onBack} style={{
+        width:"100%",
+        padding:"14px",
+        borderRadius:50,
+        border:"none",
+        background:"transparent",
+        color:T.muted,
+        fontWeight:600,
+        marginTop:12
+      }}>
+        Back
+      </button>
+    </div>
+  );
+};
 // ═══════════════════════════════════════════════
 // ONBOARDING
 // ═══════════════════════════════════════════════
@@ -9146,6 +9334,7 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
 
 function DUBIApp() {
   const [phase,setPhase] = useState("welcome");
+  const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
   const [plan,setPlan] = useState(null);
   const [activeTab,setActiveTab] = useState("today");
@@ -9201,12 +9390,8 @@ function DUBIApp() {
         ::-webkit-scrollbar{display:none;}
       `}</style>
       <div style={{width:"100%",maxWidth:430,background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
-        {phase==="welcome" && <WelcomeScreen onStart={async () => {
-  const token = await registerOrLoginUser();
-  if (token) {
-    setPhase("onboarding");
-  }
-}} />}
+        {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
+        {phase==="auth" && <AuthScreen onSuccess={() => setPhase("onboarding")} onBack={() => setPhase("welcome")} />}
         {phase==="onboarding" && <OnboardingScreen onComplete={handleComplete} isPremium={isPremium} onPremiumRequired={handlePremiumUpgrade}/>}
         {phase==="safety" && safetyReview && (
           <SafetyReviewScreen
