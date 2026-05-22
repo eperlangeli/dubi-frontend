@@ -92,7 +92,70 @@
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
+const API_BASE_URL = "https://dubi-backend.onrender.com";
 
+const getAuthToken = () => {
+  return localStorage.getItem("dubi_token") || "";
+};
+
+const saveOnboardingToBackend = async (data) => {
+  const token = getAuthToken();
+
+  if (!token) {
+    console.warn("No auth token found. Onboarding saved locally only.");
+    return null;
+  }
+
+  const payload = {
+    name: data.name || "",
+    gender: data.gender === "M" ? "male" : data.gender === "F" ? "female" : data.gender,
+    age: Number(data.age),
+    height: Number(data.height),
+    weight: Number(data.weight),
+
+    goal: data.goal,
+    target_weight: data.targetWeight ? Number(data.targetWeight) : null,
+    target_body_fat: data.targetBf ? Number(data.targetBf) : null,
+
+    competition_sport: data.competitionSport || null,
+    competition_date: data.competitionDate || null,
+
+    occupation: data.occupation,
+    workout_days: parseInt(String(data.workoutDays).split("-")[0], 10),
+    workout_duration: data.workoutDuration,
+    workout_intensity: data.workoutIntensity,
+    daily_steps: data.dailySteps,
+    sedentary_days: parseInt(String(data.sedentaryDays).split("-")[0], 10),
+
+    diet: data.diet,
+    allergies: data.allergies || "",
+    sport: data.sport || "",
+    training_time: data.trainingTime,
+    breakfast_pref: data.breakfastPref,
+
+    day_start: `${String(data.dayStart).padStart(2, "0")}:00`,
+    day_end: `${String(data.dayEnd).padStart(2, "0")}:00`,
+
+    wearable_provider: data.wearable || "none"
+  };
+
+  const response = await fetch(`${API_BASE_URL}/api/onboarding/save`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    console.error("Failed to save onboarding:", err);
+    return null;
+  }
+
+  return await response.json();
+};
 const T = {
   bg:"#FAF9F7", card:"#F5F3EF", border:"#E7E2DA",
   text:"#2B2B2B", muted:"#9A9490", accent:"#A8B3A1",
