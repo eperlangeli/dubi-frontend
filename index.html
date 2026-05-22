@@ -5485,9 +5485,9 @@ const WelcomeScreen = ({onStart}) => {
     }
 
     if (password.length < 6) {
-  setError("Password must be at least 6 characters.");
-  return;
-}
+      setError("Password must be at least 6 characters.");
+      return;
+    }
 
     setLoading(true);
 
@@ -5525,62 +5525,38 @@ const WelcomeScreen = ({onStart}) => {
       }
 
       if (data.token) {
-  localStorage.setItem("dubi_token", data.token);
+        localStorage.setItem("dubi_token", data.token);
 
-  try {
-    const onboardingResponse = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${data.token}`
-      }
-    });
+        try {
+          const onboardingResponse = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${data.token}`
+            }
+          });
 
-    if (onboardingResponse.ok) {
-      const onboardingData = await onboardingResponse.json();
+          if (onboardingResponse.ok) {
+            const onboardingData = await onboardingResponse.json();
 
-      if (onboardingData.onboarding) {
-        onSuccess(onboardingData.onboarding);
+            if (onboardingData.onboarding) {
+              onSuccess(onboardingData.onboarding);
+              return;
+            }
+          }
+        } catch (onboardingError) {
+          console.warn("Onboarding check after login failed:", onboardingError);
+        }
+
+        onSuccess(null);
         return;
-      }
-    }
-  } catch (err) {
-    console.warn("Onboarding check after login failed:", err);
-  }
-
-  onSuccess(null);
-  return;
-}
-
-  try {
-    const onboardingResponse = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${data.token}`
-      }
-    });
-
-    if (onboardingResponse.ok) {
-      const onboardingData = await onboardingResponse.json();
-
-      if (onboardingData.onboarding) {
-        onSuccess(onboardingData.onboarding);
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn("Onboarding check after login failed:", err);
-  }
-
-  onSuccess(null);
-  return;
-}
       }
 
       if (mode === "register") {
-  setError(data.error || "This email may already be registered. Try Login, or use a password with at least 6 characters.");
-} else {
-  setError(data.error || "Invalid email or password. Please check your credentials.");
-}
+        setError(data.error || "This email may already be registered. Try Login, or use a password with at least 6 characters.");
+      } else {
+        setError(data.error || "Invalid email or password. Please check your credentials.");
+      }
+
     } catch (err) {
       console.error("Auth error:", err);
       setError("Connection error. Please try again.");
