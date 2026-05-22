@@ -93,6 +93,57 @@
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 const API_BASE_URL = "https://dubi-backend.onrender.com";
+    const registerOrLoginUser = async () => {
+  const email = window.prompt("Enter your email:");
+  if (!email) return null;
+
+  const password = window.prompt("Create or enter your password:");
+  if (!password) return null;
+
+  try {
+    let response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        age: 25,
+        weight: 75,
+        height: 180,
+        goal: "fitness"
+      })
+    });
+
+    if (!response.ok) {
+      response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
+      });
+    }
+
+    const data = await response.json();
+
+    if (data.token) {
+      localStorage.setItem("dubi_token", data.token);
+      return data.token;
+    }
+
+    alert(data.error || "Login failed");
+    return null;
+  } catch (error) {
+    console.error("Auth error:", error);
+    alert("Connection error. Please try again.");
+    return null;
+  }
+};
 
 const getAuthToken = () => {
   return localStorage.getItem("dubi_token") || "";
@@ -9150,7 +9201,12 @@ function DUBIApp() {
         ::-webkit-scrollbar{display:none;}
       `}</style>
       <div style={{width:"100%",maxWidth:430,background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
-        {phase==="welcome" && <WelcomeScreen onStart={()=>setPhase("onboarding")} />}
+        {phase==="welcome" && <WelcomeScreen onStart={async () => {
+  const token = await registerOrLoginUser();
+  if (token) {
+    setPhase("onboarding");
+  }
+}} />}
         {phase==="onboarding" && <OnboardingScreen onComplete={handleComplete} isPremium={isPremium} onPremiumRequired={handlePremiumUpgrade}/>}
         {phase==="safety" && safetyReview && (
           <SafetyReviewScreen
