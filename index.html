@@ -5525,9 +5525,31 @@ const WelcomeScreen = ({onStart}) => {
       }
 
       if (data.token) {
-        localStorage.setItem("dubi_token", data.token);
-        onSuccess();
+  localStorage.setItem("dubi_token", data.token);
+
+  try {
+    const onboardingResponse = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${data.token}`
+      }
+    });
+
+    if (onboardingResponse.ok) {
+      const onboardingData = await onboardingResponse.json();
+
+      if (onboardingData.onboarding) {
+        onSuccess(onboardingData.onboarding);
         return;
+      }
+    }
+  } catch (err) {
+    console.warn("Onboarding check after login failed:", err);
+  }
+
+  onSuccess(null);
+  return;
+}
       }
 
       setError(data.error || "Authentication failed.");
@@ -9391,7 +9413,16 @@ function DUBIApp() {
   </div>
 )}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
-        {phase==="auth" && <AuthScreen onSuccess={() => setPhase("onboarding")} onBack={() => setPhase("welcome")} />}
+        {phase==="auth" && <AuthScreen onSuccess={(existingOnboarding) => {
+  if (existingOnboarding) {
+    setUserData(existingOnboarding);
+    const generatedPlan = generatePlan(existingOnboarding);
+    setPlan(generatedPlan);
+    setPhase("app");
+  } else {
+    setPhase("onboarding");
+  }
+}} onBack={() => setPhase("welcome")} />}
         {phase==="onboarding" && <OnboardingScreen onComplete={handleComplete} isPremium={isPremium} onPremiumRequired={handlePremiumUpgrade}/>}
         {phase==="safety" && safetyReview && (
           <SafetyReviewScreen
