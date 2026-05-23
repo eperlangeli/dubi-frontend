@@ -93,7 +93,43 @@
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 const API_BASE_URL = "https://dubi-backend.onrender.com";
-  
+
+    const normalizeOnboarding = (data) => {
+  if (!data) return null;
+
+  const parseHour = (value, fallback) => {
+    if (!value) return fallback;
+    if (typeof value === "number") return value;
+    const hour = parseInt(String(value).split(":")[0], 10);
+    return Number.isFinite(hour) ? hour : fallback;
+  };
+
+  return {
+    ...data,
+
+    gender: data.gender === "male" ? "M" : data.gender === "female" ? "F" : data.gender,
+
+    targetWeight: data.target_weight ?? data.targetWeight ?? null,
+    targetBf: data.target_body_fat ?? data.targetBf ?? null,
+
+    competitionSport: data.competition_sport ?? data.competitionSport ?? null,
+    competitionDate: data.competition_date ?? data.competitionDate ?? null,
+
+    workoutDays: data.workout_days != null ? String(data.workout_days) : (data.workoutDays || "0"),
+    workoutDuration: data.workout_duration ?? data.workoutDuration ?? "45-60",
+    workoutIntensity: data.workout_intensity ?? data.workoutIntensity ?? "moderata",
+    dailySteps: data.daily_steps ?? data.dailySteps ?? "unknown",
+    sedentaryDays: data.sedentary_days ?? data.sedentaryDays ?? 0,
+
+    trainingTime: data.training_time ?? data.trainingTime ?? "varies",
+    breakfastPref: data.breakfast_pref ?? data.breakfastPref ?? "both",
+
+    dayStart: parseHour(data.day_start ?? data.dayStart, 7),
+    dayEnd: parseHour(data.day_end ?? data.dayEnd, 22),
+
+    wearable: data.wearable_provider ?? data.wearable ?? "none"
+  };
+};
 const getAuthToken = () => {
   return localStorage.getItem("dubi_token") || "";
 };
@@ -5535,7 +5571,7 @@ const WelcomeScreen = ({onStart}) => {
           if (onboardingResponse.ok) {
             const onboardingData = await onboardingResponse.json();
             if (onboardingData.onboarding) {
-              onSuccess(onboardingData.onboarding);
+              onSuccess(normalizeOnboarding(onboardingData.onboarding));
               return;
             }
           }
@@ -9334,7 +9370,12 @@ function DUBIApp() {
         const data = await response.json();
 
         if (data.onboarding) {
-          setUserData(data.onboarding);
+          const normalizedOnboarding = normalizeOnboarding(data.onboarding);
+
+setUserData(normalizedOnboarding);
+
+const generatedPlan = calcPlan(normalizedOnboarding);
+setPlan(generatedPlan);
 
           const generatedPlan = calcPlan(data.onboarding);
           setPlan(generatedPlan);
