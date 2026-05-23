@@ -9374,11 +9374,8 @@ function DUBIApp() {
 
 setUserData(normalizedOnboarding);
 
-const generatedPlan = calcPlan(normalizedOnboarding);
-setPlan(generatedPlan);
-
-          const generatedPlan = calcPlan(data.onboarding);
-          setPlan(generatedPlan);
+const sessionPlan = calcPlan(normalizedOnboarding);
+setPlan(sessionPlan);
 
           setPhase("app");
           return;
