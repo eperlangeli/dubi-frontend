@@ -9377,37 +9377,55 @@ const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgr
 const [profileMessage, setProfileMessage] = useState("");
 const [savingProfile, setSavingProfile] = useState(false);
 
-const [profileForm, setProfileForm] = useState({
-  name: userData?.name || "",
-  age: userData?.age || "",
-  height: userData?.height || "",
-  weight: userData?.weight || "",
-  goal: userData?.goal || "",
-  target_weight: userData?.target_weight || "",
-  daily_steps: userData?.daily_steps || "",
-  allergies: userData?.allergies || "",
-  sport: userData?.sport || "",
-  diet: userData?.diet || ""
-});
+
   const handleProfileFieldChange = (field, value) => {
   setProfileForm(prev => ({
     ...prev,
     [field]: value
   }));
 };
-
+const [profileForm, setProfileForm] = useState({
+  name: userData?.name || "",
+  gender: userData?.gender || "",
+  age: userData?.age || "",
+  height: userData?.height || "",
+  weight: userData?.weight || "",
+  goal: userData?.goal || "",
+  target_weight: userData?.target_weight || "",
+  target_body_fat: userData?.target_body_fat || "",
+  competition_sport: userData?.competition_sport || "",
+  competition_date: userData?.competition_date || "",
+  occupation: userData?.occupation || "",
+  workout_days: userData?.workout_days || "",
+  workout_duration: userData?.workout_duration || "",
+  workout_intensity: userData?.workout_intensity || "",
+  daily_steps: userData?.daily_steps || "",
+  sedentary_days: userData?.sedentary_days || "",
+  diet: userData?.diet || "",
+  allergies: userData?.allergies || "",
+  sport: userData?.sport || "",
+  training_time: userData?.training_time || "",
+  breakfast_pref: userData?.breakfast_pref || "",
+  day_start: userData?.day_start || "",
+  day_end: userData?.day_end || "",
+  wearable_provider: userData?.wearable_provider || ""
+});
 const handleSaveProfile = async () => {
   setProfileMessage("");
 
   const updatedData = {
-    ...userData,
-    ...profileForm,
-    age: Number(profileForm.age || userData?.age || 0),
-    height: Number(profileForm.height || userData?.height || 0),
-    weight: Number(profileForm.weight || userData?.weight || 0),
-    target_weight: profileForm.target_weight ? Number(profileForm.target_weight) : null,
-    daily_steps: profileForm.daily_steps ? Number(profileForm.daily_steps) : null
-  };
+  ...userData,
+  ...profileForm,
+  age: profileForm.age ? Number(profileForm.age) : null,
+  height: profileForm.height ? Number(profileForm.height) : null,
+  weight: profileForm.weight ? Number(profileForm.weight) : null,
+  target_weight: profileForm.target_weight ? Number(profileForm.target_weight) : null,
+  target_body_fat: profileForm.target_body_fat ? Number(profileForm.target_body_fat) : null,
+  workout_days: profileForm.workout_days ? Number(profileForm.workout_days) : null,
+  workout_duration: profileForm.workout_duration ? Number(profileForm.workout_duration) : null,
+  daily_steps: profileForm.daily_steps ? Number(profileForm.daily_steps) : null,
+  sedentary_days: profileForm.sedentary_days ? Number(profileForm.sedentary_days) : null
+};
 
   setSavingProfile(true);
 
@@ -9482,7 +9500,7 @@ const handleSaveProfile = async () => {
       </div>
 
       <div style={{padding:"0 20px"}}>
-        {/* Profile & Preferences editor */}
+        {/* Edit onboarding answers */}
 <div style={{
   background:T.card,
   border:`1px solid ${T.border}`,
@@ -9493,10 +9511,10 @@ const handleSaveProfile = async () => {
   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
     <div>
       <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
-        Profile & Preferences
+        Edit onboarding answers
       </p>
-      <p style={{margin:"4px 0 0",fontSize:11,color:T.muted}}>
-        Edit your onboarding data and refresh your plan.
+      <p style={{margin:"4px 0 0",fontSize:11,color:T.muted,lineHeight:1.4}}>
+        Update your profile, goal, training, nutrition and wearable data. DUBI will refresh your plan.
       </p>
     </div>
 
@@ -9512,42 +9530,124 @@ const handleSaveProfile = async () => {
         fontWeight:800
       }}
     >
-      {editingProfile ? "Close" : "Edit"}
+      {editingProfile ? "Close" : "Open editor"}
     </button>
   </div>
 
   {editingProfile && (
-    <div style={{display:"grid",gap:10}}>
+    <div style={{display:"grid",gap:16}}>
+
       {[
-        ["name", "Name", "text"],
-        ["age", "Age", "number"],
-        ["height", "Height cm", "number"],
-        ["weight", "Weight kg", "number"],
-        ["goal", "Goal", "text"],
-        ["target_weight", "Target weight kg", "number"],
-        ["daily_steps", "Daily steps", "number"],
-        ["allergies", "Allergies", "text"],
-        ["sport", "Sport", "text"],
-        ["diet", "Diet", "text"]
-      ].map(([field,label,type]) => (
-        <div key={field}>
-          <p style={{fontSize:11,color:T.muted,margin:"0 0 5px",fontWeight:700}}>
-            {label}
+        {
+          title:"Personal",
+          fields:[
+            ["name","Name","text"],
+            ["gender","Gender","select",["male","female","other"]],
+            ["age","Age","number"],
+            ["occupation","Occupation","text"]
+          ]
+        },
+        {
+          title:"Body & Goal",
+          fields:[
+            ["height","Height cm","number"],
+            ["weight","Weight kg","number"],
+            ["goal","Goal","select",["fatLoss","muscle","recomp","maintain","athletic"]],
+            ["target_weight","Target weight kg","number"],
+            ["target_body_fat","Target body fat %","number"],
+            ["competition_sport","Competition sport","text"],
+            ["competition_date","Competition date","date"]
+          ]
+        },
+        {
+          title:"Training",
+          fields:[
+            ["sport","Sport","text"],
+            ["workout_days","Workout days per week","number"],
+            ["workout_duration","Workout duration minutes","number"],
+            ["workout_intensity","Workout intensity","select",["low","medium","high"]],
+            ["training_time","Training time","select",["morning","afternoon","evening","night"]]
+          ]
+        },
+        {
+          title:"Lifestyle",
+          fields:[
+            ["daily_steps","Average daily steps","number"],
+            ["sedentary_days","Sedentary days per week","number"],
+            ["day_start","Day start time","time"],
+            ["day_end","Day end time","time"]
+          ]
+        },
+        {
+          title:"Nutrition",
+          fields:[
+            ["diet","Diet preference","select",["standard","vegetarian","vegan","pescatarian","halal","kosher","keto","mediterranean"]],
+            ["allergies","Allergies / foods to avoid","text"],
+            ["breakfast_pref","Breakfast preference","select",["yes","no","sometimes"]]
+          ]
+        },
+        {
+          title:"Wearable",
+          fields:[
+            ["wearable_provider","Wearable provider","select",["none","apple","whoop","garmin","oura","fitbit","polar","suunto","samsung","google"]]
+          ]
+        }
+      ].map(section => (
+        <div key={section.title} style={{
+          borderTop:`1px solid ${T.border}`,
+          paddingTop:14
+        }}>
+          <p style={{fontSize:12,fontWeight:900,color:T.text,margin:"0 0 10px"}}>
+            {section.title}
           </p>
-          <input
-            type={type}
-            value={profileForm[field]}
-            onChange={e=>handleProfileFieldChange(field,e.target.value)}
-            style={{
-              width:"100%",
-              padding:"11px 12px",
-              borderRadius:12,
-              border:`1.5px solid ${T.border}`,
-              background:T.bg,
-              color:T.text,
-              fontSize:13
-            }}
-          />
+
+          <div style={{display:"grid",gap:10}}>
+            {section.fields.map(([field,label,type,options]) => (
+              <div key={field}>
+                <p style={{fontSize:11,color:T.muted,margin:"0 0 5px",fontWeight:700}}>
+                  {label}
+                </p>
+
+                {type === "select" ? (
+                  <select
+                    value={profileForm[field]}
+                    onChange={e=>handleProfileFieldChange(field,e.target.value)}
+                    style={{
+                      width:"100%",
+                      padding:"11px 12px",
+                      borderRadius:12,
+                      border:`1.5px solid ${T.border}`,
+                      background:T.bg,
+                      color:T.text,
+                      fontSize:13
+                    }}
+                  >
+                    <option value="">Select</option>
+                    {options.map(option => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={type}
+                    value={profileForm[field]}
+                    onChange={e=>handleProfileFieldChange(field,e.target.value)}
+                    style={{
+                      width:"100%",
+                      padding:"11px 12px",
+                      borderRadius:12,
+                      border:`1.5px solid ${T.border}`,
+                      background:T.bg,
+                      color:T.text,
+                      fontSize:13
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       ))}
 
@@ -9556,13 +9656,13 @@ const handleSaveProfile = async () => {
         disabled={savingProfile}
         style={{
           width:"100%",
-          marginTop:8,
-          padding:"13px 16px",
+          marginTop:4,
+          padding:"14px 16px",
           borderRadius:14,
           border:"none",
           background:T.text,
           color:T.bg,
-          fontWeight:800,
+          fontWeight:900,
           fontSize:14,
           opacity:savingProfile ? 0.7 : 1
         }}
@@ -9574,7 +9674,7 @@ const handleSaveProfile = async () => {
         <p style={{
           fontSize:12,
           color:profileMessage.includes("successfully") ? "#2F855A" : "#B91C1C",
-          margin:"2px 0 0"
+          margin:"0"
         }}>
           {profileMessage}
         </p>
