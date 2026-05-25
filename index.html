@@ -6625,7 +6625,7 @@ const normalizeInitialOnboardingData = (source) => {
 const [data, setData] = useState(() => normalizeInitialOnboardingData(initialData));
   useEffect(() => {
   if (isEditing) {
-    setFormData((prev) => ({
+    setData((prev) => ({
       ...prev,
       dayStart: safeTime(prev.dayStart || prev.day_start, "07:00"),
       dayEnd: safeTime(prev.dayEnd || prev.day_end, "22:00"),
