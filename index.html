@@ -6459,20 +6459,71 @@ const WearableStep = ({d,u}) => {
 );};
 
 const STEP_NAMES_KEYS = ["onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
-const OnboardingScreen = ({onComplete, isPremium, onPremiumRequired}) => {
+const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing = false }) => {
   const { t, lang } = useT();
 
   const [step,setStep] = useState(0);
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [step]);
-  const [data,setData] = useState({
-    gender:"M",age:30,height:175,weight:78,goal:"fatLoss",competitionSport:"endurance",competitionDate:"",targetWeight:"",targetBf:"",
-    occupation:"sedentary",workoutDays:"3-4",workoutDuration:"45-60",workoutIntensity:"moderata",dailySteps:"6000-8000",sedentaryDays:"2-3",
-    diet:"omnivore",allergies:"",sport:"",trainingTime:"sera",breakfastPref:"entrambi",
-    dayStart:7, dayEnd:22,
-    wearable:"apple",
-  });
+  const defaultOnboardingData = {
+  gender:"M",
+  age:30,
+  height:175,
+  weight:78,
+  goal:"fatLoss",
+  targetWeight:"",
+  targetBodyFat:"",
+  competitionSport:"endurance",
+  competitionDate:"",
+  occupation:"sedentary",
+  workoutDays:"3-4",
+  workoutDuration:"45-60",
+  workoutIntensity:"moderate",
+  dailySteps:"",
+  sedentaryDays:"",
+  diet:"omnivore",
+  allergies:"",
+  sport:"",
+  trainingTime:"sera",
+  breakfastPref:"entrambi",
+  dayStart:7,
+  dayEnd:22,
+  wearable:"apple"
+};
+
+const normalizeInitialOnboardingData = (source) => {
+  if (!source) return defaultOnboardingData;
+
+  return {
+    ...defaultOnboardingData,
+    gender: source.gender || defaultOnboardingData.gender,
+    age: source.age || defaultOnboardingData.age,
+    height: source.height || defaultOnboardingData.height,
+    weight: source.weight || defaultOnboardingData.weight,
+    goal: source.goal || defaultOnboardingData.goal,
+    targetWeight: source.target_weight || source.targetWeight || "",
+    targetBodyFat: source.target_body_fat || source.targetBodyFat || "",
+    competitionSport: source.competition_sport || source.competitionSport || "",
+    competitionDate: source.competition_date || source.competitionDate || "",
+    occupation: source.occupation || defaultOnboardingData.occupation,
+    workoutDays: source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
+    workoutDuration: source.workout_duration || source.workoutDuration || defaultOnboardingData.workoutDuration,
+    workoutIntensity: source.workout_intensity || source.workoutIntensity || defaultOnboardingData.workoutIntensity,
+    dailySteps: source.daily_steps || source.dailySteps || "",
+    sedentaryDays: source.sedentary_days || source.sedentaryDays || "",
+    diet: source.diet || defaultOnboardingData.diet,
+    allergies: source.allergies || "",
+    sport: source.sport || "",
+    trainingTime: source.training_time || source.trainingTime || defaultOnboardingData.trainingTime,
+    breakfastPref: source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref,
+    dayStart: source.day_start || source.dayStart || defaultOnboardingData.dayStart,
+    dayEnd: source.day_end || source.dayEnd || defaultOnboardingData.dayEnd,
+    wearable: source.wearable_provider || source.wearable || defaultOnboardingData.wearable
+  };
+};
+
+const [data, setData] = useState(() => normalizeInitialOnboardingData(initialData));
   const u = (k,v) => setData(p=>({...p,[k]:v}));
   const content = [
     <PhysicalStep d={data} u={u}/>,
@@ -9370,7 +9421,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
 // ═══════════════════════════════════════════════
 // SETTINGS SCREEN
 // ═══════════════════════════════════════════════
-const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgrade, onLogout}) => {
+const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgrade, onLogout, onEditOnboarding}) => {
   const { t, lang, setLang } = useT();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -9500,7 +9551,7 @@ const handleSaveProfile = async () => {
       </div>
 
       <div style={{padding:"0 20px"}}>
-        {/* Edit onboarding answers */}
+      {/* Edit onboarding answers */}
 <div style={{
   background:T.card,
   border:`1px solid ${T.border}`,
@@ -9508,177 +9559,32 @@ const handleSaveProfile = async () => {
   padding:16,
   marginBottom:16
 }}>
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-    <div>
-      <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
-        Edit onboarding answers
-      </p>
-      <p style={{margin:"4px 0 0",fontSize:11,color:T.muted,lineHeight:1.4}}>
-        Update your profile, goal, training, nutrition and wearable data. DUBI will refresh your plan.
-      </p>
-    </div>
+  <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
+    Edit onboarding answers
+  </p>
+  <p style={{margin:"6px 0 14px",fontSize:11,color:T.muted,lineHeight:1.4}}>
+    Update your profile, goals, training, nutrition and wearable preferences using the onboarding flow.
+  </p>
 
-    <button
-      onClick={()=>setEditingProfile(!editingProfile)}
-      style={{
-        padding:"8px 12px",
-        borderRadius:12,
-        border:`1px solid ${T.border}`,
-        background:T.bg,
-        color:T.text,
-        fontSize:12,
-        fontWeight:800
-      }}
-    >
-      {editingProfile ? "Close" : "Open editor"}
-    </button>
-  </div>
-
-  {editingProfile && (
-    <div style={{display:"grid",gap:16}}>
-
-      {[
-        {
-          title:"Personal",
-          fields:[
-            ["name","Name","text"],
-            ["gender","Gender","select",["male","female","other"]],
-            ["age","Age","number"],
-            ["occupation","Occupation","text"]
-          ]
-        },
-        {
-          title:"Body & Goal",
-          fields:[
-            ["height","Height cm","number"],
-            ["weight","Weight kg","number"],
-            ["goal","Goal","select",["fatLoss","muscle","recomp","maintain","athletic"]],
-            ["target_weight","Target weight kg","number"],
-            ["target_body_fat","Target body fat %","number"],
-            ["competition_sport","Competition sport","text"],
-            ["competition_date","Competition date","date"]
-          ]
-        },
-        {
-          title:"Training",
-          fields:[
-            ["sport","Sport","text"],
-            ["workout_days","Workout days per week","number"],
-            ["workout_duration","Workout duration minutes","number"],
-            ["workout_intensity","Workout intensity","select",["low","medium","high"]],
-            ["training_time","Training time","select",["morning","afternoon","evening","night"]]
-          ]
-        },
-        {
-          title:"Lifestyle",
-          fields:[
-            ["daily_steps","Average daily steps","number"],
-            ["sedentary_days","Sedentary days per week","number"],
-            ["day_start","Day start time","time"],
-            ["day_end","Day end time","time"]
-          ]
-        },
-        {
-          title:"Nutrition",
-          fields:[
-            ["diet","Diet preference","select",["standard","vegetarian","vegan","pescatarian","halal","kosher","keto","mediterranean"]],
-            ["allergies","Allergies / foods to avoid","text"],
-            ["breakfast_pref","Breakfast preference","select",["yes","no","sometimes"]]
-          ]
-        },
-        {
-          title:"Wearable",
-          fields:[
-            ["wearable_provider","Wearable provider","select",["none","apple","whoop","garmin","oura","fitbit","polar","suunto","samsung","google"]]
-          ]
-        }
-      ].map(section => (
-        <div key={section.title} style={{
-          borderTop:`1px solid ${T.border}`,
-          paddingTop:14
-        }}>
-          <p style={{fontSize:12,fontWeight:900,color:T.text,margin:"0 0 10px"}}>
-            {section.title}
-          </p>
-
-          <div style={{display:"grid",gap:10}}>
-            {section.fields.map(([field,label,type,options]) => (
-              <div key={field}>
-                <p style={{fontSize:11,color:T.muted,margin:"0 0 5px",fontWeight:700}}>
-                  {label}
-                </p>
-
-                {type === "select" ? (
-                  <select
-                    value={profileForm[field]}
-                    onChange={e=>handleProfileFieldChange(field,e.target.value)}
-                    style={{
-                      width:"100%",
-                      padding:"11px 12px",
-                      borderRadius:12,
-                      border:`1.5px solid ${T.border}`,
-                      background:T.bg,
-                      color:T.text,
-                      fontSize:13
-                    }}
-                  >
-                    <option value="">Select</option>
-                    {options.map(option => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type={type}
-                    value={profileForm[field]}
-                    onChange={e=>handleProfileFieldChange(field,e.target.value)}
-                    style={{
-                      width:"100%",
-                      padding:"11px 12px",
-                      borderRadius:12,
-                      border:`1.5px solid ${T.border}`,
-                      background:T.bg,
-                      color:T.text,
-                      fontSize:13
-                    }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <button
-        onClick={handleSaveProfile}
-        disabled={savingProfile}
-        style={{
-          width:"100%",
-          marginTop:4,
-          padding:"14px 16px",
-          borderRadius:14,
-          border:"none",
-          background:T.text,
-          color:T.bg,
-          fontWeight:900,
-          fontSize:14,
-          opacity:savingProfile ? 0.7 : 1
-        }}
-      >
-        {savingProfile ? "Saving..." : "Save changes & refresh plan"}
-      </button>
-
-      {profileMessage && (
-        <p style={{
-          fontSize:12,
-          color:profileMessage.includes("successfully") ? "#2F855A" : "#B91C1C",
-          margin:"0"
-        }}>
-          {profileMessage}
-        </p>
-      )}
+  <button
+    onClick={() => {
+    localStorage.setItem("dubi_edit_onboarding", "true");
+    onEditOnboarding();
+    }}
+    style={{
+      width:"100%",
+      padding:"13px 16px",
+      borderRadius:14,
+      border:"none",
+      background:T.text,
+      color:T.bg,
+      fontWeight:900,
+      fontSize:14
+    }}
+  >
+    Open onboarding editor
+  </button>
+</div>
     </div>
   )}
 </div>
@@ -10079,6 +9985,7 @@ const handleLogout = () => {
   const [consentData, setConsentData] = useState(null);
 
   const handleComplete = data => {
+    localStorage.removeItem("dubi_edit_onboarding");
     // Safety engine: rileva regole HARD/SOFT/COERENZA
     const sc = runSafetyChecks(data);
     if (sc.findings.length > 0) {
@@ -10090,6 +9997,7 @@ const handleLogout = () => {
   };
 
   const finalizeData = data => {
+    
     // Genera codice DUBI univoco se non esiste già
     if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
     // Salva profilo in localStorage per il collegamento con altri profili
@@ -10143,7 +10051,14 @@ const handleLogout = () => {
 }
 }} onBack={() => setPhase("welcome")} />}
 
-        {phase==="onboarding" && <OnboardingScreen onComplete={handleComplete} isPremium={isPremium} onPremiumRequired={handlePremiumUpgrade}/>}
+        {phase==="onboarding" && (
+  <OnboardingScreen
+    initialData={userData}
+    isEditing={localStorage.getItem("dubi_edit_onboarding") === "true"}
+    onComplete={handleComplete}
+    isPremium={isPremium}
+  />
+)}
         {phase==="safety" && safetyReview && (
           <SafetyReviewScreen
             findings={safetyReview.findings}
@@ -10188,7 +10103,21 @@ const handleLogout = () => {
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} />}
               {activeTab==="sources"  && <SourcesScreen />}
-              {activeTab==="settings" && <SettingsScreen userData={userData} setUserData={setUserData} plan={plan} setPlan={setPlan} isPremium={isPremium} onUpgrade={handlePremiumUpgrade} onLogout={handleLogout} />}
+              {activeTab==="settings" && (
+  <SettingsScreen
+    userData={userData}
+    setUserData={setUserData}
+    plan={plan}
+    setPlan={setPlan}
+    isPremium={isPremium}
+    onUpgrade={handlePremiumUpgrade}
+    onLogout={handleLogout}
+    onEditOnboarding={() => {
+  setActiveTab("today");
+  setPhase("onboarding");
+}}
+  />
+)}
             </div>
     
             <BottomNav active={activeTab} onChange={setActiveTab} />
