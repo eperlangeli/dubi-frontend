@@ -192,6 +192,46 @@ const saveOnboardingToBackend = async (data) => {
 
   return await response.json();
 };
+    const savePlanToBackend = async (plan, userData) => {
+  const token = getAuthToken();
+
+  if (!token || !plan) {
+    console.warn("No auth token or plan found. Plan not saved.");
+    return null;
+  }
+
+  const payload = {
+    calories: Number(plan.calories || plan.kcal || 0),
+    protein: Number(plan.protein || plan.proteins || 0),
+    carbs: Number(plan.carbs || 0),
+    fat: Number(plan.fat || plan.fats || 0),
+    meals_count: plan.meals ? plan.meals.length : 0,
+    goal: userData?.goal || null,
+    plan_json: plan
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/plans/save`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Failed to save plan:", err);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Plan save request failed:", error);
+    return null;
+  }
+};
 const T = {
   bg:"#FAF9F7", card:"#F5F3EF", border:"#E7E2DA",
   text:"#2B2B2B", muted:"#9A9490", accent:"#A8B3A1",
@@ -9431,7 +9471,10 @@ const handleLogout = () => {
     // Salva profilo in localStorage per il collegamento con altri profili
     saveDubiProfile(data);
     setUserData(data);
-    setPlan(calcPlan(data));
+
+    const generatedPlan = calcPlan(data);
+    setPlan(generatedPlan);
+    savePlanToBackend(generatedPlan, data);
     // Se under-18 → schermata consenso genitoriale, altrimenti → schermata consenso GDPR
     if (data.age && data.age < 18) {
       setPhase("minor");
