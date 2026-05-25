@@ -9350,6 +9350,11 @@ function DUBIApp() {
   const [plan,setPlan] = useState(null);
   const [activeTab,setActiveTab] = useState("today");
   useEffect(() => {
+  if (phase === "app") {
+    setActiveTab("today");
+  }
+}, [phase]);
+  useEffect(() => {
   const checkUserSession = async () => {
     const token = localStorage.getItem("dubi_token");
 
