@@ -6459,7 +6459,7 @@ const WearableStep = ({d,u}) => {
 );};
 
 const STEP_NAMES_KEYS = ["onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
-const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing = false }) => {
+const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing = false, onPremiumRequired = () => {} }) => {
   const { t, lang } = useT();
 
   const [step,setStep] = useState(0);
