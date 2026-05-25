@@ -2743,21 +2743,19 @@ const calcMealTimes = ({ dayStart, dayEnd, meals }) => {
   const mealCount = Math.max(1, Number(meals) || 5);
 
   if (end <= start) {
-    return ["07:00", "10:00", "13:00", "17:00", "20:00"]
-      .slice(0, mealCount)
-      .join(" · ");
+   return ["07:00", "10:00", "13:00", "17:00", "20:00"].slice(0, mealCount);
   }
 
   if (mealCount === 1) {
-    return `${String(start).padStart(2, "0")}:00`;
+    return [`${String(start).padStart(2, "0")}:00`];
   }
 
   const gap = (end - start) / (mealCount - 1);
 
   return Array.from({ length: mealCount }, (_, index) => {
-    const hour = Math.round(start + gap * index);
-    return `${String(hour).padStart(2, "0")}:00`;
-  }).join(" · ");
+  const hour = Math.round(start + gap * index);
+  return `${String(hour).padStart(2, "0")}:00`;
+});
 };
 
 function getMealSlots(mealCount) {
