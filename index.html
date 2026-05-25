@@ -6517,8 +6517,8 @@ const normalizeInitialOnboardingData = (source) => {
     sport: source.sport || "",
     trainingTime: source.training_time || source.trainingTime || defaultOnboardingData.trainingTime,
     breakfastPref: source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref,
-    dayStart: source.day_start || source.dayStart || defaultOnboardingData.dayStart,
-    dayEnd: source.day_end || source.dayEnd || defaultOnboardingData.dayEnd,
+    dayStart: source.day_start || source.dayStart || 7,
+    dayEnd: source.day_end || source.dayEnd || 22,
     wearable: source.wearable_provider || source.wearable || defaultOnboardingData.wearable
   };
 };
@@ -6532,6 +6532,12 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
     <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u}/>,
   ];
+  const safeHour = (value, fallback) => {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.includes(":")) return Number(value.split(":")[0]);
+  return Number(value) || fallback;
+};
   return (
     <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"56px 24px 0",position:"relative"}}>
