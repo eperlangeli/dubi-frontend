@@ -6557,6 +6557,40 @@ const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing
   wearable:"apple"
 };
 
+  const safeTime = (value, fallback = "07:00") => {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  if (typeof value === "string") {
+    if (value.includes(":")) {
+      const [hourRaw] = value.split(":");
+      const hour = parseInt(hourRaw, 10);
+
+      if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+        return `${String(hour).padStart(2, "0")}:00`;
+      }
+
+      return fallback;
+    }
+
+    const hour = parseInt(value, 10);
+
+    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+      return `${String(hour).padStart(2, "0")}:00`;
+    }
+
+    return fallback;
+  }
+
+  if (typeof value === "number" && !Number.isNaN(value)) {
+    const hour = Math.floor(value);
+
+    if (hour >= 0 && hour <= 23) {
+      return `${String(hour).padStart(2, "0")}:00`;
+    }
+  }
+
+  return fallback;
+};
 const normalizeInitialOnboardingData = (source) => {
   if (!source) return defaultOnboardingData;
 
@@ -6611,40 +6645,7 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
     <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u}/>,
   ];
-const safeTime = (value, fallback = "07:00") => {
-  if (value === null || value === undefined || value === "") return fallback;
 
-  if (typeof value === "string") {
-    if (value.includes(":")) {
-      const [hourRaw] = value.split(":");
-      const hour = parseInt(hourRaw, 10);
-
-      if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
-        return `${String(hour).padStart(2, "0")}:00`;
-      }
-
-      return fallback;
-    }
-
-    const hour = parseInt(value, 10);
-
-    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
-      return `${String(hour).padStart(2, "0")}:00`;
-    }
-
-    return fallback;
-  }
-
-  if (typeof value === "number" && !Number.isNaN(value)) {
-    const hour = Math.floor(value);
-
-    if (hour >= 0 && hour <= 23) {
-      return `${String(hour).padStart(2, "0")}:00`;
-    }
-  }
-
-  return fallback;
-};
   
   return (
     <>
