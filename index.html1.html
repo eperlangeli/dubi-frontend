@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="it" dir="ltr" id="dubi-html">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#FAF9F7" />
+  <title>DUBI — Data-Driven Understanding of Body Intelligence</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"
+          crossorigin="anonymous"
+          onerror="window._reactCDNFailed=true"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"
+          crossorigin="anonymous"
+          onerror="window._reactCDNFailed=true"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"
+          crossorigin="anonymous"
+          onerror="window._babelCDNFailed=true"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #FAF9F7; font-family: 'Inter', -apple-system, sans-serif; color-scheme: light; forced-color-adjust: none; }
+    #root { min-height: 100vh; }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #dubi-boot {
+      position: fixed; inset: 0;
+      background: #FAF9F7;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px;
+      z-index: 9999;
+      transition: opacity 0.3s ease;
+    }
+    #dubi-boot.hidden { opacity: 0; pointer-events: none; }
+    .dubi-boot-logo {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: #2B2B2B;
+    }
+    .dubi-boot-logo span { color: #6B8A64; }
+    .dubi-boot-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #E7E2DA;
+      border-top-color: #6B8A64;
+      border-radius: 50%;
+      animation: dubi-spin 0.8s linear infinite;
+    }
+    .dubi-boot-msg {
+      font-size: 13px; color: #9A9490; letter-spacing: 0.04em;
+    }
+    .dubi-boot-error {
+      font-size: 13px; color: #c0392b; text-align: center;
+      max-width: 280px; line-height: 1.5; display: none;
+    }
+    @keyframes dubi-spin { to { transform: rotate(360deg); } }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+    /* ✅ TOAST NOTIFICATION STYLES */
+    #dubi-toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      font-family: 'Inter', -apple-system, sans-serif;
+      max-width: 400px;
+      pointer-events: none;
+    }
+
+    .dubi-toast {
+      background: white;
+      color: #2B2B2B;
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      animation: slideInRight 0.3s ease;
+      pointer-events: auto;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      border-left: 4px solid #6B8A64;
+    }
+
+    .dubi-toast.success {
+      border-left-color: #10b981;
+    }
+
+    .dubi-toast.error {
+      border-left-color: #ef4444;
+    }
+
+    .dubi-toast.warning {
+      border-left-color: #f59e0b;
+    }
+
+    .dubi-toast.info {
+      border-left-color: #3b82f6;
+    }
+
+    .dubi-toast-icon {
+      font-weight: bold;
+      font-size: 18px;
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .dubi-toast.success .dubi-toast-icon { color: #10b981; }
+    .dubi-toast.error .dubi-toast-icon { color: #ef4444; }
+    .dubi-toast.warning .dubi-toast-icon { color: #f59e0b; }
+    .dubi-toast.info .dubi-toast-icon { color: #3b82f6; }
+
+    .dubi-toast-text {
+      flex: 1;
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+
+    .dubi-toast.exit {
+      animation: slideOutRight 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="dubi-boot">
+    <div class="dubi-boot-logo">DU<span>BI</span></div>
+    <div class="dubi-boot-spinner"></div>
+    <div class="dubi-boot-msg">Caricamento in corso…</div>
+    <div class="dubi-boot-error" id="dubi-boot-error">
+      Connessione assente o lenta.<br>
+      Assicurati di essere sulla stessa rete WiFi del computer e che il WiFi abbia accesso a internet.
+    </div>
+  </div>
+
+  <script>
+    window._dubiBootTimer = setTimeout(function() {
+      if (!window._dubiReady) {
+        var el = document.getElementById('dubi-boot-error');
+        if (el) el.style.display = 'block';
+        var spinner = document.querySelector('.dubi-boot-spinner');
+        if (spinner) spinner.style.display = 'none';
+      }
+    }, 12000);
+  </script>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ✅ TOAST NOTIFICATION SYSTEM
+    const Toast = (() => {
+      const container = (() => {
+        const div = document.createElement('div');
+        div.id = 'dubi-toast-container';
+        document.body.appendChild(div);
+        return div;
+      })();
+
+      const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+      };
+
+      const show = (message, type = 'info', duration = 4000) => {
+        const toast = document.createElement('div');
+        toast.className = `dubi-toast ${type}`;
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'dubi-toast-icon';
+        iconEl.textContent = icons[type] || icons.info;
+
+        const textEl = document.createElement('div');
+        textEl.className = 'dubi-toast-text';
+        textEl.textContent = message;
+
+        toast.appendChild(iconEl);
+        toast.appendChild(textEl);
+
+        container.appendChild(toast);
+
+        toast.addEventListener('click', () => {
+          toast.classList.add('exit');
+          setTimeout(() => toast.remove(), 300);
+        });
+
+        if (duration > 0) {
+          setTimeout(() => {
+            if (toast.parentNode) {
+              toast.classList.add('exit');
+              setTimeout(() => toast.remove(), 300);
+            }
+          }, duration);
+        }
+      };
+
+      return {
+        show,
+        success: (msg, duration) => show(msg, 'success', duration),
+        error: (msg, duration) => show(msg, 'error', duration),
+        warning: (msg, duration) => show(msg, 'warning', duration),
+        info: (msg, duration) => show(msg, 'info', duration)
+      };
+    })();
+
+    // ✅ API CLIENT WITH CENTRALIZED ERROR HANDLING
+    const ApiClient = {
+      baseURL: process.env.REACT_APP_API_URL || 'https://dubi-backend.onrender.com',
+
+      async request(method, endpoint, body = null) {
+        try {
+          const token = localStorage.getItem('dubi_token');
+          const url = `${this.baseURL}${endpoint}`;
+
+          const config = {
+            method,
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            }
+          };
+
+          if (body) {
+            config.body = JSON.stringify(body);
+          }
+
+          const response = await fetch(url, config);
+          const data = await response.json();
+
+          if (!response.ok) {
+            const error = new Error(data.error || `API Error: ${response.status}`);
+            error.status = response.status;
+            error.details = data.details || null;
+            throw error;
+          }
+
+          return data;
+        } catch (error) {
+          if (error instanceof Error && error.status) {
+            throw error;
+          }
+          const newError = new Error(error.message || 'Network error');
+          newError.status = 0;
+          throw newError;
+        }
+      },
+
+      get(endpoint) {
+        return this.request('GET', endpoint);
+      },
+
+      post(endpoint, body) {
+        return this.request('POST', endpoint, body);
+      },
+
+      patch(endpoint, body) {
+        return this.request('PATCH', endpoint, body);
+      },
+
+      delete(endpoint) {
+        return this.request('DELETE', endpoint);
+      }
+    };
+
+    // ✅ CENTRALIZED ERROR HANDLER
+    const ErrorHandler = {
+      handle(error, context = '') {
+        console.error(`[${context}]`, error);
+
+        let userMessage = 'Si è verificato un errore. Riprova.';
+
+        if (error instanceof Error) {
+          if (error.status === 401) {
+            userMessage = 'La tua sessione è scaduta. Accedi di nuovo.';
+            localStorage.removeItem('dubi_token');
+            localStorage.removeItem('dubi_email');
+            // Potremmo reindirizzare a login qui
+          } else if (error.status === 403) {
+            userMessage = 'Non hai i permessi per questa azione.';
+          } else if (error.status === 404) {
+            userMessage = 'Risorsa non trovata.';
+          } else if (error.status === 409) {
+            userMessage = error.message;
+          } else if (error.status === 429) {
+            userMessage = 'Troppi tentativi. Aspetta un momento.';
+          } else if (error.status === 500) {
+            userMessage = 'Errore del server. Contatta il supporto.';
+          } else if (error.status === 0) {
+            userMessage = 'Errore di connessione. Controlla la tua rete.';
+          } else {
+            userMessage = error.message || userMessage;
+          }
+        }
+
+        Toast.error(userMessage);
+        return userMessage;
+      }
+    };
+
+    // ✅ EXPORT TO WINDOW FOR USE IN COMPONENTS
+    window.Toast = Toast;
+    window.ApiClient = ApiClient;
+    window.ErrorHandler = ErrorHandler;
+
+    // ✅ PLACEHOLDER: Your existing React app code continues here
+    // Replace the import/require with your actual app component
+    
+    // For now, show a simple message
+    const { useState, useEffect } = React;
+
+    function DUBIApp() {
+      return (
+        <div style={{fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif",background:"#E8E4DF",minHeight:"100vh",display:"flex",justifyContent:"center",alignItems:"center"}}>
+          <div style={{textAlign:"center", padding:"40px", background:"white", borderRadius:"12px", maxWidth:"400px", boxShadow:"0 8px 24px rgba(0,0,0,0.12)"}}>
+            <div style={{fontSize:"26px", fontWeight:"700", color:"#2B2B2B", marginBottom:"20px"}}>
+              DU<span style={{color:"#6B8A64"}}>BI</span>
+            </div>
+            <h1 style={{color:"#2B2B2B", marginBottom:"10px", fontSize:"24px"}}>Backend Aggiornato! ✅</h1>
+            <p style={{color:"#9A9490", marginBottom:"20px", lineHeight:"1.6"}}>
+              Il backend è online con security hardening, CORS restrictions, rate limiting, validazione input e nuovi endpoint CRUD.
+            </p>
+            <div style={{background:"#FAF9F7", padding:"16px", borderRadius:"8px", marginBottom:"20px", fontSize:"13px", color:"#6B8A64", fontFamily:"monospace"}}>
+              ✓ Helmet.js<br/>
+              ✓ Rate Limiting<br/>
+              ✓ CORS Secure<br/>
+              ✓ Input Validation<br/>
+              ✓ Error Handling<br/>
+              ✓ Toast Notifications
+            </div>
+            <button 
+              onClick={() => Toast.success('Test Toast - Backend Pronto! 🚀')}
+              style={{
+                background:"#6B8A64",
+                color:"white",
+                border:"none",
+                padding:"12px 24px",
+                borderRadius:"8px",
+                fontSize:"14px",
+                fontWeight:"600",
+                cursor:"pointer",
+                width:"100%"
+              }}
+            >
+              Test Toast Notification
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<DUBIApp />);
+
+    window._dubiReady = true;
+    clearTimeout(window._dubiBootTimer);
+    const bootEl = document.getElementById('dubi-boot');
+    if (bootEl) {
+      bootEl.classList.add('hidden');
+      setTimeout(function() { bootEl.style.display = 'none'; }, 350);
+    }
+  </script>
+</body>
+</html>
