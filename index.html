@@ -9369,18 +9369,18 @@ function DUBIApp() {
       if (response.ok) {
         const data = await response.json();
 
-        if (data.onboarding) {
-          const normalizedOnboarding = normalizeOnboarding(data.onboarding);
+       if (data.onboarding) {
+  const normalizedOnboarding = normalizeOnboarding(data.onboarding);
 
-setUserData(normalizedOnboarding);
+  setUserData(normalizedOnboarding);
 
-const sessionPlan = calcPlan(normalizedOnboarding);
-setPlan(sessionPlan);
+  const sessionPlan = calcPlan(normalizedOnboarding);
+  setPlan(sessionPlan);
 
-          setActiveTab("today");
-          setPhase("app");
-          return;
-        }
+  setActiveTab("today");
+  setPhase("app");
+  return;
+}
       }
 
       setPhase("onboarding");
@@ -9397,11 +9397,12 @@ setPlan(sessionPlan);
   const [safetyReview,setSafetyReview] = useState(null);
   const [isPremium,setIsPremium] = useState(false);
   const handlePremiumUpgrade = () => setIsPremium(true);
-  const handleLogout = () => {
+const handleLogout = () => {
   localStorage.removeItem("dubi_token");
   localStorage.removeItem("dubi_email");
   setUserData(null);
   setPlan(null);
+  setActiveTab("today");
   setPhase("welcome");
 };
   const [swaps, setSwaps] = useState({});
@@ -9458,14 +9459,16 @@ setPlan(sessionPlan);
 )}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
         {phase==="auth" && <AuthScreen onSuccess={(existingOnboarding) => {
-  if (existingOnboarding) {
-    setUserData(existingOnboarding);
-    const generatedPlan = calcPlan(existingOnboarding);
-    setPlan(generatedPlan);
-    setPhase("app");
-  } else {
-    setPhase("onboarding");
-  }
+ if (existingOnboarding) {
+  setUserData(existingOnboarding);
+  const authPlan = calcPlan(existingOnboarding);
+  setPlan(authPlan);
+  setActiveTab("today");
+  setPhase("app");
+} else {
+  setActiveTab("today");
+  setPhase("onboarding");
+}
 }} onBack={() => setPhase("welcome")} />}
 
         {phase==="onboarding" && <OnboardingScreen onComplete={handleComplete} isPremium={isPremium} onPremiumRequired={handlePremiumUpgrade}/>}
@@ -9501,7 +9504,10 @@ setPlan(sessionPlan);
           />
         )}
         {phase==="paywall" && <PaywallScreen userData={userData} plan={plan} onContinue={()=>setPhase("loading")} />}
-        {phase==="loading" && <LoadingScreen onDone={()=>setPhase("app")} />}
+        {phase==="loading" && <LoadingScreen onDone={() => {
+  setActiveTab("today");
+  setPhase("app");
+}} />}
         {phase==="app" && (
           <>
             <div style={{height:"100vh",overflowY:"auto",position:"relative"}}>
