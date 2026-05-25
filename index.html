@@ -2679,21 +2679,86 @@ function calcTDEE({ gender, age, height, weight, occupation, workoutDays, workou
   return Math.round(bmr * (occMult + freqScore*durScore*intScore + stepsAdd));
 }
 
-function calcMealCount({ goal, workoutIntensity, workoutDays, dayStart=7, dayEnd=22 }) {
-  let base = { gain:5, definition:5, fatLoss:4, maintain:4, competition:6 }[goal] || 4;
-  if (workoutIntensity === "alta" && workoutDays !== "0") base = Math.min(base+1, 6);
-  if ((dayEnd - dayStart) < 13) base = Math.min(base, 4);
+function calcMealCount({ goal, workoutIntensity, workoutDays, dayStart = "07:00", dayEnd = "22:00" }) {
+  const toHour = (value, fallback) => {
+    if (!value) return fallback;
+    if (typeof value === "string" && value.includes(":")) {
+      const hour = parseInt(value.split(":")[0], 10);
+      return Number.isNaN(hour) ? fallback : hour;
+    }
+    const hour = parseInt(value, 10);
+    return Number.isNaN(hour) ? fallback : hour;
+  };
+
+  const start = toHour(dayStart, 7);
+  const end = toHour(dayEnd, 22);
+
+  let base = { gain: 5, definition: 5, fatLoss: 4, maintain: 4, competition: 6 }[goal] || 4;
+
+  if (workoutIntensity === "alta" && workoutDays !== "0") base = Math.min(base + 1, 6);
+  if ((end - start) < 13) base = Math.min(base, 4);
+
   return base;
 }
 
-function calcMealTimes({ dayStart=7, dayEnd=22, mealCount=4 }) {
-  const span = dayEnd - dayStart;
-  return Array.from({length: mealCount}, (_,i) => {
-    const h = dayStart + span * i / Math.max(mealCount-1,1);
-    const hour = Math.floor(h), min = Math.round((h-hour)*60);
-    return String(hour).padStart(2,"0")+":"+String(min).padStart(2,"0");
-  });
-}
+const calcMealTimes = ({ dayStart, dayEnd, meals }) => {
+  const normalizeTime = (value, fallback) => {
+    if (value === null || value === undefined || value === "") return fallback;
+
+    if (typeof value === "string") {
+      if (value.includes(":")) {
+        const hour = parseInt(value.split(":")[0], 10);
+        if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+          return `${String(hour).padStart(2, "0")}:00`;
+        }
+        return fallback;
+      }
+
+      const hour = parseInt(value, 10);
+      if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+        return `${String(hour).padStart(2, "0")}:00`;
+      }
+
+      return fallback;
+    }
+
+    if (typeof value === "number" && !Number.isNaN(value)) {
+      const hour = Math.floor(value);
+      if (hour >= 0 && hour <= 23) {
+        return `${String(hour).padStart(2, "0")}:00`;
+      }
+    }
+
+    return fallback;
+  };
+
+  const toHour = (value, fallback) => {
+    const safe = normalizeTime(value, fallback);
+    const hour = parseInt(String(safe).split(":")[0], 10);
+    return Number.isNaN(hour) ? parseInt(fallback.split(":")[0], 10) : hour;
+  };
+
+  const start = toHour(dayStart, "07:00");
+  const end = toHour(dayEnd, "22:00");
+  const mealCount = Math.max(1, Number(meals) || 5);
+
+  if (end <= start) {
+    return ["07:00", "10:00", "13:00", "17:00", "20:00"]
+      .slice(0, mealCount)
+      .join(" · ");
+  }
+
+  if (mealCount === 1) {
+    return `${String(start).padStart(2, "0")}:00`;
+  }
+
+  const gap = (end - start) / (mealCount - 1);
+
+  return Array.from({ length: mealCount }, (_, index) => {
+    const hour = Math.round(start + gap * index);
+    return `${String(hour).padStart(2, "0")}:00`;
+  }).join(" · ");
+};
 
 function getMealSlots(mealCount) {
   if (mealCount <= 3) return [
@@ -6459,7 +6524,7 @@ const WearableStep = ({d,u}) => {
 );};
 
 const STEP_NAMES_KEYS = ["onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
-const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing = false, onPremiumRequired = () => {} }) => {
+const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing = false, onPremiumRequired = () => {}, onCancelEdit = () => {}, }) => {
   const { t, lang } = useT();
 
   const [step,setStep] = useState(0);
@@ -6524,30 +6589,84 @@ const normalizeInitialOnboardingData = (source) => {
 };
 
 const [data, setData] = useState(() => normalizeInitialOnboardingData(initialData));
+  useEffect(() => {
+  if (isEditing) {
+    setFormData((prev) => ({
+      ...prev,
+      dayStart: safeTime(prev.dayStart || prev.day_start, "07:00"),
+      dayEnd: safeTime(prev.dayEnd || prev.day_end, "22:00"),
+    }));
+  }
+}, [isEditing]);
   const u = (k,v) => setData(p=>({...p,[k]:v}));
   const content = [
     <PhysicalStep d={data} u={u}/>,
-    <GoalStep d={data} u={u} isPremium={isPremium} onPremiumRequired={onPremiumRequired}/>,
+    <GoalStep
+  d={data}
+  u={u}
+  isPremium={isEditing ? true : isPremium}
+  onPremiumRequired={isEditing ? (() => {}) : onPremiumRequired}
+/>
     <ActivityStep d={data} u={u}/>,
     <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u}/>,
   ];
-const safeTime = (value, fallback) => {
+const safeTime = (value, fallback = "07:00") => {
   if (value === null || value === undefined || value === "") return fallback;
 
-  if (typeof value === "string" && value.includes(":")) {
-    const hour = value.split(":")[0].padStart(2, "0");
-    return `${hour}:00`;
+  if (typeof value === "string") {
+    if (value.includes(":")) {
+      const [hourRaw] = value.split(":");
+      const hour = parseInt(hourRaw, 10);
+
+      if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+        return `${String(hour).padStart(2, "0")}:00`;
+      }
+
+      return fallback;
+    }
+
+    const hour = parseInt(value, 10);
+
+    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+      return `${String(hour).padStart(2, "0")}:00`;
+    }
+
+    return fallback;
   }
 
-  const numberValue = Number(value);
-  if (!Number.isNaN(numberValue)) {
-    return `${String(numberValue).padStart(2, "0")}:00`;
+  if (typeof value === "number" && !Number.isNaN(value)) {
+    const hour = Math.floor(value);
+
+    if (hour >= 0 && hour <= 23) {
+      return `${String(hour).padStart(2, "0")}:00`;
+    }
   }
 
   return fallback;
 };
+  
   return (
+    <>
+    {isEditing && (
+  <button
+    type="button"
+    onClick={() => {
+      localStorage.removeItem("dubi_edit_onboarding");
+      onCancelEdit();
+    }}
+    style={{
+      marginBottom: 12,
+      fontSize: 13,
+      color: T.muted,
+      background: "transparent",
+      border: "none",
+      cursor: "pointer"
+    }}
+  >
+    ← Back to settings
+  </button>
+)}
     <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"56px 24px 0",position:"relative"}}>
         <div style={{display:"flex",gap:4,marginBottom:28}}>
@@ -6574,7 +6693,8 @@ const safeTime = (value, fallback) => {
         </div>
       </div>
     </div>
-  );
+  </>
+    );
 };
 
 // ═══════════════════════════════════════════════
@@ -10029,7 +10149,7 @@ const handleLogout = () => {
   const [consentData, setConsentData] = useState(null);
 
   const handleComplete = data => {
-    localStorage.removeItem("dubi_edit_onboarding");
+    
     // Safety engine: rileva regole HARD/SOFT/COERENZA
     const sc = runSafetyChecks(data);
     if (sc.findings.length > 0) {
@@ -10048,15 +10168,24 @@ const handleLogout = () => {
     saveDubiProfile(data);
     setUserData(data);
 
-    const generatedPlan = calcPlan(data);
-    setPlan(generatedPlan);
-    savePlanToBackend(generatedPlan, data);
-    // Se under-18 → schermata consenso genitoriale, altrimenti → schermata consenso GDPR
-    if (data.age && data.age < 18) {
-      setPhase("minor");
-    } else {
-      setPhase("consent");
-    }
+  const generatedPlan = calcPlan(data);
+setPlan(generatedPlan);
+savePlanToBackend(generatedPlan, data);
+
+const isEditingOnboarding = localStorage.getItem("dubi_edit_onboarding") === "true";
+localStorage.removeItem("dubi_edit_onboarding");
+
+if (isEditingOnboarding) {
+  setActiveTab("today");
+  setPhase("app");
+  return;
+}
+
+if (data.age && data.age < 18) {
+  setPhase("minor");
+} else {
+  setPhase("consent");
+}
   };
 
   // Quando l'utente entra nell'app (tab today) la prima volta, disattiva isFirstAccess dopo qualche secondo
@@ -10097,6 +10226,11 @@ const handleLogout = () => {
 
         {phase==="onboarding" && (
   <OnboardingScreen
+    onCancelEdit={() => {
+  localStorage.removeItem("dubi_edit_onboarding");
+  setPhase("app");
+  setActiveTab("settings");
+}}
     initialData={userData}
     isEditing={localStorage.getItem("dubi_edit_onboarding") === "true"}
     onComplete={handleComplete}
