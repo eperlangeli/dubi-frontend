@@ -232,6 +232,36 @@ const saveOnboardingToBackend = async (data) => {
     return null;
   }
 };
+    const saveProgressToBackend = async (progressData) => {
+  const token = getAuthToken();
+
+  if (!token) {
+    console.warn("No auth token found. Progress not saved.");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/progress/save`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(progressData)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Failed to save progress:", err);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Progress save request failed:", error);
+    return null;
+  }
+};
 const T = {
   bg:"#FAF9F7", card:"#F5F3EF", border:"#E7E2DA",
   text:"#2B2B2B", muted:"#9A9490", accent:"#A8B3A1",
@@ -8506,6 +8536,8 @@ const ProgressScreen = ({userData, plan, onOpenWrap}) => {
 
   const [weightLog, setWeightLog] = useState(MOCK_METRIC_DATA.peso.map(d=>({week:d.w,weight:d.v})));
   const [newWeight, setNewWeight] = useState("");
+  const [progressMessage, setProgressMessage] = useState("");
+  const [savingProgress, setSavingProgress] = useState(false);
   const [activeMetric, setActiveMetric] = useState("peso");
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
 
@@ -8558,6 +8590,40 @@ const ProgressScreen = ({userData, plan, onOpenWrap}) => {
     {icon:"trend",   color:T.accentD, label:t("prog.imp.adherence.l"),          value:"87%",                      note:t("prog.imp.adherence.n")},
   ];
 
+  const handleSaveProgress = async () => {
+  setProgressMessage("");
+
+  const weightValue = Number(newWeight || currentWeight || userData?.weight || 0);
+
+  if (!weightValue) {
+    setProgressMessage("Please enter your current weight first.");
+    return;
+  }
+
+  const mealsTotal = plan?.meals ? plan.meals.length : 0;
+
+  const progressPayload = {
+    weight: weightValue,
+    calories_consumed: Number(plan?.calories || plan?.kcal || 0),
+    meals_completed: mealsTotal,
+    meals_total: mealsTotal,
+    adherence_percent: 100,
+    note: "Manual progress check-in"
+  };
+
+  setSavingProgress(true);
+
+  const result = await saveProgressToBackend(progressPayload);
+
+  setSavingProgress(false);
+
+  if (result) {
+    setProgressMessage("Progress saved successfully.");
+  } else {
+    setProgressMessage("Progress could not be saved. Please try again.");
+  }
+};
+  
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
@@ -8640,6 +8706,36 @@ const ProgressScreen = ({userData, plan, onOpenWrap}) => {
             </button>
           </div>
         </div>
+      <button
+  
+      onClick={handleSaveProgress}
+  disabled={savingProgress}
+  style={{
+    width:"100%",
+    marginTop:12,
+    padding:"13px 16px",
+    borderRadius:14,
+    border:"none",
+    background:T.text,
+    color:T.bg,
+    fontWeight:800,
+    fontSize:14,
+    opacity:savingProgress ? 0.7 : 1
+  }}
+>
+  {savingProgress ? "Saving..." : "Save progress"}
+</button>
+
+{progressMessage && (
+  <p style={{
+    fontSize:12,
+    color:progressMessage.includes("successfully") ? "#2F855A" : "#B91C1C",
+    marginTop:10,
+    marginBottom:0
+  }}>
+    {progressMessage}
+  </p>
+)}
       )}
 
       {/* ── RESOCONTO SETTIMANALE COLLAPSIBLE ── */}
