@@ -6487,8 +6487,8 @@ const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing
   sport:"",
   trainingTime:"sera",
   breakfastPref:"entrambi",
-  dayStart:7,
-  dayEnd:22,
+  dayStart:"07:00",
+  dayEnd:"22:00",
   wearable:"apple"
 };
 
@@ -6517,8 +6517,8 @@ const normalizeInitialOnboardingData = (source) => {
     sport: source.sport || "",
     trainingTime: source.training_time || source.trainingTime || defaultOnboardingData.trainingTime,
     breakfastPref: source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref,
-    dayStart: source.day_start || source.dayStart || 7,
-    dayEnd: source.day_end || source.dayEnd || 22,
+    dayStart: safeTime(source.day_start || source.dayStart, "07:00"),
+    dayEnd: safeTime(source.day_end || source.dayEnd, "22:00"),
     wearable: source.wearable_provider || source.wearable || defaultOnboardingData.wearable
   };
 };
@@ -6532,11 +6532,20 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
     <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u}/>,
   ];
-  const safeHour = (value, fallback) => {
+const safeTime = (value, fallback) => {
   if (value === null || value === undefined || value === "") return fallback;
-  if (typeof value === "number") return value;
-  if (typeof value === "string" && value.includes(":")) return Number(value.split(":")[0]);
-  return Number(value) || fallback;
+
+  if (typeof value === "string" && value.includes(":")) {
+    const hour = value.split(":")[0].padStart(2, "0");
+    return `${hour}:00`;
+  }
+
+  const numberValue = Number(value);
+  if (!Number.isNaN(numberValue)) {
+    return `${String(numberValue).padStart(2, "0")}:00`;
+  }
+
+  return fallback;
 };
   return (
     <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
