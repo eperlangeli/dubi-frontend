@@ -9370,9 +9370,66 @@ const WrapScreen = ({userData, plan, onClose}) => {
 // ═══════════════════════════════════════════════
 // SETTINGS SCREEN
 // ═══════════════════════════════════════════════
-const SettingsScreen = ({userData, plan, isPremium, onUpgrade, onLogout}) => {
+const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgrade, onLogout}) => {
   const { t, lang, setLang } = useT();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+const [profileMessage, setProfileMessage] = useState("");
+const [savingProfile, setSavingProfile] = useState(false);
+
+const [profileForm, setProfileForm] = useState({
+  name: userData?.name || "",
+  age: userData?.age || "",
+  height: userData?.height || "",
+  weight: userData?.weight || "",
+  goal: userData?.goal || "",
+  target_weight: userData?.target_weight || "",
+  daily_steps: userData?.daily_steps || "",
+  allergies: userData?.allergies || "",
+  sport: userData?.sport || "",
+  diet: userData?.diet || ""
+});
+  const handleProfileFieldChange = (field, value) => {
+  setProfileForm(prev => ({
+    ...prev,
+    [field]: value
+  }));
+};
+
+const handleSaveProfile = async () => {
+  setProfileMessage("");
+
+  const updatedData = {
+    ...userData,
+    ...profileForm,
+    age: Number(profileForm.age || userData?.age || 0),
+    height: Number(profileForm.height || userData?.height || 0),
+    weight: Number(profileForm.weight || userData?.weight || 0),
+    target_weight: profileForm.target_weight ? Number(profileForm.target_weight) : null,
+    daily_steps: profileForm.daily_steps ? Number(profileForm.daily_steps) : null
+  };
+
+  setSavingProfile(true);
+
+  const saved = await saveOnboardingToBackend(updatedData);
+
+  if (!saved) {
+    setSavingProfile(false);
+    setProfileMessage("Could not save profile changes. Please try again.");
+    return;
+  }
+
+  const updatedPlan = calcPlan(updatedData);
+
+  setUserData(updatedData);
+  setPlan(updatedPlan);
+  saveDubiProfile(updatedData);
+  await savePlanToBackend(updatedPlan, updatedData);
+
+  setSavingProfile(false);
+  setEditingProfile(false);
+  setProfileMessage("Profile updated successfully. Your plan has been refreshed.");
+};
 
   const GOAL_LABELS = {
     fatLoss:   t("goal.fatLoss.t"),
@@ -9425,6 +9482,106 @@ const SettingsScreen = ({userData, plan, isPremium, onUpgrade, onLogout}) => {
       </div>
 
       <div style={{padding:"0 20px"}}>
+        {/* Profile & Preferences editor */}
+<div style={{
+  background:T.card,
+  border:`1px solid ${T.border}`,
+  borderRadius:22,
+  padding:16,
+  marginBottom:16
+}}>
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+    <div>
+      <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
+        Profile & Preferences
+      </p>
+      <p style={{margin:"4px 0 0",fontSize:11,color:T.muted}}>
+        Edit your onboarding data and refresh your plan.
+      </p>
+    </div>
+
+    <button
+      onClick={()=>setEditingProfile(!editingProfile)}
+      style={{
+        padding:"8px 12px",
+        borderRadius:12,
+        border:`1px solid ${T.border}`,
+        background:T.bg,
+        color:T.text,
+        fontSize:12,
+        fontWeight:800
+      }}
+    >
+      {editingProfile ? "Close" : "Edit"}
+    </button>
+  </div>
+
+  {editingProfile && (
+    <div style={{display:"grid",gap:10}}>
+      {[
+        ["name", "Name", "text"],
+        ["age", "Age", "number"],
+        ["height", "Height cm", "number"],
+        ["weight", "Weight kg", "number"],
+        ["goal", "Goal", "text"],
+        ["target_weight", "Target weight kg", "number"],
+        ["daily_steps", "Daily steps", "number"],
+        ["allergies", "Allergies", "text"],
+        ["sport", "Sport", "text"],
+        ["diet", "Diet", "text"]
+      ].map(([field,label,type]) => (
+        <div key={field}>
+          <p style={{fontSize:11,color:T.muted,margin:"0 0 5px",fontWeight:700}}>
+            {label}
+          </p>
+          <input
+            type={type}
+            value={profileForm[field]}
+            onChange={e=>handleProfileFieldChange(field,e.target.value)}
+            style={{
+              width:"100%",
+              padding:"11px 12px",
+              borderRadius:12,
+              border:`1.5px solid ${T.border}`,
+              background:T.bg,
+              color:T.text,
+              fontSize:13
+            }}
+          />
+        </div>
+      ))}
+
+      <button
+        onClick={handleSaveProfile}
+        disabled={savingProfile}
+        style={{
+          width:"100%",
+          marginTop:8,
+          padding:"13px 16px",
+          borderRadius:14,
+          border:"none",
+          background:T.text,
+          color:T.bg,
+          fontWeight:800,
+          fontSize:14,
+          opacity:savingProfile ? 0.7 : 1
+        }}
+      >
+        {savingProfile ? "Saving..." : "Save changes & refresh plan"}
+      </button>
+
+      {profileMessage && (
+        <p style={{
+          fontSize:12,
+          color:profileMessage.includes("successfully") ? "#2F855A" : "#B91C1C",
+          margin:"2px 0 0"
+        }}>
+          {profileMessage}
+        </p>
+      )}
+    </div>
+  )}
+</div>
 
         {/* Personal data */}
         <SectionLabel lk="set.personal" />
@@ -9931,7 +10088,7 @@ const handleLogout = () => {
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} />}
               {activeTab==="sources"  && <SourcesScreen />}
-              {activeTab==="settings" && <SettingsScreen userData={userData} plan={plan} isPremium={isPremium} onUpgrade={handlePremiumUpgrade} onLogout={handleLogout} />}
+              {activeTab==="settings" && <SettingsScreen userData={userData} setUserData={setUserData} plan={plan} setPlan={setPlan} isPremium={isPremium} onUpgrade={handlePremiumUpgrade} onLogout={handleLogout} />}
             </div>
     
             <BottomNav active={activeTab} onChange={setActiveTab} />
