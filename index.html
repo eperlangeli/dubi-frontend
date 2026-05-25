@@ -9551,51 +9551,82 @@ const handleSaveProfile = async () => {
       </div>
 
       <div style={{padding:"0 20px"}}>
-      {/* Edit onboarding answers */}
-<div style={{
-  background:T.card,
-  border:`1px solid ${T.border}`,
-  borderRadius:22,
-  padding:16,
-  marginBottom:16
-}}>
-  <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
-    Edit onboarding answers
-  </p>
-  <p style={{margin:"6px 0 14px",fontSize:11,color:T.muted,lineHeight:1.4}}>
-    Update your profile, goals, training, nutrition and wearable preferences using the onboarding flow.
-  </p>
 
-  <button
-    onClick={() => {
-    localStorage.setItem("dubi_edit_onboarding", "true");
-    onEditOnboarding();
-    }}
-    style={{
-      width:"100%",
-      padding:"13px 16px",
-      borderRadius:14,
-      border:"none",
-      background:T.text,
-      color:T.bg,
-      fontWeight:900,
-      fontSize:14
-    }}
-  >
-    Open onboarding editor
-  </button>
-</div>
-  
+  {/* Edit onboarding answers */}
+  <div style={{
+    background:T.card,
+    border:`1px solid ${T.border}`,
+    borderRadius:22,
+    padding:16,
+    marginBottom:16
+  }}>
+    <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
+      Edit onboarding answers
+    </p>
 
-        {/* Personal data */}
-        <SectionLabel lk="set.personal" />
-        <Card>
-          {userData?.age    && <Row label={t("set.info.age")}    value={`${userData.age} ${t("phys.age.unit")}`} />}
-          {userData?.weight && <Row label={t("set.info.weight")} value={`${userData.weight} kg`} />}
-          {userData?.height && <Row label={t("set.info.height")} value={`${userData.height} cm`} />}
-          {userData?.goal   && <Row label={t("set.info.goal")}   value={GOAL_LABELS[userData.goal]||userData.goal} />}
-          {plan?.calories   && <Row label={t("set.info.calories")} value={`${plan.calories} kcal`} last={true}/>}
-        </Card>
+    <p style={{margin:"6px 0 14px",fontSize:11,color:T.muted,lineHeight:1.4}}>
+      Update your profile, goals, training, nutrition and wearable preferences using the onboarding flow.
+    </p>
+
+    <button
+      onClick={() => {
+        localStorage.setItem("dubi_edit_onboarding", "true");
+        onEditOnboarding();
+      }}
+      style={{
+        width:"100%",
+        padding:"13px 16px",
+        borderRadius:14,
+        border:"none",
+        background:T.text,
+        color:T.bg,
+        fontWeight:900,
+        fontSize:14
+      }}
+    >
+      Open onboarding editor
+    </button>
+  </div>
+
+  {/* Personal data */}
+  <SectionLabel lk="set.personal" />
+  <Card>
+    {userData?.age && (
+      <Row
+        label={t("set.info.age")}
+        value={`${userData.age} ${t("age.unit")}`}
+      />
+    )}
+
+    {userData?.weight && (
+      <Row
+        label={t("set.info.weight")}
+        value={`${userData.weight} kg`}
+      />
+    )}
+
+    {userData?.height && (
+      <Row
+        label={t("set.info.height")}
+        value={`${userData.height} cm`}
+      />
+    )}
+
+    {userData?.goal && (
+      <Row
+        label={t("set.info.goal")}
+        value={GOAL_LABELS[userData.goal] || userData.goal}
+      />
+    )}
+
+    {plan?.calories && (
+      <Row
+        label={t("set.info.calories")}
+        value={`${plan.calories} kcal`}
+        last
+      />
+    )}
+  </Card>
 
         {/* Subscription */}
         <SectionLabel lk="set.subscription" />
