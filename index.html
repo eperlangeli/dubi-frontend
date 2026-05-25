@@ -6640,8 +6640,8 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
   u={u}
   isPremium={isEditing ? true : isPremium}
   onPremiumRequired={isEditing ? (() => {}) : onPremiumRequired}
-/>
-    <ActivityStep d={data} u={u}/>,
+/>,
+<ActivityStep d={data} u={u}/>,
     <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u}/>,
   ];
