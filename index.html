@@ -4018,6 +4018,12 @@ function formatShoppingQuantity(total, unit) {
   return ` (${Math.round(total)}${unit})`;
 }
 
+function splitShoppingDisplay(item) {
+  const text = formatFoodText(item);
+  const match = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+  return match ? { name: match[1].trim(), quantity: match[2].trim() } : { name: text, quantity: "" };
+}
+
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
   if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
     const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
@@ -8538,6 +8544,15 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
                 <span key={m.l} style={{fontSize:11,color:m.c,fontWeight:600}}>{m.l}: {m.v}</span>
               ))}
             </div>
+            {meal.source && (
+              <div style={{marginTop:8,padding:"8px 10px",borderRadius:10,background:T.sel,
+                border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7}}>
+                <Ico n="info" size={13} c={T.accentD}/>
+                <span style={{fontSize:11,color:T.accentD,lineHeight:1.35}}>
+                  Fonte scientifica collegata: {meal.source}
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -8974,6 +8989,7 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
                 {filtered.map((entry, i) => {
                   const key = entry.item;
                   const isDone = !!checked[key];
+                  const display = splitShoppingDisplay(entry.item);
                   return (
                     <button key={key} onClick={()=>toggle(key)}
                       style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"14px 16px",
@@ -8986,9 +9002,18 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.2s"}}>
                         {isDone && <Ico n="check" size={12} c={T.bg}/>}
                       </div>
-                      <span style={{flex:1,fontSize:14,color:isDone?T.muted:T.text,
-                        textDecoration:isDone?"line-through":"none",transition:"color 0.2s"}}>
-                        {localizeFood(entry.item, lang)}
+                      <span style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                        <span style={{fontSize:14,color:isDone?T.muted:T.text,
+                          textDecoration:isDone?"line-through":"none",transition:"color 0.2s"}}>
+                          {localizeFood(display.name, lang)}
+                        </span>
+                        {display.quantity && (
+                          <span style={{fontSize:11,fontWeight:800,color:isDone?T.muted:T.accentD,
+                            background:isDone?T.bg:T.sel,border:`1px solid ${T.border}`,
+                            borderRadius:999,padding:"3px 8px",lineHeight:1,whiteSpace:"nowrap"}}>
+                            {display.quantity}
+                          </span>
+                        )}
                       </span>
                       {/* Tag per-persona o "entrambi" */}
                       {!isDone && partnerMode && partnerProfile && (
