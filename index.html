@@ -8212,6 +8212,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const [selDay,setSelDay] = useState(todayIdx);
   const [swapOpen,setSwapOpen] = useState(null);
   const [swapNotif,setSwapNotif] = useState(null); // {from, to}
+  const [shoppingPrompt,setShoppingPrompt] = useState(null);
 
   // ── Banner stagionale — visibile ad ogni accesso, svanisce dopo 30s ──
   const [showSeasonBanner, setShowSeasonBanner] = useState(true);
@@ -8286,19 +8287,8 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     f:   Math.round(mx.f   * wScaleF),
   });
 
-  const doSwap = (mealKey,itemIdx,newItem,oldItem) => {
-    const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
-    const replacement = formatFoodText(newItem);
-    const nextSwaps = {...swaps, [swapKey]: replacement};
-    const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement);
-    const coverageAfter = findShoppingCoverage(userData, plan, nextSwaps, replacement);
-    let hadAtHome = null;
-
-    if (!coverageBefore.checked && !coverageAfter.checked) {
-      hadAtHome = window.confirm(`DUBI: "${replacement}" non risulta gia' spuntato nella lista della spesa. Ce l'hai gia'?`);
-      if (hadAtHome) rememberOwnedShoppingIngredient(userData, replacement);
-    }
-
+  const applyIngredientSwap = ({swapKey, mealKey, itemIdx, oldItem, replacement, hadAtHome = null}) => {
+    if (hadAtHome) rememberOwnedShoppingIngredient(userData, replacement);
     setSwaps(s=>({...s,[swapKey]:replacement}));
     saveIngredientSwapToBackend({
       swap_key: swapKey,
@@ -8310,9 +8300,25 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
       had_at_home: hadAtHome
     });
     setSwapOpen(null);
-    // Notifica interna: ingrediente cambiato + lista spesa aggiornata
+    setShoppingPrompt(null);
     setSwapNotif({from: oldItem || "ingrediente", to: replacement});
     setTimeout(()=>setSwapNotif(null), 4500);
+  };
+
+  const doSwap = (mealKey,itemIdx,newItem,oldItem) => {
+    const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
+    const replacement = formatFoodText(newItem);
+    const original = formatFoodText(oldItem);
+    const nextSwaps = {...swaps, [swapKey]: replacement};
+    const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement);
+    const coverageAfter = findShoppingCoverage(userData, plan, nextSwaps, replacement);
+
+    if (!coverageBefore.checked && !coverageAfter.checked) {
+      setShoppingPrompt({swapKey, mealKey, itemIdx, oldItem: original, replacement});
+      return;
+    }
+
+    applyIngredientSwap({swapKey, mealKey, itemIdx, oldItem: original, replacement});
   };
 
   return (
@@ -8333,6 +8339,43 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
             {" → "}<strong>{swapNotif.to.split("(")[0].trim()}</strong>
           </p>
           <p style={{fontSize:11,opacity:.75,paddingLeft:24}}>📋 Lista della spesa aggiornata automaticamente.</p>
+        </div>
+      )}
+
+      {shoppingPrompt && (
+        <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(35,33,29,.28)",
+          backdropFilter:"blur(3px)",display:"flex",alignItems:"flex-end",justifyContent:"center",
+          padding:"18px 16px calc(18px + env(safe-area-inset-bottom, 0px))"}}>
+          <div style={{width:"100%",maxWidth:520,background:T.card,border:`1.5px solid ${T.border}`,
+            borderRadius:22,boxShadow:"0 18px 50px rgba(35,33,29,.22)",padding:18,
+            animation:"slideUp .22s ease"}}>
+            <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:14}}>
+              <div style={{width:40,height:40,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`,
+                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ico n="bag" size={20} c={T.accentD}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{fontSize:15,fontWeight:800,color:T.text,margin:"0 0 5px"}}>
+                  Lo hai gia' in casa?
+                </p>
+                <p style={{fontSize:13,color:T.muted,lineHeight:1.5,margin:0}}>
+                  <strong style={{color:T.text}}>{localizeFood(shoppingPrompt.replacement, lang)}</strong> non risulta gia' spuntato nella lista della spesa.
+                </p>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>applyIngredientSwap({...shoppingPrompt, hadAtHome:false})}
+                style={{flex:1,padding:"13px 12px",borderRadius:14,background:T.card,
+                  border:`1.5px solid ${T.border}`,color:T.text,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                No, aggiungilo
+              </button>
+              <button onClick={()=>applyIngredientSwap({...shoppingPrompt, hadAtHome:true})}
+                style={{flex:1,padding:"13px 12px",borderRadius:14,background:T.accentD,
+                  border:`1.5px solid ${T.accentD}`,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+                Si, ce l'ho
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
