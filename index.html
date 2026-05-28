@@ -205,7 +205,7 @@ const saveOnboardingToBackend = async (data) => {
     protein: Number(plan.protein || plan.proteins || 0),
     carbs: Number(plan.carbs || 0),
     fat: Number(plan.fat || plan.fats || 0),
-    meals_count: plan.meals ? plan.meals.length : 0,
+    meals_count: plan.meals ? plan.meals.length : Number(plan.mealCount || 0),
     goal: userData?.goal || null,
     plan_json: plan
   };
@@ -229,6 +229,77 @@ const saveOnboardingToBackend = async (data) => {
     return await response.json();
   } catch (error) {
     console.error("Plan save request failed:", error);
+    return null;
+  }
+};
+
+const mapAiPlanToFrontend = (aiPlan, userData) => {
+  const fallbackPlan = calcPlan(userData);
+  const slots = aiPlan?.mealStructure?.slots || [];
+
+  return {
+    ...fallbackPlan,
+    tdee: Number(aiPlan?.tdee || fallbackPlan.tdee),
+    calories: Number(aiPlan?.caloriesTarget || fallbackPlan.calories),
+    protein: Number(aiPlan?.proteinTarget || fallbackPlan.protein),
+    carbs: Number(aiPlan?.carbsTarget || fallbackPlan.carbs),
+    fat: Number(aiPlan?.fatsTarget || fallbackPlan.fat),
+    mealCount: slots.length || fallbackPlan.mealCount,
+    aiGenerated: true,
+    aiEnginePlan: aiPlan,
+    scienceTrace: aiPlan?.mealStructure?.scientificBasis || []
+  };
+};
+
+const generateAiPlanFromBackend = async (userData) => {
+  const token = getAuthToken();
+  const fallbackPlan = calcPlan(userData);
+
+  if (!token) {
+    return { plan: fallbackPlan, savedByAi: false };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/generate-plan`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("AI plan generation failed:", err);
+      return { plan: fallbackPlan, savedByAi: false };
+    }
+
+    const data = await response.json();
+    return { plan: mapAiPlanToFrontend(data.plan, userData), savedByAi: true };
+  } catch (error) {
+    console.error("AI plan request failed:", error);
+    return { plan: fallbackPlan, savedByAi: false };
+  }
+};
+
+const fetchCurrentAiPlanFromBackend = async (userData) => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/plan/current`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const rawPlan = data?.plan?.plan_json;
+    const aiPlan = typeof rawPlan === "string" ? JSON.parse(rawPlan) : rawPlan;
+    return aiPlan ? mapAiPlanToFrontend(aiPlan, userData) : null;
+  } catch (error) {
+    console.error("Current AI plan load failed:", error);
     return null;
   }
 };
@@ -2787,6 +2858,51 @@ function getMealSlots(mealCount) {
     {id:"cena",labelKey:"meal.cena",label:"Cena",icon:"moon"},
     {id:"snack_n",labelKey:"meal.snack_n",label:"Pre-nanna",icon:"moon"},
   ];
+}
+
+const AI_SLOT_IDS = {
+  breakfast: "colazione",
+  snack_morning: "snack_m",
+  lunch: "pranzo",
+  snack_afternoon: "snack",
+  dinner: "cena",
+  snack_evening: "snack_n"
+};
+
+function getAiMealListForDay(plan, dayIdx, slots, times) {
+  const aiDay = plan?.aiEnginePlan?.mealStructure?.days?.[dayIdx];
+  if (!aiDay?.meals?.length) return null;
+
+  return aiDay.meals.map((meal, i) => {
+    const fallbackSlot = slots[i] || { id: `ai_meal_${i}`, labelKey: "meal.snack", icon: "fork" };
+    const id = AI_SLOT_IDS[meal.slot] || fallbackSlot.id;
+    const reasons = meal.scienceTrace?.reasons || [];
+    const source = meal.scienceTrace?.source || meal.scientificSource || "";
+    const evidence = meal.evidenceLevel ? ` Evidence: ${meal.evidenceLevel}.` : "";
+    const why = [...reasons, source ? `Fonte scientifica: ${source}.${evidence}` : ""].filter(Boolean).join(" ");
+
+    return {
+      ...fallbackSlot,
+      id,
+      time: times[i] || "--:--",
+      data: {
+        items: meal.ingredients?.length ? meal.ingredients : [meal.description || meal.name],
+        macros: {
+          cal: Number(meal.nutrition?.calories || 0),
+          p: Number(meal.nutrition?.protein || 0),
+          c: Number(meal.nutrition?.carbs || 0),
+          f: Number(meal.nutrition?.fats || 0)
+        },
+        why,
+        whyEN: why,
+        source,
+        aiMeal: meal
+      },
+      workoutLabel: meal.mealType === "pre_workout" ? "PRE" : meal.mealType === "post_workout" ? "POST" : null,
+      carbTargetPct: null,
+      adaptSkipped: false
+    };
+  });
 }
 
 function carbNote(sport, goal) {
@@ -7423,7 +7539,8 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   // Se Ask DUBI ha ricalcolato gli orari per l'allenamento, usa quelli custom
   const times = planAdaptations.customTimes || plan.mealTimes || ["08:00","13:00","16:30","20:00"];
 
-  const mealList = slots.map((sl,i) => {
+  const aiMealList = getAiMealListForDay(plan, dayIdx, slots, times);
+  const fallbackMealList = slots.map((sl,i) => {
     let meal;
     if (sl.id==="colazione") meal = dayMeals[bfKey]||dayMeals.colazione_dolce;
     else if (sl.id==="pranzo") meal = dayMeals.pranzo;
@@ -7435,7 +7552,8 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
     const carbPct = getCarbTargetPct(userData?.trainingTime, sl.id, userData?.sport);
     const adaptSkipped = planAdaptations.skipped.includes(sl.id);
     return {...sl, time: times[i]||"--:--", data: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct, adaptSkipped};
-  }).concat((planAdaptations.extraMeals||[]));
+  });
+  const mealList = (aiMealList || fallbackMealList).concat((planAdaptations.extraMeals||[]));
 
   // ── MACRO SCALING — fattori indipendenti per ogni macro ──
   // Usa solo i pasti ATTIVI (non saltati da DUBI) per calcolare i fattori.
@@ -7910,7 +8028,8 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const slots = getMealSlots(plan.mealCount || 4);
   const times = plan.mealTimes || ["08:00","13:00","16:30","20:00"];
 
-  const mealEntries = slots.map((sl,i) => {
+  const aiWeeklyMeals = getAiMealListForDay(plan, selDay, slots, times);
+  const fallbackMealEntries = slots.map((sl,i) => {
     let meal;
     if (sl.id==="colazione") meal = dayMeals[bfKey]||dayMeals.colazione_dolce;
     else if (sl.id==="pranzo") meal = dayMeals.pranzo;
@@ -7922,6 +8041,9 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     const carbPct = getCarbTargetPct(userData?.trainingTime, sl.id, userData?.sport);
     return {...sl, time: times[i]||"--:--", meal: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct};
   });
+  const mealEntries = aiWeeklyMeals
+    ? aiWeeklyMeals.map(m => ({...m, meal: m.data}))
+    : fallbackMealEntries;
 
   // Fattori di scala indipendenti per macro (stessa logica di TodayScreen)
   const wBaseCal = mealEntries.reduce((s,m) => s + (m.meal?.macros?.cal||0), 0);
@@ -9624,12 +9746,12 @@ const handleSaveProfile = async () => {
     return;
   }
 
-  const updatedPlan = calcPlan(updatedData);
+  const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData);
 
   setUserData(updatedData);
   setPlan(updatedPlan);
   saveDubiProfile(updatedData);
-  await savePlanToBackend(updatedPlan, updatedData);
+  if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
 
   setSavingProfile(false);
   setEditingProfile(false);
@@ -10114,7 +10236,7 @@ function DUBIApp() {
 
   setUserData(normalizedOnboarding);
 
-  const sessionPlan = calcPlan(normalizedOnboarding);
+  const sessionPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding) || calcPlan(normalizedOnboarding);
   setPlan(sessionPlan);
 
   setActiveTab("today");
@@ -10161,7 +10283,7 @@ const handleLogout = () => {
     finalizeData(data);
   };
 
-  const finalizeData = data => {
+  const finalizeData = async data => {
     
     // Genera codice DUBI univoco se non esiste già
     if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
@@ -10169,9 +10291,9 @@ const handleLogout = () => {
     saveDubiProfile(data);
     setUserData(data);
 
-  const generatedPlan = calcPlan(data);
+  const { plan: generatedPlan, savedByAi } = await generateAiPlanFromBackend(data);
 setPlan(generatedPlan);
-savePlanToBackend(generatedPlan, data);
+if (!savedByAi) await savePlanToBackend(generatedPlan, data);
 
 const isEditingOnboarding = localStorage.getItem("dubi_edit_onboarding") === "true";
 localStorage.removeItem("dubi_edit_onboarding");
@@ -10212,13 +10334,13 @@ if (data.age && data.age < 18) {
   </div>
 )}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
-        {phase==="auth" && <AuthScreen onSuccess={(existingOnboarding) => {
- if (existingOnboarding) {
-  setUserData(existingOnboarding);
-  const authPlan = calcPlan(existingOnboarding);
-  setPlan(authPlan);
-  setActiveTab("today");
-  setPhase("app");
+        {phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding) => {
+  if (existingOnboarding) {
+   setUserData(existingOnboarding);
+   const authPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding) || calcPlan(existingOnboarding);
+   setPlan(authPlan);
+   setActiveTab("today");
+   setPhase("app");
 } else {
   setActiveTab("today");
   setPhase("onboarding");
