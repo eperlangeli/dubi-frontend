@@ -4220,15 +4220,26 @@ function rememberOwnedShoppingIngredient(userData, item) {
   } catch(e) {}
 }
 
-function isShoppingFullyChecked(userData, plan, swaps) {
+function flattenShoppingItems(userData, plan, swaps) {
+  const shop = getPersonalizedShopping(userData, plan, swaps);
+  return Object.values(shop).flat();
+}
+
+function findShoppingCoverage(userData, plan, swaps, ingredient) {
+  const base = shoppingItemBase(ingredient);
+  if (!base) return { exists: false, checked: false, item: null };
+  const items = flattenShoppingItems(userData, plan, swaps);
+  const item = items.find(entry => {
+    const entryBase = shoppingItemBase(entry);
+    return entryBase === base || entryBase.includes(base) || base.includes(entryBase);
+  });
+  if (!item) return { exists: false, checked: false, item: null };
+
   try {
-    const shop = getPersonalizedShopping(userData, plan, swaps);
-    const entries = Object.values(shop).flat();
-    if (!entries.length) return false;
     const checked = JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}");
-    return entries.every(item => checked[item]);
+    return { exists: true, checked: Boolean(checked[item]), item };
   } catch(e) {
-    return false;
+    return { exists: true, checked: false, item };
   }
 }
 
@@ -8278,10 +8289,13 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const doSwap = (mealKey,itemIdx,newItem,oldItem) => {
     const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
     const replacement = formatFoodText(newItem);
+    const nextSwaps = {...swaps, [swapKey]: replacement};
+    const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement);
+    const coverageAfter = findShoppingCoverage(userData, plan, nextSwaps, replacement);
     let hadAtHome = null;
 
-    if (isShoppingFullyChecked(userData, plan, swaps)) {
-      hadAtHome = window.confirm(`DUBI: "${replacement}" non era nella lista della spesa completata. Ce l'hai gia?`);
+    if (!coverageBefore.checked && !coverageAfter.checked) {
+      hadAtHome = window.confirm(`DUBI: "${replacement}" non risulta gia' spuntato nella lista della spesa. Ce l'hai gia'?`);
       if (hadAtHome) rememberOwnedShoppingIngredient(userData, replacement);
     }
 
