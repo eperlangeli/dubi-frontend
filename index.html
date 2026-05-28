@@ -2677,6 +2677,54 @@ function detectInitialLang(){
   return TRANSLATIONS[nav] ? nav : "it";
 }
 
+const SETTINGS_EXTRA_TRANSLATIONS = {
+  it: {
+    "set.hero.kicker":"CENTRO PROFILO", "set.hero.sub":"Gestisci i dati che guidano piano, pasti e adattamenti di DUBI.",
+    "set.edit.title":"Modifica intelligente", "set.edit.sub":"Cambia solo il dato che ti serve. Se impatta la dieta, DUBI ti spiega perche prima di aggiornare il piano.",
+    "set.edit.open":"Scegli cosa modificare", "set.edit.active":"Editor profilo", "set.edit.close":"Chiudi", "set.edit.pick":"Cosa vuoi aggiornare?",
+    "set.edit.value":"Nuovo valore", "set.edit.save":"Salva modifica", "set.edit.saving":"Salvataggio...", "set.edit.confirm":"Conferma aggiornamento",
+    "set.edit.confirmDiet":"Questa modifica puo cambiare calorie, macro, ingredienti o distribuzione dei pasti.",
+    "set.edit.confirmNoDiet":"Questa modifica aggiorna il profilo, ma non dovrebbe cambiare il piano nutrizionale gia generato.",
+    "set.edit.reason":"Motivo", "set.edit.double":"Confermo, aggiorna DUBI", "set.edit.cancel":"Annulla", "set.edit.success":"Profilo aggiornato. DUBI ha riallineato il piano.",
+    "set.edit.selectField":"Seleziona un campo da modificare.", "set.edit.profile":"Profilo", "set.edit.body":"Corpo e obiettivo", "set.edit.training":"Allenamento", "set.edit.nutrition":"Nutrizione", "set.edit.routine":"Routine",
+    "set.field.name":"Nome", "set.field.gender":"Sesso", "set.field.age":"Eta", "set.field.height":"Altezza", "set.field.weight":"Peso attuale", "set.field.goal":"Obiettivo", "set.field.targetWeight":"Peso target", "set.field.targetBf":"Body fat target",
+    "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita", "set.field.dailySteps":"Passi medi", "set.field.sedentaryDays":"Giorni sedentari", "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.dayStart":"Inizio giornata", "set.field.dayEnd":"Fine giornata", "set.field.wearable":"Wearable",
+    "set.reason.energy":"influenza fabbisogno energetico, macro e porzioni.", "set.reason.foods":"influenza selezione ingredienti, allergeni e alternative sicure.", "set.reason.training":"influenza timing dei carboidrati, pasti pre/post workout e recupero.", "set.reason.routine":"influenza orari e distribuzione dei pasti.", "set.reason.profile":"aggiorna i dati profilo senza rigenerare la dieta.",
+    "set.quick.goal":"Obiettivo", "set.quick.diet":"Dieta", "set.quick.training":"Allenamento", "set.quick.allergies":"Allergie",
+    "set.logout":"Esci", "set.logout.q":"Sei sicuro di voler uscire?", "set.logout.cancel":"Annulla"
+  },
+  en: {
+    "set.hero.kicker":"PROFILE CENTER", "set.hero.sub":"Manage the data that drives DUBI plans, meals and adaptations.",
+    "set.edit.title":"Smart editing", "set.edit.sub":"Change only what you need. If it affects nutrition, DUBI explains why before updating the plan.",
+    "set.edit.open":"Choose what to edit", "set.edit.active":"Profile editor", "set.edit.close":"Close", "set.edit.pick":"What do you want to update?",
+    "set.edit.value":"New value", "set.edit.save":"Save change", "set.edit.saving":"Saving...", "set.edit.confirm":"Confirm update",
+    "set.edit.confirmDiet":"This change may alter calories, macros, ingredients or meal distribution.",
+    "set.edit.confirmNoDiet":"This updates your profile and should not change the current nutrition plan.",
+    "set.edit.reason":"Reason", "set.edit.double":"I confirm, update DUBI", "set.edit.cancel":"Cancel", "set.edit.success":"Profile updated. DUBI realigned the plan.",
+    "set.edit.selectField":"Select a field to edit.", "set.edit.profile":"Profile", "set.edit.body":"Body and goal", "set.edit.training":"Training", "set.edit.nutrition":"Nutrition", "set.edit.routine":"Routine",
+    "set.field.name":"Name", "set.field.gender":"Gender", "set.field.age":"Age", "set.field.height":"Height", "set.field.weight":"Current weight", "set.field.goal":"Goal", "set.field.targetWeight":"Target weight", "set.field.targetBf":"Target body fat",
+    "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity", "set.field.dailySteps":"Average steps", "set.field.sedentaryDays":"Sedentary days", "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.dayStart":"Day start", "set.field.dayEnd":"Day end", "set.field.wearable":"Wearable",
+    "set.reason.energy":"affects energy needs, macros and portions.", "set.reason.foods":"affects ingredient selection, allergens and safe alternatives.", "set.reason.training":"affects carb timing, pre/post workout meals and recovery.", "set.reason.routine":"affects meal timing and distribution.", "set.reason.profile":"updates profile data without regenerating nutrition.",
+    "set.quick.goal":"Goal", "set.quick.diet":"Diet", "set.quick.training":"Training", "set.quick.allergies":"Allergies",
+    "set.logout":"Log out", "set.logout.q":"Are you sure you want to log out?", "set.logout.cancel":"Cancel"
+  },
+  fr: {
+    "set.edit.open":"Choisir quoi modifier", "set.edit.title":"Modification intelligente", "set.edit.sub":"Modifie seulement ce dont tu as besoin. Si cela impacte la nutrition, DUBI explique pourquoi avant de mettre a jour le plan.", "set.logout":"Se deconnecter", "set.logout.cancel":"Annuler"
+  },
+  es: {
+    "set.edit.open":"Elegir que modificar", "set.edit.title":"Edicion inteligente", "set.edit.sub":"Cambia solo lo necesario. Si afecta a la nutricion, DUBI explica por que antes de actualizar el plan.", "set.logout":"Cerrar sesion", "set.logout.cancel":"Cancelar"
+  },
+  de: {
+    "set.edit.open":"Auswahlen, was geandert wird", "set.edit.title":"Intelligente Bearbeitung", "set.edit.sub":"Andere nur, was du brauchst. Wenn es die Ernahrung beeinflusst, erklart DUBI warum.", "set.logout":"Abmelden", "set.logout.cancel":"Abbrechen"
+  },
+  pt: {
+    "set.edit.open":"Escolher o que editar", "set.edit.title":"Edicao inteligente", "set.edit.sub":"Altere apenas o que precisa. Se afetar a nutricao, o DUBI explica antes de atualizar o plano.", "set.logout":"Sair", "set.logout.cancel":"Cancelar"
+  }
+};
+Object.keys(SETTINGS_EXTRA_TRANSLATIONS).forEach(code => {
+  TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...SETTINGS_EXTRA_TRANSLATIONS[code]};
+});
+
 function applyDir(lang){
   const meta = LANGUAGES.find(l=>l.code===lang) || LANGUAGES[0];
   const root = document.getElementById("dubi-html") || document.documentElement;
@@ -10180,6 +10228,8 @@ const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgr
   const [editingProfile, setEditingProfile] = useState(false);
 const [profileMessage, setProfileMessage] = useState("");
 const [savingProfile, setSavingProfile] = useState(false);
+const [selectedProfileField, setSelectedProfileField] = useState("goal");
+const [confirmProfileSave, setConfirmProfileSave] = useState(false);
 
 
   const handleProfileFieldChange = (field, value) => {
@@ -10195,27 +10245,77 @@ const [profileForm, setProfileForm] = useState({
   height: userData?.height || "",
   weight: userData?.weight || "",
   goal: userData?.goal || "",
-  target_weight: userData?.target_weight || "",
-  target_body_fat: userData?.target_body_fat || "",
+  target_weight: userData?.target_weight || userData?.targetWeight || "",
+  target_body_fat: userData?.target_body_fat || userData?.targetBf || "",
   competition_sport: userData?.competition_sport || "",
   competition_date: userData?.competition_date || "",
   occupation: userData?.occupation || "",
-  workout_days: userData?.workout_days || "",
-  workout_duration: userData?.workout_duration || "",
-  workout_intensity: userData?.workout_intensity || "",
-  daily_steps: userData?.daily_steps || "",
-  sedentary_days: userData?.sedentary_days || "",
+  workout_days: userData?.workout_days || userData?.workoutDays || "",
+  workout_duration: userData?.workout_duration || userData?.workoutDuration || "",
+  workout_intensity: userData?.workout_intensity || userData?.workoutIntensity || "",
+  daily_steps: userData?.daily_steps || userData?.dailySteps || "",
+  sedentary_days: userData?.sedentary_days || userData?.sedentaryDays || "",
   diet: userData?.diet || "",
   allergies: userData?.allergies || "",
   sport: userData?.sport || "",
-  training_time: userData?.training_time || "",
-  breakfast_pref: userData?.breakfast_pref || "",
-  day_start: userData?.day_start || "",
-  day_end: userData?.day_end || "",
-  wearable_provider: userData?.wearable_provider || ""
+  training_time: userData?.training_time || userData?.trainingTime || "",
+  breakfast_pref: userData?.breakfast_pref || userData?.breakfastPref || "",
+  day_start: userData?.day_start || userData?.dayStart || "",
+  day_end: userData?.day_end || userData?.dayEnd || "",
+  wearable_provider: userData?.wearable_provider || userData?.wearable || ""
 });
+const PROFILE_FIELDS = [
+  {key:"name", label:t("set.field.name"), section:t("set.edit.profile"), type:"text", impactsDiet:false, reason:t("set.reason.profile")},
+  {key:"age", label:t("set.field.age"), section:t("set.edit.body"), type:"number", unit:t("phys.age.unit"), impactsDiet:true, reason:t("set.reason.energy")},
+  {key:"height", label:t("set.field.height"), section:t("set.edit.body"), type:"number", unit:"cm", impactsDiet:true, reason:t("set.reason.energy")},
+  {key:"weight", label:t("set.field.weight"), section:t("set.edit.body"), type:"number", unit:"kg", impactsDiet:true, reason:t("set.reason.energy")},
+  {key:"goal", label:t("set.field.goal"), section:t("set.edit.body"), type:"select", impactsDiet:true, reason:t("set.reason.energy"), options:[["fatLoss",t("goal.fatLoss.t")],["definition",t("goal.definition.t")],["gain",t("goal.gain.t")],["maintain",t("goal.maintain.t")]]},
+  {key:"workout_days", label:t("set.field.workoutDays"), section:t("set.edit.training"), type:"number", unit:"/7", impactsDiet:true, reason:t("set.reason.training")},
+  {key:"workout_duration", label:t("set.field.workoutDuration"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["<30",t("act.dur.short")],["30-45",t("act.dur.mid1")],["45-60",t("act.dur.mid2")],["60-90",t("act.dur.long")],[">90",t("act.dur.xlong")]]},
+  {key:"workout_intensity", label:t("set.field.workoutIntensity"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["leggera",t("act.int.light")],["moderata",t("act.int.moderate")],["alta",t("act.int.high")]]},
+  {key:"diet", label:t("set.field.diet"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["omnivore",t("pref.diet.omni")],["vegetarian",t("pref.diet.veg")],["vegan",t("pref.diet.vegan")]]},
+  {key:"allergies", label:t("set.field.allergies"), section:t("set.edit.nutrition"), type:"text", impactsDiet:true, reason:t("set.reason.foods")},
+  {key:"sport", label:t("set.field.sport"), section:t("set.edit.training"), type:"text", impactsDiet:true, reason:t("set.reason.training")},
+  {key:"training_time", label:t("set.field.trainingTime"), section:t("set.edit.routine"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["morning",t("pref.training.morning")],["lunch",t("pref.training.lunch")],["afternoon",t("pref.training.afternoon")],["evening",t("pref.training.evening")],["varies",t("pref.training.varies")]]},
+  {key:"breakfast_pref", label:t("set.field.breakfastPref"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["dolce",t("pref.bf.plain.sweet")],["salata",t("pref.bf.plain.salty")],["entrambi",t("pref.bf.plain.both")]]},
+  {key:"day_start", label:t("set.field.dayStart"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
+  {key:"day_end", label:t("set.field.dayEnd"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
+  {key:"wearable_provider", label:t("set.field.wearable"), section:t("set.edit.profile"), type:"select", impactsDiet:false, reason:t("set.reason.profile"), options:[["none",t("wear.none")],["apple",t("wear.apple")],["whoop",t("wear.whoop")],["garmin","Garmin"],["oura","Oura"],["polar","Polar"]]},
+];
+const selectedProfileDef = PROFILE_FIELDS.find(f => f.key === selectedProfileField) || PROFILE_FIELDS[0];
+const profileFieldGroups = [...new Set(PROFILE_FIELDS.map(f => f.section))];
+const profileFieldValue = (field) => {
+  const value = profileForm[field.key] ?? "";
+  if (field.options) return (field.options.find(o => String(o[0]) === String(value)) || [null,value])[1] || "—";
+  return value ? `${value}${field.unit ? ` ${field.unit}` : ""}` : "—";
+};
+const currentProfileValue = (key) => ({
+  target_weight: userData?.target_weight ?? userData?.targetWeight,
+  target_body_fat: userData?.target_body_fat ?? userData?.targetBf,
+  workout_days: userData?.workout_days ?? userData?.workoutDays,
+  workout_duration: userData?.workout_duration ?? userData?.workoutDuration,
+  workout_intensity: userData?.workout_intensity ?? userData?.workoutIntensity,
+  daily_steps: userData?.daily_steps ?? userData?.dailySteps,
+  sedentary_days: userData?.sedentary_days ?? userData?.sedentaryDays,
+  training_time: userData?.training_time ?? userData?.trainingTime,
+  breakfast_pref: userData?.breakfast_pref ?? userData?.breakfastPref,
+  day_start: userData?.day_start ?? userData?.dayStart,
+  day_end: userData?.day_end ?? userData?.dayEnd,
+  wearable_provider: userData?.wearable_provider ?? userData?.wearable
+}[key] ?? userData?.[key] ?? "");
+const changedProfileFields = () => PROFILE_FIELDS.filter(f => String(profileForm[f.key] ?? "") !== String(currentProfileValue(f.key) || ""));
+const selectedProfileImpactsDiet = changedProfileFields().some(f => f.impactsDiet);
 const handleSaveProfile = async () => {
   setProfileMessage("");
+  const changed = changedProfileFields();
+  if (!changed.length) {
+    setProfileMessage(t("set.edit.selectField"));
+    return;
+  }
+  if (!confirmProfileSave) {
+    setConfirmProfileSave(true);
+    return;
+  }
 
   const updatedData = {
   ...userData,
@@ -10223,12 +10323,18 @@ const handleSaveProfile = async () => {
   age: profileForm.age ? Number(profileForm.age) : null,
   height: profileForm.height ? Number(profileForm.height) : null,
   weight: profileForm.weight ? Number(profileForm.weight) : null,
-  target_weight: profileForm.target_weight ? Number(profileForm.target_weight) : null,
-  target_body_fat: profileForm.target_body_fat ? Number(profileForm.target_body_fat) : null,
-  workout_days: profileForm.workout_days ? Number(profileForm.workout_days) : null,
-  workout_duration: profileForm.workout_duration ? Number(profileForm.workout_duration) : null,
-  daily_steps: profileForm.daily_steps ? Number(profileForm.daily_steps) : null,
-  sedentary_days: profileForm.sedentary_days ? Number(profileForm.sedentary_days) : null
+  targetWeight: profileForm.target_weight ? Number(profileForm.target_weight) : (userData?.targetWeight || null),
+  targetBf: profileForm.target_body_fat ? Number(profileForm.target_body_fat) : (userData?.targetBf || null),
+  workoutDays: profileForm.workout_days ? String(profileForm.workout_days) : (userData?.workoutDays || "0"),
+  workoutDuration: profileForm.workout_duration || userData?.workoutDuration || "45-60",
+  workoutIntensity: profileForm.workout_intensity || userData?.workoutIntensity || "moderata",
+  dailySteps: profileForm.daily_steps || userData?.dailySteps || "unknown",
+  sedentaryDays: profileForm.sedentary_days ? Number(profileForm.sedentary_days) : (userData?.sedentaryDays || 0),
+  trainingTime: profileForm.training_time || userData?.trainingTime || "varies",
+  breakfastPref: profileForm.breakfast_pref || userData?.breakfastPref || "entrambi",
+  dayStart: profileForm.day_start ? Number(profileForm.day_start) : (userData?.dayStart || 7),
+  dayEnd: profileForm.day_end ? Number(profileForm.day_end) : (userData?.dayEnd || 22),
+  wearable: profileForm.wearable_provider || userData?.wearable || "none"
 };
 
   setSavingProfile(true);
@@ -10241,22 +10347,26 @@ const handleSaveProfile = async () => {
     return;
   }
 
-  const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData);
-
   setUserData(updatedData);
-  setPlan(updatedPlan);
   saveDubiProfile(updatedData);
-  if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+  if (selectedProfileImpactsDiet) {
+    const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData);
+    setPlan(updatedPlan);
+    if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+  }
 
   setSavingProfile(false);
   setEditingProfile(false);
-  setProfileMessage("Profile updated successfully. Your plan has been refreshed.");
+  setConfirmProfileSave(false);
+  setProfileMessage(t("set.edit.success"));
 };
 
   const GOAL_LABELS = {
     fatLoss:   t("goal.fatLoss.t"),
-    muscle:    t("goal.muscle.t"),
-    recomp:    t("goal.recomp.t"),
+    definition:t("goal.definition.t"),
+    gain:      t("goal.gain.t"),
+    muscle:    t("goal.gain.t"),
+    recomp:    t("goal.definition.t"),
     maintain:  t("goal.maintain.t"),
     athletic:  t("goal.athletic.t"),
   };
@@ -10289,11 +10399,13 @@ const handleSaveProfile = async () => {
     <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:120}}>
       {/* Header */}
       <div style={{padding:"56px 20px 0"}}>
-        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:800,color:T.text,letterSpacing:-0.8,margin:"0 0 20px"}}>{t("set.title")}</h1>
+        <p style={{fontSize:10,color:T.accentD,fontWeight:900,letterSpacing:1.5,margin:"0 0 8px"}}>{t("set.hero.kicker")}</p>
+        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:30,fontWeight:900,color:T.text,letterSpacing:-0.8,margin:"0 0 6px"}}>{t("set.title")}</h1>
+        <p style={{fontSize:13,color:T.muted,lineHeight:1.45,margin:"0 0 18px"}}>{t("set.hero.sub")}</p>
 
         {/* Avatar + name */}
-        <div style={{display:"flex",alignItems:"center",gap:16,padding:"16px 20px",background:T.card,borderRadius:20,border:`1px solid ${T.border}`,marginBottom:4}}>
-          <div style={{width:56,height:56,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:16,padding:"18px 20px",background:T.card,borderRadius:22,border:`1px solid ${T.border}`,marginBottom:4,boxShadow:"0 8px 24px rgba(0,0,0,.04)"}}>
+          <div style={{width:62,height:62,borderRadius:18,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
             <span style={{fontSize:22,fontWeight:800,color:"#fff"}}>{initial}</span>
           </div>
           <div>
@@ -10305,7 +10417,7 @@ const handleSaveProfile = async () => {
 
       <div style={{padding:"0 20px"}}>
 
-  {/* Edit onboarding answers */}
+  {/* Smart profile editor */}
   <div style={{
     background:T.card,
     border:`1px solid ${T.border}`,
@@ -10314,17 +10426,26 @@ const handleSaveProfile = async () => {
     marginBottom:16
   }}>
     <p style={{margin:0,fontSize:13,fontWeight:800,color:T.text}}>
-      Edit onboarding answers
+      {t("set.edit.title")}
     </p>
 
     <p style={{margin:"6px 0 14px",fontSize:11,color:T.muted,lineHeight:1.4}}>
-      Update your profile, goals, training, nutrition and wearable preferences using the onboarding flow.
+      {t("set.edit.sub")}
     </p>
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6,marginBottom:12}}>
+      {[["goal","set.quick.goal"],["diet","set.quick.diet"],["workout_days","set.quick.training"],["allergies","set.quick.allergies"]].map(([field,key])=>(
+        <button key={field} onClick={()=>{setEditingProfile(true);setSelectedProfileField(field);setConfirmProfileSave(false);}}
+          style={{padding:"9px 4px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:10,fontWeight:800,cursor:"pointer"}}>
+          {t(key)}
+        </button>
+      ))}
+    </div>
 
     <button
       onClick={() => {
-        localStorage.setItem("dubi_edit_onboarding", "true");
-        onEditOnboarding();
+        setEditingProfile(v=>!v);
+        setConfirmProfileSave(false);
       }}
       style={{
         width:"100%",
@@ -10337,9 +10458,87 @@ const handleSaveProfile = async () => {
         fontSize:14
       }}
     >
-      Open onboarding editor
+      {editingProfile ? t("set.edit.close") : t("set.edit.open")}
     </button>
+    {profileMessage && (
+      <p style={{margin:"10px 0 0",fontSize:11,fontWeight:700,color:profileMessage.includes("Could not")?"#B91C1C":T.accentD}}>
+        {profileMessage}
+      </p>
+    )}
   </div>
+
+  {editingProfile && (
+    <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:22,padding:16,marginBottom:16}}>
+      <p style={{margin:"0 0 10px",fontSize:13,fontWeight:800,color:T.text}}>{t("set.edit.pick")}</p>
+      {profileFieldGroups.map(group=>(
+        <div key={group} style={{marginBottom:12}}>
+          <p style={{margin:"0 0 7px",fontSize:10,fontWeight:800,color:T.muted,letterSpacing:1,textTransform:"uppercase"}}>{group}</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {PROFILE_FIELDS.filter(f=>f.section===group).map(field=>(
+              <button key={field.key} onClick={()=>{setSelectedProfileField(field.key);setConfirmProfileSave(false);}}
+                style={{padding:"10px",borderRadius:13,border:`1.5px solid ${selectedProfileField===field.key?T.accent:T.border}`,
+                  background:selectedProfileField===field.key?T.sel:T.bg,textAlign:"left",cursor:"pointer"}}>
+                <span style={{display:"block",fontSize:12,fontWeight:800,color:T.text}}>{field.label}</span>
+                <span style={{display:"block",fontSize:10,color:T.muted,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{profileFieldValue(field)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {selectedProfileDef && (
+        <div style={{marginTop:4,padding:14,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
+          <p style={{margin:"0 0 8px",fontSize:12,fontWeight:800,color:T.text}}>{t("set.edit.value")} · {selectedProfileDef.label}</p>
+          {selectedProfileDef.type==="select" ? (
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {(selectedProfileDef.options||[]).map(([value,label])=>(
+                <button key={value} onClick={()=>{handleProfileFieldChange(selectedProfileDef.key,value);setConfirmProfileSave(false);}}
+                  style={{padding:"11px 10px",borderRadius:12,border:`1.5px solid ${String(profileForm[selectedProfileDef.key])===String(value)?T.accent:T.border}`,
+                    background:String(profileForm[selectedProfileDef.key])===String(value)?T.card:T.bg,color:T.text,fontSize:12,fontWeight:800,cursor:"pointer",textAlign:"left"}}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <input type={selectedProfileDef.type==="number"?"number":"text"} value={profileForm[selectedProfileDef.key]||""}
+                onChange={e=>{handleProfileFieldChange(selectedProfileDef.key,e.target.value);setConfirmProfileSave(false);}}
+                style={{flex:1,padding:"13px 14px",borderRadius:14,border:`1.5px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,fontWeight:700,outline:"none"}} />
+              {selectedProfileDef.unit && <span style={{fontSize:13,color:T.muted,fontWeight:800}}>{selectedProfileDef.unit}</span>}
+            </div>
+          )}
+
+          <div style={{marginTop:12,padding:11,borderRadius:13,background:T.card,border:`1px solid ${T.border}`}}>
+            <p style={{margin:0,fontSize:11,color:T.muted,lineHeight:1.45}}>
+              <strong style={{color:T.text}}>{t("set.edit.reason")}:</strong> {selectedProfileDef.reason}
+            </p>
+          </div>
+
+          {confirmProfileSave && (
+            <div style={{marginTop:12,padding:12,borderRadius:14,background:selectedProfileImpactsDiet?"#FFF8F0":T.card,border:`1px solid ${selectedProfileImpactsDiet?"#E8D0AA":T.border}`}}>
+              <p style={{margin:"0 0 5px",fontSize:12,fontWeight:900,color:T.text}}>{t("set.edit.confirm")}</p>
+              <p style={{margin:0,fontSize:11,color:T.muted,lineHeight:1.45}}>
+                {selectedProfileImpactsDiet ? t("set.edit.confirmDiet") : t("set.edit.confirmNoDiet")}
+              </p>
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            {confirmProfileSave && (
+              <button onClick={()=>setConfirmProfileSave(false)}
+                style={{flex:1,padding:"12px",borderRadius:13,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                {t("set.edit.cancel")}
+              </button>
+            )}
+            <button onClick={handleSaveProfile} disabled={savingProfile}
+              style={{flex:confirmProfileSave?1.5:1,width:"100%",padding:"12px",borderRadius:13,border:"none",background:T.accentD,color:"#fff",fontWeight:900,fontSize:13,cursor:savingProfile?"default":"pointer",opacity:savingProfile ? .7 : 1}}>
+              {savingProfile ? t("set.edit.saving") : (confirmProfileSave ? t("set.edit.double") : t("set.edit.save"))}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )}
 
   {/* Personal data */}
   <SectionLabel lk="set.personal" />
@@ -10347,7 +10546,7 @@ const handleSaveProfile = async () => {
     {userData?.age && (
       <Row
         label={t("set.info.age")}
-        value={`${userData.age} ${t("age.unit")}`}
+        value={`${userData.age} ${t("phys.age.unit")}`}
       />
     )}
 
@@ -10435,23 +10634,23 @@ const handleSaveProfile = async () => {
             style={{width:"100%",padding:"15px 16px",borderRadius:16,
                     border:`1px solid #E8C4C4`,background:"#FDF5F5",
                     color:"#B91C1C",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:8}}>
-            Log out
+            {t("set.logout")}
           </button>
         ) : (
           <div style={{background:"#FDF5F5",borderRadius:16,border:`1px solid #E8C4C4`,padding:"18px 16px",marginTop:8}}>
             <p style={{fontSize:14,color:T.text,fontWeight:600,marginBottom:12,textAlign:"center"}}>
-              Are you sure you want to log out?
+              {t("set.logout.q")}
             </p>
             <div style={{display:"flex",gap:10}}>
               <button onClick={() => setShowLogoutConfirm(false)}
                 style={{flex:1,padding:"12px",borderRadius:12,border:`1px solid ${T.border}`,
                         background:T.card,color:T.text,fontWeight:600,fontSize:14,cursor:"pointer"}}>
-                Cancel
+                {t("set.logout.cancel")}
               </button>
               <button onClick={onLogout}
                 style={{flex:1,padding:"12px",borderRadius:12,border:"none",
                         background:"#B91C1C",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>
-                Log out
+                {t("set.logout")}
               </button>
             </div>
           </div>
