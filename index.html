@@ -4024,6 +4024,15 @@ function splitShoppingDisplay(item) {
   return match ? { name: match[1].trim(), quantity: match[2].trim() } : { name: text, quantity: "" };
 }
 
+function splitIngredientDisplay(item) {
+  const text = formatFoodText(item).trim();
+  const dashMatch = text.match(/^(.+?)\s*-\s*(\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|pz|media|medio|tazzina|cucchiaino))$/i);
+  if (dashMatch) return { name: dashMatch[1].trim(), quantity: dashMatch[2].trim(), full: text };
+  const parenMatch = text.match(/^(.+?)\s*\(([^)]+)\)$/);
+  if (parenMatch) return { name: parenMatch[1].trim(), quantity: parenMatch[2].trim(), full: text };
+  return { name: text, quantity: "", full: text };
+}
+
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
   if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
     const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
@@ -5044,6 +5053,7 @@ const IngredientModal = ({ingredient, onClose}) => {
     tip:  INGREDIENT_EN[_info.name].tip,
     macros: (()=>{ let m=_info.macros; m=m.replace(/1 uovo intero/,"1 whole egg").replace(/1 banana media/,"1 medium banana").replace(/1 media \(/,"1 medium (").replace(/1 dattero \(/,"1 date (").replace(/Succo /,"Juice ").replace(/3 gallette \(/,"3 rice cakes (").replace(/Per (\d+g) secco:/,"Per $1 dry:").replace(/cotti?:/,"cooked:").replace(/cotte:/,"cooked:").replace(/g G\b/g,"g F"); return m; })(),
   } : _info) : null;
+  const ingredientDisplay = splitIngredientDisplay(ingredient);
   return (
     <div style={{position:"fixed",inset:0,zIndex:250,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
       <div style={{background:"rgba(0,0,0,0.45)",position:"absolute",inset:0}} />
@@ -5053,7 +5063,7 @@ const IngredientModal = ({ingredient, onClose}) => {
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
           <div style={{flex:1,paddingRight:12}}>
-            <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:20,fontWeight:700,color:T.text,margin:"0 0 6px"}}>{info?.name || ingredient.split("(")[0].trim()}</h2>
+            <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:20,fontWeight:700,color:T.text,margin:"0 0 6px"}}>{info?.name || ingredientDisplay.name}</h2>
             {info && <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:info.catC+"20",color:info.catC,letterSpacing:0.3}}>{info.cat}</span>}
           </div>
           <button onClick={onClose} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:50,width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
@@ -8139,13 +8149,14 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                     {meal.items.map((item,i)=>{
                       const _tSwapKey = `${dayIdx}-${mt.id}-${i}`;
                       const _tDispItem = (swaps && swaps[_tSwapKey]) ? swaps[_tSwapKey] : item;
+                      const _tName = splitIngredientDisplay(_tDispItem).name;
                       return (
                       <div key={i} onClick={()=>setIngModal(_tDispItem)}
                         style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"6px 8px",borderRadius:10,cursor:"pointer",background:"transparent",border:`1px solid transparent`,transition:"all 0.15s"}}
                         onMouseEnter={e=>{e.currentTarget.style.background=T.sel;e.currentTarget.style.borderColor=T.border;}}
                         onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
                         <div style={{width:5,height:5,borderRadius:"50%",background:T.accent,flexShrink:0}} />
-                        <span style={{fontSize:14,color:T.text,flex:1}}>{localizeFood(_tDispItem, lang)}</span>
+                        <span style={{fontSize:14,color:T.text,flex:1}}>{localizeFood(_tName, lang)}</span>
                         <Ico n="chev" size={12} c={T.muted}/>
                       </div>
                       );
@@ -8235,6 +8246,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const [swapOpen,setSwapOpen] = useState(null);
   const [swapNotif,setSwapNotif] = useState(null); // {from, to}
   const [shoppingPrompt,setShoppingPrompt] = useState(null);
+  const [ingModal,setIngModal] = useState(null);
 
   // ── Banner stagionale — visibile ad ogni accesso, svanisce dopo 30s ──
   const [showSeasonBanner, setShowSeasonBanner] = useState(true);
@@ -8510,15 +8522,19 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
             {meal.items.map((item,i)=>{
               const swapKey = `${selDay}-${mKey}-${i}`;
               const displayItem = swaps[swapKey] || item;
+              const displayName = splitIngredientDisplay(displayItem).name;
               const hasAlts = Boolean(meal.alts && meal.alts[i] && meal.alts[i].length);
               const isSwapOpen = swapOpen===`${mKey}-${i}`;
               return (
                 <div key={i}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+                  <div onClick={()=>setIngModal(displayItem)}
+                    style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,padding:"5px 4px",borderRadius:9,cursor:"pointer"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background=T.sel;}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
                     <div style={{width:4,height:4,borderRadius:"50%",background:T.accent,flexShrink:0}} />
-                    <span style={{fontSize:13,color:T.text,flex:1,textDecoration:swaps[swapKey]?"line-through none":"none"}}>{localizeFood(displayItem, lang)}</span>
+                    <span style={{fontSize:13,color:T.text,flex:1,textDecoration:swaps[swapKey]?"line-through none":"none"}}>{localizeFood(displayName, lang)}</span>
                     {hasAlts && (
-                      <button onClick={()=>setSwapOpen(isSwapOpen?null:`${mKey}-${i}`)}
+                      <button onClick={(e)=>{e.stopPropagation();setSwapOpen(isSwapOpen?null:`${mKey}-${i}`);}}
                         style={{background:"none",border:"none",cursor:"pointer",padding:4,opacity:0.6}}>
                         <Ico n="swap" size={14} c={T.muted} />
                       </button>
@@ -8530,7 +8546,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
                       {meal.alts[i].map((alt,ai)=>(
                         <button key={ai} onClick={()=>doSwap(mKey,i,alt,displayItem)} title={localizeFood(alt,lang)}
                           style={{display:"block",width:"100%",textAlign:"left",padding:"8px 10px",marginBottom:4,borderRadius:8,background:T.card,border:`1px solid ${T.border}`,fontSize:13,color:T.text,cursor:"pointer"}}>
-                          {localizeFood(alt, lang)}
+                          {localizeFood(splitIngredientDisplay(alt).name, lang)}
                         </button>
                       ))}
                     </div>
@@ -8556,6 +8572,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
           </div>
         ))}
       </div>
+      {ingModal && <IngredientModal ingredient={ingModal} onClose={()=>setIngModal(null)}/>}
     </div>
   );
 };
