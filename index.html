@@ -2631,7 +2631,21 @@ const FOOD_DICT = {
     "Petto di pollo":"صدر دجاج","Pollo":"دجاج","Salmone":"سلمون","Tonno":"تونة","Uova":"بيض","Uova bio":"بيض عضوي","Pane integrale":"خبز كامل الحبوب","Pane":"خبز","Riso integrale":"أرز بنّي","Riso":"أرز","Avena":"شوفان","Banana":"موزة","Mele":"تفاح","Mela":"تفاحة","Frutti di bosco":"توت متنوع","Spinaci":"سبانخ","Broccoli":"بروكلي","Pomodorini":"طماطم كرزية","Avocado":"أفوكادو","Limone":"ليمون","Yogurt greco":"زبادي يوناني","Yogurt":"زبادي","Mandorle":"لوز","Noci":"جوز","Olio EVO":"زيت زيتون بكر","Quinoa":"كينوا","Tonno fresco":"تونة طازجة","Lenticchie rosse":"عدس أحمر","Lenticchie":"عدس","Tacchino":"ديك رومي","Merluzzo":"سمك القد","Patate dolci":"بطاطا حلوة","Patate":"بطاطس","Zucchine":"كوسا","Peperoni":"فلفل","Carote":"جزر","Rucola":"جرجير","Insalata":"سلطة","Cetrioli":"خيار","Cetriolo":"خيار","Ceci":"حمص","Pasta integrale":"معكرونة كاملة","Pasta":"معكرونة","Farro":"فاروـ قمح قديم","Latte":"حليب","Tofu":"توفو","Tempeh":"تمبيه","Cioccolato fondente":"شوكولاتة داكنة","Miele":"عسل","Cannella":"قرفة","Curcuma":"كركم","Manzo":"لحم بقر","Bresaola":"بريسولا","Verdure fresche":"خضروات طازجة","Cereali & Legumi":"حبوب وبقوليات","Grassi & Semi":"دهون وبذور","Frutta":"فواكه","Proteine":"بروتينات"
   }
 };
+function formatFoodText(item){
+  if (!item) return "";
+  if (typeof item === "string") return item;
+  if (typeof item === "number") return String(item);
+  if (Array.isArray(item)) return item.map(formatFoodText).filter(Boolean).join(", ");
+  if (typeof item === "object") {
+    const qty = item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ""}` : "";
+    const name = item.name || item.label || item.title || item.description || "";
+    return [name, qty].filter(Boolean).join(" - ") || JSON.stringify(item);
+  }
+  return String(item);
+}
+
 function localizeFood(text, lang){
+  text = formatFoodText(text);
   if (!text || lang==="it") return text;
   const dict = FOOD_DICT[lang] || FOOD_DICT.en;
   if (!dict) return text;
@@ -2886,7 +2900,7 @@ function getAiMealListForDay(plan, dayIdx, slots, times) {
       id,
       time: times[i] || "--:--",
       data: {
-        items: meal.ingredients?.length ? meal.ingredients : [meal.description || meal.name],
+        items: meal.ingredients?.length ? meal.ingredients.map(formatFoodText) : [formatFoodText(meal.description || meal.name)],
         macros: {
           cal: Number(meal.nutrition?.calories || 0),
           p: Number(meal.nutrition?.protein || 0),
