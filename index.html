@@ -415,6 +415,37 @@ const logAiWeightToBackend = async (weight) => {
     return null;
   }
 };
+
+const confirmAiAnomalyToBackend = async (payload) => {
+  const token = getAuthToken();
+
+  if (!token) {
+    console.warn("No auth token found. AI anomaly not saved.");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/anomaly/confirm`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Failed to confirm AI anomaly:", err);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("AI anomaly confirmation request failed:", error);
+    return null;
+  }
+};
     const fetchProgressHistory = async () => {
   const token = getAuthToken();
 
@@ -7725,6 +7756,28 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   }, []);
 
   const anomalyTxt = ANOMALY_TEXTS[lang] || ANOMALY_TEXTS.it;
+  const confirmAnomaly = async (answer) => {
+    const attribution = answer === "yes" ? "temporary_stress" : "none_reported";
+    setAnomalyState(answer);
+    const result = await confirmAiAnomalyToBackend({
+      anomaly_type: "acute_hrv_drop",
+      metric: "hrv",
+      current_value: 40,
+      baseline_value: 52,
+      delta_percent: -23,
+      attribution,
+      payload: {
+        source: "home_anomaly_card",
+        user_answer: answer
+      }
+    });
+
+    if (result?.decision) {
+      try {
+        sessionStorage.setItem("dubi_last_anomaly_decision", JSON.stringify(result.decision));
+      } catch(e) {}
+    }
+  };
 
   // ── Notifica del giorno (2x) ──
   const [activeNotif, setActiveNotif] = React.useState(null);
@@ -8000,12 +8053,12 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                   {anomalyTxt.question}
                 </p>
                 <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>setAnomalyState("yes")}
+                  <button onClick={()=>confirmAnomaly("yes")}
                     style={{flex:1,padding:"10px 8px",borderRadius:12,border:`1.5px solid ${T.accent}`,
                       background:T.sel,color:T.accentD,fontWeight:600,fontSize:12,cursor:"pointer"}}>
                     {anomalyTxt.yes}
                   </button>
-                  <button onClick={()=>setAnomalyState("no")}
+                  <button onClick={()=>confirmAnomaly("no")}
                     style={{flex:1,padding:"10px 8px",borderRadius:12,border:`1.5px solid ${T.border}`,
                       background:T.card,color:T.text,fontWeight:600,fontSize:12,cursor:"pointer"}}>
                     {anomalyTxt.no}
