@@ -7722,6 +7722,19 @@ const ANOMALY_TEXTS = {
   },
 };
 
+const ANOMALY_CAUSE_OPTIONS = [
+  { id: "caffeine", label: "Caffeina", detail: "Caffe, pre-workout o stimolanti" },
+  { id: "argument", label: "Litigata/stress", detail: "Discussione, ansia o rabbia" },
+  { id: "poor_sleep", label: "Sonno scarso", detail: "Poche ore o sonno disturbato" },
+  { id: "alcohol", label: "Alcool", detail: "Drink nelle ultime 24 ore" },
+  { id: "intense_training", label: "Allenamento intenso", detail: "Carico piu alto del solito" },
+  { id: "high_sodium", label: "Pasto molto salato", detail: "Possibile ritenzione temporanea" },
+  { id: "travel", label: "Viaggio", detail: "Jet lag, spostamenti o routine diversa" },
+  { id: "illness", label: "Malessere", detail: "Raffreddore, febbre o sintomi" },
+  { id: "menstrual_cycle", label: "Ciclo", detail: "Fase mestruale/ormonale" },
+  { id: "none_reported", label: "Nulla di evidente", detail: "DUBI monitora 48-72 ore" },
+];
+
 const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const { t, lang } = useT();
 
@@ -7737,6 +7750,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
 
   // ── Anomalia wearable — rilevamento sbalzi improvvisi ──
   const [anomalyState, setAnomalyState] = React.useState(null); // null | "pending" | "yes" | "no"
+  const [anomalyDecision, setAnomalyDecision] = React.useState(null);
 
   React.useEffect(() => {
     const today = new Date().toDateString();
@@ -7756,9 +7770,15 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   }, []);
 
   const anomalyTxt = ANOMALY_TEXTS[lang] || ANOMALY_TEXTS.it;
-  const confirmAnomaly = async (answer) => {
-    const attribution = answer === "yes" ? "temporary_stress" : "none_reported";
-    setAnomalyState(answer);
+  const confirmAnomaly = async (cause) => {
+    const causeOption = ANOMALY_CAUSE_OPTIONS.find(o => o.id === cause) || ANOMALY_CAUSE_OPTIONS[ANOMALY_CAUSE_OPTIONS.length - 1];
+    const attribution = causeOption.id;
+    setAnomalyState(causeOption.id === "none_reported" ? "no" : "yes");
+    setAnomalyDecision({
+      attribution,
+      action: causeOption.id === "none_reported" ? "monitor_48_72h" : "exclude_and_monitor",
+      excludedFromRegeneration: causeOption.id !== "none_reported"
+    });
     const result = await confirmAiAnomalyToBackend({
       anomaly_type: "acute_hrv_drop",
       metric: "hrv",
@@ -7768,11 +7788,13 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
       attribution,
       payload: {
         source: "home_anomaly_card",
-        user_answer: answer
+        cause_id: causeOption.id,
+        cause_label: causeOption.label
       }
     });
 
     if (result?.decision) {
+      setAnomalyDecision(result.decision);
       try {
         sessionStorage.setItem("dubi_last_anomaly_decision", JSON.stringify(result.decision));
       } catch(e) {}
@@ -8052,17 +8074,20 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                 <p style={{fontSize:13,fontWeight:600,color:T.text,margin:"0 0 12px",lineHeight:1.45}}>
                   {anomalyTxt.question}
                 </p>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>confirmAnomaly("yes")}
-                    style={{flex:1,padding:"10px 8px",borderRadius:12,border:`1.5px solid ${T.accent}`,
-                      background:T.sel,color:T.accentD,fontWeight:600,fontSize:12,cursor:"pointer"}}>
-                    {anomalyTxt.yes}
-                  </button>
-                  <button onClick={()=>confirmAnomaly("no")}
-                    style={{flex:1,padding:"10px 8px",borderRadius:12,border:`1.5px solid ${T.border}`,
-                      background:T.card,color:T.text,fontWeight:600,fontSize:12,cursor:"pointer"}}>
-                    {anomalyTxt.no}
-                  </button>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {ANOMALY_CAUSE_OPTIONS.map(option => {
+                    const isNone = option.id === "none_reported";
+                    return (
+                      <button key={option.id} onClick={()=>confirmAnomaly(option.id)}
+                        style={{padding:"10px 10px",borderRadius:12,
+                          border:`1.5px solid ${isNone ? T.border : "rgba(107,138,100,.45)"}`,
+                          background:isNone ? T.card : T.sel,color:isNone ? T.text : T.accentD,
+                          fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"left",lineHeight:1.25}}>
+                        <span style={{display:"block",fontSize:12,marginBottom:2}}>{option.label}</span>
+                        <span style={{display:"block",fontSize:10,fontWeight:500,color:T.muted}}>{option.detail}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -8071,7 +8096,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
               <>
                 <p style={{fontSize:13,color: anomalyState==="yes" ? T.accentD : "#C9A87C",
                   fontWeight:600,lineHeight:1.5,margin:"0 0 12px"}}>
-                  {anomalyState==="yes" ? anomalyTxt.respYes : anomalyTxt.respNo}
+                  {anomalyDecision?.excludedFromRegeneration ? anomalyTxt.respYes : anomalyTxt.respNo}
                 </p>
                 <button onClick={()=>setAnomalyState("dismissed")}
                   style={{padding:"9px 20px",borderRadius:11,border:"none",
