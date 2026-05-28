@@ -297,6 +297,7 @@ const fetchCurrentAiPlanFromBackend = async (userData) => {
     const data = await response.json();
     const rawPlan = data?.plan?.plan_json;
     const aiPlan = typeof rawPlan === "string" ? JSON.parse(rawPlan) : rawPlan;
+    if (JSON.stringify(aiPlan || {}).includes("Fonte proteica principale")) return null;
     return aiPlan ? mapAiPlanToFrontend(aiPlan, userData) : null;
   } catch (error) {
     console.error("Current AI plan load failed:", error);
@@ -10250,7 +10251,8 @@ function DUBIApp() {
 
   setUserData(normalizedOnboarding);
 
-  const sessionPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding) || calcPlan(normalizedOnboarding);
+  const currentAiPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding);
+  const sessionPlan = currentAiPlan || (await generateAiPlanFromBackend(normalizedOnboarding)).plan || calcPlan(normalizedOnboarding);
   setPlan(sessionPlan);
 
   setActiveTab("today");
@@ -10351,7 +10353,8 @@ if (data.age && data.age < 18) {
         {phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding) => {
   if (existingOnboarding) {
    setUserData(existingOnboarding);
-   const authPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding) || calcPlan(existingOnboarding);
+   const currentAiPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding);
+   const authPlan = currentAiPlan || (await generateAiPlanFromBackend(existingOnboarding)).plan || calcPlan(existingOnboarding);
    setPlan(authPlan);
    setActiveTab("today");
    setPhase("app");
