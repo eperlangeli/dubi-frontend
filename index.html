@@ -354,7 +354,7 @@ const saveIngredientSwapToBackend = async (payload) => {
     return null;
   }
 };
-    const saveProgressToBackend = async (progressData) => {
+const saveProgressToBackend = async (progressData) => {
   const token = getAuthToken();
 
   if (!token) {
@@ -381,6 +381,37 @@ const saveIngredientSwapToBackend = async (payload) => {
     return await response.json();
   } catch (error) {
     console.error("Progress save request failed:", error);
+    return null;
+  }
+};
+
+const logAiWeightToBackend = async (weight) => {
+  const token = getAuthToken();
+
+  if (!token) {
+    console.warn("No auth token found. AI weight log not saved.");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/weight/log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ weight })
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Failed to log AI weight:", err);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("AI weight log request failed:", error);
     return null;
   }
 };
@@ -9300,7 +9331,7 @@ const METRIC_CFG = {
   calorie: {labelKey:"prog.metric.cal", icon:"flame", unit:" kcal",color:"#C9A87C", inv:false, noteKey:"prog.imp.cal.l"},
 };
 
-const ProgressScreen = ({userData, plan, onOpenWrap}) => {
+const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const { t, lang } = useT();
 
   const [weightLog, setWeightLog] = useState(MOCK_METRIC_DATA.peso.map(d=>({week:d.w,weight:d.v})));
@@ -9394,12 +9425,27 @@ const ProgressScreen = ({userData, plan, onOpenWrap}) => {
 
   setSavingProgress(true);
 
-  const result = await saveProgressToBackend(progressPayload);
+  const [result, aiWeightResult] = await Promise.all([
+    saveProgressToBackend(progressPayload),
+    logAiWeightToBackend(weightValue)
+  ]);
 
   setSavingProgress(false);
 
   if (result) {
-    setProgressMessage("Progress saved successfully.");
+    const week = "S."+(weightLog.length+1);
+    setWeightLog(prev=>[...prev,{week,weight:weightValue}]);
+    setNewWeight("");
+    refreshProgressHistory();
+
+    if (aiWeightResult?.regenerated && aiWeightResult.plan && onAiPlanRefresh) {
+      onAiPlanRefresh(aiWeightResult.plan, weightValue);
+      setProgressMessage("Progress saved. DUBI regenerated your plan from the new weight trend.");
+    } else if (aiWeightResult?.decision?.explanation) {
+      setProgressMessage(`Progress saved. ${aiWeightResult.decision.explanation}`);
+    } else {
+      setProgressMessage("Progress saved successfully.");
+    }
   } else {
     setProgressMessage("Progress could not be saved. Please try again.");
   }
@@ -10644,6 +10690,15 @@ const handleLogout = () => {
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
 
+  const handleAiPlanRefreshFromProgress = (aiPlan, weightValue) => {
+    const nextUserData = {...userData, weight: weightValue};
+    const refreshedPlan = mapAiPlanToFrontend(aiPlan, nextUserData);
+    setUserData(nextUserData);
+    setPlan(refreshedPlan);
+    setSwaps({});
+    saveDubiProfile(nextUserData);
+  };
+
   const handleComplete = data => {
     
     // Safety engine: rileva regole HARD/SOFT/COERENZA
@@ -10777,7 +10832,7 @@ if (data.age && data.age < 18) {
               {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} isFirstAccess={isFirstAccess} swaps={swaps} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
-              {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} />}
+              {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} />}
               {activeTab==="sources"  && <SourcesScreen />}
               {activeTab==="settings" && (
   <SettingsScreen
