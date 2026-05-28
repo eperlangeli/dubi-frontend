@@ -3978,38 +3978,60 @@ function getDietMeals(diet, month, allergyText) {
 }
 
 
+function normalizeShoppingName(name) {
+  return formatFoodText(name).toLowerCase()
+    .replace(/\b(integrali?|bio|fresc[oa]|natural[ei]|magr[oa]|affumicat[oa]|0%|grezzo|secch[oi])\b/g,'')
+    .replace(/\d+%/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function getShoppingCategory(name) {
+  const n = formatFoodText(name).toLowerCase();
+  if (/\b(pollo|tacchino|salmone|tonno|sgombro|merluzzo|branzino|gamberi?|manzo|bresaola|uov[ao]|albumi|skyr|yogurt|kefir|ricotta|fiocchi di latt|tofu|tempeh|edamame|seitan|proteine|mozzarella|feta|grana)\b/.test(n)) return "Proteine";
+  if (/\b(riso|avena|quinoa|farro|pasta|orzo|cous.?cous|pane|patate|zucca|granola|crackers|gallette|muesli|farina|fiocchi|crema di riso|wrap|piadina|ceci|lenticchie|fagioli)\b/.test(n)) return "Cereali & Legumi";
+  if (/\b(spinaci|broccoli|zucchine?|peperoni|carote?|pomodorini?|pomodoro|rucola|cetrioli?|finocchi?|asparagi|fagiolini|insalata|funghi|verdure?|mais|minestrone)\b/.test(n)) return "Verdure fresche";
+  if (/\b(banana|mele?|mango|frutti rossi|frutti di bosco|kiwi|arancia|pere?|lamponi|mirtilli|fragole|frutta|datteri)\b/.test(n)) return "Frutta";
+  if (/\b(olio|mandorle?|noci|semi|sesamo|burro di arachidi|tahina|olive?|cioccolato|cacao|avocado|nocciole?)\b/.test(n)) return "Grassi & Semi";
+  return "Condimenti & Altro";
+}
+
+function parseShoppingIngredient(item) {
+  const display = formatFoodText(item).trim();
+  const match = display.match(/^(.+?)\s*-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)$/i);
+  const name = match ? match[1].trim() : display;
+  const qty = match ? parseFloat(match[2].replace(',','.')) : 1;
+  const rawUnit = match ? match[3].toLowerCase() : 'qb';
+  const unit = rawUnit === 'kg' ? 'g' : rawUnit === 'l' ? 'ml' : rawUnit;
+  const total = rawUnit === 'kg' || rawUnit === 'l' ? qty * 1000 : qty;
+  return { display, name, qty: total, unit, key: `${normalizeShoppingName(name)}|${unit}`, cat: getShoppingCategory(name) };
+}
+
+function formatShoppingQuantity(total, unit) {
+  if (unit === 'qb') return '';
+  if (unit === 'g' && total >= 1000) return ` (${(total / 1000).toFixed(total % 1000 ? 1 : 0)}kg)`;
+  if (unit === 'ml' && total >= 1000) return ` (${(total / 1000).toFixed(total % 1000 ? 1 : 0)}l)`;
+  if (unit === 'media') return ` (${Math.round(total)} ${Math.round(total) === 1 ? 'media' : 'medie'})`;
+  if (unit === 'medio') return ` (${Math.round(total)} ${Math.round(total) === 1 ? 'medio' : 'medi'})`;
+  if (unit === 'tazzina') return ` (${Math.round(total)} ${Math.round(total) === 1 ? 'tazzina' : 'tazzine'})`;
+  if (unit === 'cucchiaino') return ` (${Math.round(total)} ${Math.round(total) === 1 ? 'cucchiaino' : 'cucchiaini'})`;
+  return ` (${Math.round(total)}${unit})`;
+}
+
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
   if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
     const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
     const result = {};
     cats.forEach(c => { result[c] = []; });
 
-    const _key = (name) => name.toLowerCase()
-      .replace(/\b(integrali?|bio|fresc[oa]|natural[ei]|magr[oa]|affumicat[oa]|0%|grezzo|secch[oi])\b/g,'')
-      .replace(/\d+%/g,'').replace(/\s+/g,' ').trim();
-
-    const _cat = (name) => {
-      const n = name.toLowerCase();
-      if (/\b(pollo|tacchino|salmone|tonno|sgombro|merluzzo|branzino|gamberi?|manzo|bresaola|uov[ao]|albumi|skyr|yogurt|kefir|ricotta|fiocchi di latt|tofu|tempeh|edamame|seitan|proteine|mozzarella|feta|grana)\b/.test(n)) return "Proteine";
-      if (/\b(riso|avena|quinoa|farro|pasta|orzo|cous.?cous|pane|patate|zucca|granola|crackers|gallette|muesli|farina|fiocchi|crema di riso|wrap|piadina)\b/.test(n)) return "Cereali & Legumi";
-      if (/\b(spinaci|broccoli|zucchine?|peperoni|carote?|pomodorini?|pomodoro|rucola|cetrioli?|finocchi?|asparagi|fagiolini|insalata|funghi|verdure?|mais|minestrone)\b/.test(n)) return "Verdure fresche";
-      if (/\b(banana|mele?|mango|frutti rossi|frutti di bosco|kiwi|arancia|pere?|lamponi|mirtilli|fragole|frutta|datteri)\b/.test(n)) return "Frutta";
-      if (/\b(olio|mandorle?|noci|semi|sesamo|burro di arachidi|tahina|olive?|cioccolato|cacao|avocado|nocciole?)\b/.test(n)) return "Grassi & Semi";
-      return "Condimenti & Altro";
-    };
-
     const totals = {};
     const swaps = appliedSwaps || {};
     const add = (item, fallbackKey) => {
       const display = swaps[fallbackKey] || formatFoodText(item);
-      const match = display.match(/^(.+?)\s*-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)$/i);
-      const name = match ? match[1].trim() : display.trim();
-      const qty = match ? parseFloat(match[2].replace(',','.')) : 1;
-      const unit = match ? match[3].toLowerCase() : 'qb';
-      const k = _key(name);
-      if (!k) return;
-      if (!totals[k]) totals[k] = { dispName: name, total: 0, unit, cat: _cat(name) };
-      totals[k].total += unit === 'kg' || unit === 'l' ? qty * 1000 : qty;
+      const parsed = parseShoppingIngredient(display);
+      if (!parsed.key) return;
+      if (!totals[parsed.key]) totals[parsed.key] = { dispName: parsed.name, total: 0, unit: parsed.unit, cat: parsed.cat };
+      totals[parsed.key].total += parsed.qty;
     };
 
     plan.aiEnginePlan.mealStructure.days.forEach((day, dayIndex) => {
@@ -4020,13 +4042,7 @@ function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
     });
 
     Object.values(totals).forEach(({dispName, total, unit, cat}) => {
-      let qty = '';
-      if (unit !== 'qb') {
-        if ((unit === 'g' || unit === 'kg') && total >= 1000) qty = ` (${(total / 1000).toFixed(total % 1000 ? 1 : 0)}kg)`;
-        else if ((unit === 'ml' || unit === 'l') && total >= 1000) qty = ` (${(total / 1000).toFixed(total % 1000 ? 1 : 0)}l)`;
-        else qty = ` (${Math.round(total)}${unit})`;
-      }
-      result[cat].push(`${dispName}${qty}`);
+      result[cat].push(`${dispName}${formatShoppingQuantity(total, unit)}`);
     });
 
     cats.forEach(c => { if (!result[c]?.length) delete result[c]; });
@@ -4148,11 +4164,11 @@ function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
 
 // Unisce due liste personalizzate sommando le quantità degli articoli in comune
 function shoppingItemBase(item) {
-  return formatFoodText(item)
+  const text = formatFoodText(item)
     .replace(/\([^)]*\)/g, '')
     .replace(/\s*-\s*\d+(?:[,.]\d+)?\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)\b/i, '')
-    .trim()
-    .toLowerCase();
+    .trim();
+  return normalizeShoppingName(text);
 }
 
 function estimateIngredientMacros(item) {
