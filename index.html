@@ -309,6 +309,51 @@ const fetchCurrentAiPlanFromBackend = async (userData) => {
     return null;
   }
 };
+
+const fetchIngredientSwapsFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return {};
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/swaps`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+
+    if (!response.ok) return {};
+
+    const data = await response.json();
+    return (data.swaps || []).reduce((acc, row) => {
+      if (row.swap_key && row.replacement_ingredient) acc[row.swap_key] = row.replacement_ingredient;
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error("Ingredient swaps load failed:", error);
+    return {};
+  }
+};
+
+const saveIngredientSwapToBackend = async (payload) => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/swaps`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("Ingredient swap save failed:", error);
+    return null;
+  }
+};
     const saveProgressToBackend = async (progressData) => {
   const token = getAuthToken();
 
@@ -3933,7 +3978,61 @@ function getDietMeals(diet, month, allergyText) {
 }
 
 
-function getPersonalizedShopping(userData, plan) {
+function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
+  if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
+    const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
+    const result = {};
+    cats.forEach(c => { result[c] = []; });
+
+    const _key = (name) => name.toLowerCase()
+      .replace(/\b(integrali?|bio|fresc[oa]|natural[ei]|magr[oa]|affumicat[oa]|0%|grezzo|secch[oi])\b/g,'')
+      .replace(/\d+%/g,'').replace(/\s+/g,' ').trim();
+
+    const _cat = (name) => {
+      const n = name.toLowerCase();
+      if (/\b(pollo|tacchino|salmone|tonno|sgombro|merluzzo|branzino|gamberi?|manzo|bresaola|uov[ao]|albumi|skyr|yogurt|kefir|ricotta|fiocchi di latt|tofu|tempeh|edamame|seitan|proteine|mozzarella|feta|grana)\b/.test(n)) return "Proteine";
+      if (/\b(riso|avena|quinoa|farro|pasta|orzo|cous.?cous|pane|patate|zucca|granola|crackers|gallette|muesli|farina|fiocchi|crema di riso|wrap|piadina)\b/.test(n)) return "Cereali & Legumi";
+      if (/\b(spinaci|broccoli|zucchine?|peperoni|carote?|pomodorini?|pomodoro|rucola|cetrioli?|finocchi?|asparagi|fagiolini|insalata|funghi|verdure?|mais|minestrone)\b/.test(n)) return "Verdure fresche";
+      if (/\b(banana|mele?|mango|frutti rossi|frutti di bosco|kiwi|arancia|pere?|lamponi|mirtilli|fragole|frutta|datteri)\b/.test(n)) return "Frutta";
+      if (/\b(olio|mandorle?|noci|semi|sesamo|burro di arachidi|tahina|olive?|cioccolato|cacao|avocado|nocciole?)\b/.test(n)) return "Grassi & Semi";
+      return "Condimenti & Altro";
+    };
+
+    const totals = {};
+    const swaps = appliedSwaps || {};
+    const add = (item, fallbackKey) => {
+      const display = swaps[fallbackKey] || formatFoodText(item);
+      const match = display.match(/^(.+?)\s*-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)$/i);
+      const name = match ? match[1].trim() : display.trim();
+      const qty = match ? parseFloat(match[2].replace(',','.')) : 1;
+      const unit = match ? match[3].toLowerCase() : 'qb';
+      const k = _key(name);
+      if (!k) return;
+      if (!totals[k]) totals[k] = { dispName: name, total: 0, unit, cat: _cat(name) };
+      totals[k].total += unit === 'kg' || unit === 'l' ? qty * 1000 : qty;
+    };
+
+    plan.aiEnginePlan.mealStructure.days.forEach((day, dayIndex) => {
+      (day.meals || []).forEach((meal) => {
+        const slotId = AI_SLOT_IDS[meal.slot] || meal.slot || 'meal';
+        (meal.ingredients || []).forEach((item, itemIndex) => add(item, `${dayIndex}-${slotId}-${itemIndex}`));
+      });
+    });
+
+    Object.values(totals).forEach(({dispName, total, unit, cat}) => {
+      let qty = '';
+      if (unit !== 'qb') {
+        if ((unit === 'g' || unit === 'kg') && total >= 1000) qty = ` (${(total / 1000).toFixed(total % 1000 ? 1 : 0)}kg)`;
+        else if ((unit === 'ml' || unit === 'l') && total >= 1000) qty = ` (${(total / 1000).toFixed(total % 1000 ? 1 : 0)}l)`;
+        else qty = ` (${Math.round(total)}${unit})`;
+      }
+      result[cat].push(`${dispName}${qty}`);
+    });
+
+    cats.forEach(c => { if (!result[c]?.length) delete result[c]; });
+    return result;
+  }
+
   const diet  = (userData?.diet || "omnivore").toLowerCase();
   const allrg = (userData?.allergies || "").toLowerCase();
   const isVegan  = diet.includes("vegan");
@@ -4048,6 +4147,91 @@ function getPersonalizedShopping(userData, plan) {
 }
 
 // Unisce due liste personalizzate sommando le quantità degli articoli in comune
+function shoppingItemBase(item) {
+  return formatFoodText(item)
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\s*-\s*\d+(?:[,.]\d+)?\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)\b/i, '')
+    .trim()
+    .toLowerCase();
+}
+
+function estimateIngredientMacros(item) {
+  const text = formatFoodText(item);
+  const lower = text.toLowerCase();
+  const match = text.match(/-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio)/i);
+  let qty = match ? parseFloat(match[1].replace(',','.')) : 100;
+  const unit = match ? match[2].toLowerCase() : 'g';
+  if (unit === 'kg' || unit === 'l') qty *= 1000;
+  if (unit === 'pz' || unit === 'media' || unit === 'medio') qty *= 100;
+
+  const table = [
+    [/pollo|tacchino|tonno|merluzzo|branzino|nasello|gamberi|bresaola/, {cal:120,p:24,c:0,f:2}],
+    [/salmone|sgombro|trota/, {cal:200,p:22,c:0,f:12}],
+    [/uova/, {cal:140,p:12,c:1,f:10}],
+    [/tofu|tempeh|seitan|edamame/, {cal:145,p:16,c:8,f:6}],
+    [/yogurt greco|skyr|ricotta|fiocchi di latte|kefir/, {cal:85,p:11,c:5,f:2}],
+    [/proteine/, {cal:380,p:75,c:8,f:5}],
+    [/riso|pasta|quinoa|cous cous|orzo|farro|avena|granola|pane|wrap|piadina|gallette|crackers|crema di riso/, {cal:350,p:10,c:70,f:3}],
+    [/patate|zucca/, {cal:85,p:2,c:19,f:0}],
+    [/ceci|lenticchie|fagioli|legumi|hummus/, {cal:145,p:8,c:20,f:3}],
+    [/olio evo|olio/, {cal:900,p:0,c:0,f:100}],
+    [/avocado|noci|mandorle|semi|tahina|burro di arachidi|olive/, {cal:580,p:15,c:15,f:50}],
+    [/banana|mela|pera|kiwi|fragole|mirtilli|frutti|lamponi|mango|arancia|datteri/, {cal:70,p:1,c:16,f:0}],
+    [/zucchine|broccoli|spinaci|carote|verdure|insalata|pomodoro|cetrioli|peperoni|funghi|asparagi|finocchi|fagiolini|mais/, {cal:35,p:2,c:6,f:0}]
+  ];
+  const found = table.find(([rx]) => rx.test(lower));
+  if (!found) return {cal:0,p:0,c:0,f:0};
+  const per100 = found[1];
+  const factor = Math.max(0, qty) / 100;
+  return {
+    cal: Math.round(per100.cal * factor),
+    p: Math.round(per100.p * factor),
+    c: Math.round(per100.c * factor),
+    f: Math.round(per100.f * factor)
+  };
+}
+
+function getAdjustedMealMacros(dayIndex, mealKey, meal, swaps) {
+  const base = meal?.macros || {cal:0,p:0,c:0,f:0};
+  return (meal?.items || []).reduce((acc, item, itemIndex) => {
+    const key = `${dayIndex}-${mealKey}-${itemIndex}`;
+    if (!swaps?.[key]) return acc;
+    const oldMx = estimateIngredientMacros(item);
+    const newMx = estimateIngredientMacros(swaps[key]);
+    return {
+      cal: Math.max(0, acc.cal - oldMx.cal + newMx.cal),
+      p: Math.max(0, acc.p - oldMx.p + newMx.p),
+      c: Math.max(0, acc.c - oldMx.c + newMx.c),
+      f: Math.max(0, acc.f - oldMx.f + newMx.f)
+    };
+  }, {...base});
+}
+
+function ownedShoppingKey(userData) {
+  return `dubi_shopping_owned_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
+}
+
+function rememberOwnedShoppingIngredient(userData, item) {
+  try {
+    const key = ownedShoppingKey(userData);
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const base = shoppingItemBase(item);
+    if (base && !existing.includes(base)) localStorage.setItem(key, JSON.stringify([...existing, base]));
+  } catch(e) {}
+}
+
+function isShoppingFullyChecked(userData, plan, swaps) {
+  try {
+    const shop = getPersonalizedShopping(userData, plan, swaps);
+    const entries = Object.values(shop).flat();
+    if (!entries.length) return false;
+    const checked = JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}");
+    return entries.every(item => checked[item]);
+  } catch(e) {
+    return false;
+  }
+}
+
 function mergeShoppingLists(shop1, shop2, name1, name2) {
   const parseItem = str => {
     const m = str.match(/^(.+?)\s*\((\d+(?:\.\d+)?)\s*(g|kg|ml|l|pz)\)$/i);
@@ -8067,12 +8251,19 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const mealEntries = aiWeeklyMeals
     ? aiWeeklyMeals.map(m => ({...m, meal: m.data}))
     : fallbackMealEntries;
+  const adjustedMealEntries = mealEntries.map(entry => ({
+    ...entry,
+    meal: {
+      ...entry.meal,
+      macros: getAdjustedMealMacros(selDay, entry.id, entry.meal, swaps)
+    }
+  }));
 
   // Fattori di scala indipendenti per macro (stessa logica di TodayScreen)
-  const wBaseCal = mealEntries.reduce((s,m) => s + (m.meal?.macros?.cal||0), 0);
-  const wBaseP   = mealEntries.reduce((s,m) => s + (m.meal?.macros?.p||0),   0);
-  const wBaseC   = mealEntries.reduce((s,m) => s + (m.meal?.macros?.c||0),   0);
-  const wBaseF   = mealEntries.reduce((s,m) => s + (m.meal?.macros?.f||0),   0);
+  const wBaseCal = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.cal||0), 0);
+  const wBaseP   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.p||0),   0);
+  const wBaseC   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.c||0),   0);
+  const wBaseF   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.f||0),   0);
   const wScaleK  = wBaseCal > 0 ? plan.calories / wBaseCal : 1;
   const wScaleP  = wBaseP   > 0 ? plan.protein  / wBaseP   : wScaleK;
   const wScaleC  = wBaseC   > 0 ? plan.carbs    / wBaseC   : wScaleK;
@@ -8085,10 +8276,28 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   });
 
   const doSwap = (mealKey,itemIdx,newItem,oldItem) => {
-    setSwaps(s=>({...s,[`${selDay}-${mealKey}-${itemIdx}`]:newItem}));
+    const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
+    const replacement = formatFoodText(newItem);
+    let hadAtHome = null;
+
+    if (isShoppingFullyChecked(userData, plan, swaps)) {
+      hadAtHome = window.confirm(`DUBI: "${replacement}" non era nella lista della spesa completata. Ce l'hai gia?`);
+      if (hadAtHome) rememberOwnedShoppingIngredient(userData, replacement);
+    }
+
+    setSwaps(s=>({...s,[swapKey]:replacement}));
+    saveIngredientSwapToBackend({
+      swap_key: swapKey,
+      day_index: selDay,
+      meal_key: mealKey,
+      item_index: itemIdx,
+      original_ingredient: formatFoodText(oldItem),
+      replacement_ingredient: replacement,
+      had_at_home: hadAtHome
+    });
     setSwapOpen(null);
     // Notifica interna: ingrediente cambiato + lista spesa aggiornata
-    setSwapNotif({from: oldItem || "ingrediente", to: newItem});
+    setSwapNotif({from: oldItem || "ingrediente", to: replacement});
     setTimeout(()=>setSwapNotif(null), 4500);
   };
 
@@ -8191,7 +8400,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
 
       {/* Meals con swap */}
       <div style={{padding:"0 24px"}}>
-        {mealEntries.map(({id:mKey,label,icon,time,meal,workoutLabel,carbTargetPct})=>(
+        {adjustedMealEntries.map(({id:mKey,label,icon,time,meal,workoutLabel,carbTargetPct})=>(
           <div key={mKey} style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${workoutLabel?T.accent:T.border}`,borderRadius:16}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,alignItems:"center"}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
@@ -8469,18 +8678,30 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
   );
 };
 
-const ShoppingScreen = ({userData, plan, partnerProfile, onLinkPartner, onUnlinkPartner}) => {
+const shoppingStorageKey = (userData) => `dubi_shopping_checked_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
+
+const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, onUnlinkPartner}) => {
   const { t, lang } = useT();
 
-  const [checked, setChecked] = useState({});
+  const [checked, setChecked] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}"); } catch(e) { return {}; }
+  });
   const [filter, setFilter] = useState("all");
   const [partnerMode, setPartnerMode] = useState(false);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
   const toggle = key => setChecked(c => ({...c, [key]: !c[key]}));
   const resetAll = () => setChecked({});
 
+  React.useEffect(() => {
+    try { setChecked(JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}")); } catch(e) { setChecked({}); }
+  }, [userData?.dubiCode]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem(shoppingStorageKey(userData), JSON.stringify(checked)); } catch(e) {}
+  }, [checked, userData?.dubiCode]);
+
   // ── Lista personalizzata per l'utente corrente ──
-  const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan), [userData, plan]);
+  const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan, swaps), [userData, plan, swaps]);
 
   // ── Lista finale: merged se partner attivo, altrimenti solo la mia ──
   // Ogni entry è {item:string, tag:string|null}
@@ -8498,6 +8719,18 @@ const ShoppingScreen = ({userData, plan, partnerProfile, onLinkPartner, onUnlink
     });
     return wrapped;
   }, [myShop, partnerMode, partnerProfile]);
+
+  React.useEffect(() => {
+    try {
+      const owned = JSON.parse(localStorage.getItem(ownedShoppingKey(userData)) || "[]");
+      if (!owned.length) return;
+      const allItems = Object.values(activeShop).flat().map(e => e.item);
+      const toMark = allItems.filter(item => owned.includes(shoppingItemBase(item)) && !checked[item]);
+      if (toMark.length) {
+        setChecked(c => toMark.reduce((acc, item) => ({...acc, [item]: true}), c));
+      }
+    } catch(e) {}
+  }, [activeShop, userData?.dubiCode]);
 
   const allEntries = Object.values(activeShop).flat();
   const total = allEntries.length;
@@ -10262,6 +10495,7 @@ function DUBIApp() {
   const currentAiPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding);
   const sessionPlan = currentAiPlan || (await generateAiPlanFromBackend(normalizedOnboarding)).plan || calcPlan(normalizedOnboarding);
   setPlan(sessionPlan);
+  setSwaps(await fetchIngredientSwapsFromBackend());
 
   setActiveTab("today");
   setPhase("app");
@@ -10364,6 +10598,7 @@ if (data.age && data.age < 18) {
    const currentAiPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding);
    const authPlan = currentAiPlan || (await generateAiPlanFromBackend(existingOnboarding)).plan || calcPlan(existingOnboarding);
    setPlan(authPlan);
+   setSwaps(await fetchIngredientSwapsFromBackend());
    setActiveTab("today");
    setPhase("app");
 } else {
@@ -10426,7 +10661,7 @@ if (data.age && data.age < 18) {
             <div style={{height:"100vh",overflowY:"auto",position:"relative"}}>
               {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} isFirstAccess={isFirstAccess} swaps={swaps} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
-              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
+              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} />}
               {activeTab==="sources"  && <SourcesScreen />}
               {activeTab==="settings" && (
