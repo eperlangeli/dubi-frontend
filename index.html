@@ -446,6 +446,79 @@ const confirmAiAnomalyToBackend = async (payload) => {
     return null;
   }
 };
+const fetchWearableStatusFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/openwearables/status`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("Wearable status request failed:", error);
+    return null;
+  }
+};
+
+const fetchWearableProvidersFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return { providers: [], error: "missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/providers`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { providers: [], error: data.error || "providers_unavailable" };
+    return { providers: data.providers || data || [], error: null };
+  } catch (error) {
+    console.error("Wearable providers request failed:", error);
+    return { providers: [], error: "network_error" };
+  }
+};
+
+const createWearableUserInBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/openwearables/user`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("Wearable user creation failed:", error);
+    return null;
+  }
+};
+
+const authorizeWearableProviderInBackend = async (provider) => {
+  const token = getAuthToken();
+  if (!token) return { error: "missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/openwearables/authorize`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ provider, redirect_uri: window.location.origin })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: data.error || "authorization_failed" };
+    return data;
+  } catch (error) {
+    console.error("Wearable authorization failed:", error);
+    return { error: "network_error" };
+  }
+};
     const fetchProgressHistory = async () => {
   const token = getAuthToken();
 
@@ -10865,6 +10938,84 @@ const [profileMessage, setProfileMessage] = useState("");
 const [savingProfile, setSavingProfile] = useState(false);
 const [selectedProfileField, setSelectedProfileField] = useState("goal");
 const [confirmProfileSave, setConfirmProfileSave] = useState(false);
+const [wearableStatus, setWearableStatus] = useState(null);
+const [wearableProviders, setWearableProviders] = useState([]);
+const [wearableMessage, setWearableMessage] = useState("");
+const [wearableBusy, setWearableBusy] = useState(false);
+
+useEffect(() => {
+  let cancelled = false;
+
+  const loadWearables = async () => {
+    const status = await fetchWearableStatusFromBackend();
+    if (!cancelled) setWearableStatus(status?.connection || null);
+
+    const providersResult = await fetchWearableProvidersFromBackend();
+    if (cancelled) return;
+
+    if (providersResult.error) {
+      setWearableMessage(
+        providersResult.error === "OPENWEARABLES_API_KEY is not configured"
+          ? "OpenWearables non e ancora configurato su Render: aggiungi OPENWEARABLES_API_KEY."
+          : "Provider wearable non disponibili ora. Riprova tra poco."
+      );
+      setWearableProviders([]);
+      return;
+    }
+
+    const normalizedProviders = Array.isArray(providersResult.providers)
+      ? providersResult.providers
+      : Object.values(providersResult.providers || {});
+    setWearableProviders(normalizedProviders);
+  };
+
+  loadWearables();
+  return () => { cancelled = true; };
+}, []);
+
+const fallbackWearableProviders = [
+  { id: "garmin", name: "Garmin" },
+  { id: "polar", name: "Polar" },
+  { id: "oura", name: "Oura" },
+  { id: "whoop", name: "WHOOP" },
+  { id: "fitbit", name: "Fitbit" },
+  { id: "strava", name: "Strava" }
+];
+
+const wearableProviderList = wearableProviders.length
+  ? wearableProviders.map((provider) => ({
+      id: provider.id || provider.slug || provider.name,
+      name: provider.display_name || provider.name || provider.id || provider.slug
+    })).filter(provider => provider.id)
+  : fallbackWearableProviders;
+
+const handleConnectWearable = async (providerId) => {
+  setWearableBusy(true);
+  setWearableMessage("");
+
+  try {
+    await createWearableUserInBackend();
+    const auth = await authorizeWearableProviderInBackend(providerId);
+
+    if (auth.error) {
+      setWearableMessage(
+        auth.error === "OPENWEARABLES_API_KEY is not configured"
+          ? "Serve aggiungere OPENWEARABLES_API_KEY su Render prima del collegamento reale."
+          : "Non riesco ad aprire il collegamento wearable. Controlla API key/provider."
+      );
+      return;
+    }
+
+    if (auth.authorization_url) {
+      window.location.href = auth.authorization_url;
+      return;
+    }
+
+    setWearableMessage("OpenWearables non ha restituito un link OAuth valido.");
+  } finally {
+    setWearableBusy(false);
+  }
+};
 
 
   const handleProfileFieldChange = (field, value) => {
@@ -11198,6 +11349,48 @@ const handleSaveProfile = async () => {
       )}
     </div>
   )}
+
+  {/* Wearable connection */}
+  <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:22,padding:16,marginBottom:16}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+      <div style={{width:44,height:44,borderRadius:14,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <Ico n="heart" size={20} c={T.accentD}/>
+      </div>
+      <div style={{flex:1}}>
+        <p style={{margin:0,fontSize:14,fontWeight:900,color:T.text}}>Collega wearable</p>
+        <p style={{margin:"3px 0 0",fontSize:11,color:T.muted,lineHeight:1.35}}>
+          DUBI usa HRV, sonno, recovery e frequenza a riposo per adattare dieta e recupero.
+        </p>
+      </div>
+      <span style={{fontSize:10,fontWeight:900,color:wearableStatus ? T.accentD : T.muted,background:wearableStatus ? T.sel : T.bg,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 8px"}}>
+        {wearableStatus ? "Attivo" : "Da collegare"}
+      </span>
+    </div>
+
+    {wearableStatus && (
+      <div style={{padding:11,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`,marginBottom:12}}>
+        <p style={{margin:0,fontSize:11,color:T.muted,lineHeight:1.45}}>
+          Provider: <strong style={{color:T.text}}>{wearableStatus.provider || "OpenWearables"}</strong>
+          {wearableStatus.last_synced_at ? ` · ultimo sync ${String(wearableStatus.last_synced_at).slice(0,10)}` : ""}
+        </p>
+      </div>
+    )}
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+      {wearableProviderList.map(provider => (
+        <button key={provider.id} onClick={()=>handleConnectWearable(provider.id)} disabled={wearableBusy}
+          style={{padding:"12px 10px",borderRadius:14,border:`1.5px solid ${T.border}`,background:T.bg,color:T.text,fontSize:12,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1,textAlign:"left"}}>
+          {provider.name}
+        </button>
+      ))}
+    </div>
+
+    {wearableMessage && (
+      <p style={{margin:"12px 0 0",fontSize:11,fontWeight:700,color:wearableMessage.includes("OPENWEARABLES") || wearableMessage.includes("Serve") ? "#B7791F" : "#B91C1C",lineHeight:1.45}}>
+        {wearableMessage}
+      </p>
+    )}
+  </div>
 
   {/* Personal data */}
   <SectionLabel lk="set.personal" />
