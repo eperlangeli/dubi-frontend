@@ -2691,7 +2691,10 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita", "set.field.dailySteps":"Passi medi", "set.field.sedentaryDays":"Giorni sedentari", "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.dayStart":"Inizio giornata", "set.field.dayEnd":"Fine giornata", "set.field.wearable":"Wearable",
     "set.reason.energy":"influenza fabbisogno energetico, macro e porzioni.", "set.reason.foods":"influenza selezione ingredienti, allergeni e alternative sicure.", "set.reason.training":"influenza timing dei carboidrati, pasti pre/post workout e recupero.", "set.reason.routine":"influenza orari e distribuzione dei pasti.", "set.reason.profile":"aggiorna i dati profilo senza rigenerare la dieta.",
     "set.quick.goal":"Obiettivo", "set.quick.diet":"Dieta", "set.quick.training":"Allenamento", "set.quick.allergies":"Allergie",
-    "set.logout":"Esci", "set.logout.q":"Sei sicuro di voler uscire?", "set.logout.cancel":"Annulla"
+    "set.logout":"Esci", "set.logout.q":"Sei sicuro di voler uscire?", "set.logout.cancel":"Annulla",
+    "trend.summary.kicker":"BODY TREND", "trend.summary.title":"Il tuo corpo sta rispondendo", "trend.summary.body":"DUBI legge peso, aderenza, recupero, sonno e dati wearable per capire se il piano e giusto per il tuo fisico.",
+    "trend.personalized":"Calcolato sul tuo profilo: {goal}, {kcal} kcal, {meals} pasti e dati biometrici wearable.", "trend.open.weight":"Peso e grafico", "trend.open.metrics":"Metriche wearable", "trend.open.report":"Report completo", "trend.back":"Torna al riassunto",
+    "trend.card.weight":"Peso", "trend.card.recovery":"Recupero", "trend.card.adherence":"Aderenza", "trend.card.energy":"Energia", "trend.explain.weight":"Serve a capire se il ritmo e coerente con il tuo obiettivo, non solo se il numero scende o sale.", "trend.explain.recovery":"HRV e sonno dicono se il corpo sta assorbendo allenamento e dieta.", "trend.explain.adherence":"Mostra quanto il risultato dipende dalla costanza sui pasti.", "trend.explain.energy":"Confronta calorie del piano, TDEE e movimento reale."
   },
   en: {
     "set.hero.kicker":"PROFILE CENTER", "set.hero.sub":"Manage the data that drives DUBI plans, meals and adaptations.",
@@ -2706,7 +2709,10 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity", "set.field.dailySteps":"Average steps", "set.field.sedentaryDays":"Sedentary days", "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.dayStart":"Day start", "set.field.dayEnd":"Day end", "set.field.wearable":"Wearable",
     "set.reason.energy":"affects energy needs, macros and portions.", "set.reason.foods":"affects ingredient selection, allergens and safe alternatives.", "set.reason.training":"affects carb timing, pre/post workout meals and recovery.", "set.reason.routine":"affects meal timing and distribution.", "set.reason.profile":"updates profile data without regenerating nutrition.",
     "set.quick.goal":"Goal", "set.quick.diet":"Diet", "set.quick.training":"Training", "set.quick.allergies":"Allergies",
-    "set.logout":"Log out", "set.logout.q":"Are you sure you want to log out?", "set.logout.cancel":"Cancel"
+    "set.logout":"Log out", "set.logout.q":"Are you sure you want to log out?", "set.logout.cancel":"Cancel",
+    "trend.summary.kicker":"BODY TREND", "trend.summary.title":"Your body is responding", "trend.summary.body":"DUBI reads weight, adherence, recovery, sleep and wearable data to understand whether the plan fits your body.",
+    "trend.personalized":"Calculated for your profile: {goal}, {kcal} kcal, {meals} meals and wearable biometric data.", "trend.open.weight":"Weight and chart", "trend.open.metrics":"Wearable metrics", "trend.open.report":"Full report", "trend.back":"Back to summary",
+    "trend.card.weight":"Weight", "trend.card.recovery":"Recovery", "trend.card.adherence":"Adherence", "trend.card.energy":"Energy", "trend.explain.weight":"Shows whether the pace matches your goal, not just whether the number moves.", "trend.explain.recovery":"HRV and sleep show whether your body is absorbing training and nutrition.", "trend.explain.adherence":"Shows how much progress depends on meal consistency.", "trend.explain.energy":"Compares plan calories, TDEE and real movement."
   },
   fr: {
     "set.edit.open":"Choisir quoi modifier", "set.edit.title":"Modification intelligente", "set.edit.sub":"Modifie seulement ce dont tu as besoin. Si cela impacte la nutrition, DUBI explique pourquoi avant de mettre a jour le plan.", "set.logout":"Se deconnecter", "set.logout.cancel":"Annuler"
@@ -9465,6 +9471,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const [progressMessage, setProgressMessage] = useState("");
   const [savingProgress, setSavingProgress] = useState(false);
   const [activeMetric, setActiveMetric] = useState("peso");
+  const [trendView, setTrendView] = useState("summary");
   const [progressHistory, setProgressHistory] = useState([]);
   const [editingProgressId, setEditingProgressId] = useState(null);
   const [editingWeight, setEditingWeight] = useState("");
@@ -9526,6 +9533,19 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
     {icon:"steps",   color:T.accentD, label:t("prog.metric.steps"),       value:"8.234",                    note:undefined},
     {icon:"drop",    color:"#7BA8C4", label:t("prog.imp.water.l"),          value:`2.1 ${t("prog.water.unit")}`,             note:t("prog.imp.water.n")},
     {icon:"trend",   color:T.accentD, label:t("prog.imp.adherence.l"),          value:"87%",                      note:t("prog.imp.adherence.n")},
+  ];
+  const goalLabelForTrend = {
+    fatLoss: t("goal.fatLoss.t"),
+    definition: t("goal.definition.t"),
+    gain: t("goal.gain.t"),
+    maintain: t("goal.maintain.t"),
+    athletic: t("goal.athletic.t")
+  }[userData?.goal || plan?.goal] || userData?.goal || "DUBI";
+  const trendCards = [
+    {id:"weight", icon:"weight", label:t("trend.card.weight"), value:`${currentWeight} kg`, note:t("trend.explain.weight"), color:T.text, view:"weight", metric:"peso"},
+    {id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:"HRV 52 ms", note:t("trend.explain.recovery"), color:"#C47B7B", view:"metrics", metric:"hrv"},
+    {id:"adherence", icon:"check", label:t("trend.card.adherence"), value:"87%", note:t("trend.explain.adherence"), color:T.accentD, view:"report", metric:"sonno"},
+    {id:"energy", icon:"zap", label:t("trend.card.energy"), value:`${plan?.tdee || 2100} kcal`, note:t("trend.explain.energy"), color:"#C9A87C", view:"report", metric:"calorie"},
   ];
 
   const handleSaveProgress = async () => {
@@ -9632,18 +9652,22 @@ const handleUpdateProgress = async (id) => {
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
       <div style={{padding:"56px 24px 20px"}}>
-        <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:700,color:T.text,margin:"0 0 4px"}}>{t("prog.title")}</h2>
-        <p style={{fontSize:14,color:T.muted}}>{t("prog.subtitle",{n:weightLog.length})}</p>
+        <p style={{fontSize:10,color:T.accentD,fontWeight:900,letterSpacing:1.5,margin:"0 0 8px"}}>{t("trend.summary.kicker")}</p>
+        <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:30,fontWeight:900,color:T.text,margin:"0 0 6px",letterSpacing:-0.8}}>{t("prog.title")}</h2>
+        <p style={{fontSize:14,color:T.muted,lineHeight:1.5,margin:0}}>{t("trend.summary.body")}</p>
       </div>
 
-      {/* Trend badge */}
-      <div style={{margin:"0 24px 18px",padding:"12px 16px",background:T.sel,borderRadius:14,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:12}}>
+      {/* Trend summary */}
+      <div style={{margin:"0 24px 14px",padding:"16px",background:T.sel,borderRadius:18,border:`1px solid ${T.border}`,display:"flex",alignItems:"flex-start",gap:12}}>
         <div style={{width:36,height:36,borderRadius:11,background:`${trendColor}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           <Ico n={trendIcon} size={18} c={trendColor}/>
         </div>
         <div style={{flex:1}}>
-          <p style={{fontSize:13,fontWeight:700,color:trendColor,margin:0}}>{trendLabel}</p>
-          <p style={{fontSize:11,color:T.muted,margin:"2px 0 0"}}>{t("prog.trend.subtitle",{v:weeklyAvg})}</p>
+          <p style={{fontSize:16,fontWeight:900,color:T.text,margin:"0 0 4px"}}>{t("trend.summary.title")}</p>
+          <p style={{fontSize:13,fontWeight:800,color:trendColor,margin:"0 0 5px"}}>{trendLabel} · {t("prog.trend.subtitle",{v:weeklyAvg})}</p>
+          <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>
+            {t("trend.personalized",{goal:goalLabelForTrend,kcal:plan?.calories || "—",meals:plan?.mealCount || plan?.meals?.length || "—"})}
+          </p>
         </div>
       </div>
 
@@ -9662,6 +9686,36 @@ const handleUpdateProgress = async (id) => {
       </div>
 
       {/* ── METRIC SELECTOR TABS ── */}
+      <div style={{padding:"0 24px",marginBottom:18}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {trendCards.map(card=>(
+            <button key={card.id} onClick={()=>{setTrendView(card.view); setActiveMetric(card.metric || "peso");}}
+              style={{padding:14,borderRadius:16,border:`1px solid ${T.border}`,background:T.card,cursor:"pointer",textAlign:"left"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <div style={{width:28,height:28,borderRadius:9,background:`${card.color}1A`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <Ico n={card.icon} size={14} c={card.color}/>
+                </div>
+                <span style={{fontSize:12,fontWeight:900,color:T.text}}>{card.label}</span>
+              </div>
+              <p style={{fontSize:18,fontWeight:900,color:card.color,margin:"0 0 4px"}}>{card.value}</p>
+              <p style={{fontSize:10,color:T.muted,lineHeight:1.35,margin:0}}>{card.note}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {trendView !== "summary" && (
+        <div style={{padding:"0 24px",marginBottom:12}}>
+          <button onClick={()=>setTrendView("summary")}
+            style={{width:"100%",padding:"11px 14px",borderRadius:14,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontWeight:800,fontSize:12,cursor:"pointer"}}>
+            {t("trend.back")}
+          </button>
+        </div>
+      )}
+
+      {trendView !== "summary" && (
+      <>
+
       <div style={{padding:"0 24px",marginBottom:12}}>
         <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:10}}>{t("prog.metric.title")}</p>
         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
@@ -9919,6 +9973,9 @@ const handleUpdateProgress = async (id) => {
       </div>
 
       {/* ── MESSAGGIO MOTIVAZIONALE ── */}
+      </>
+      )}
+
       <div style={{margin:"0 24px 20px",padding:20,background:T.sel,borderRadius:20,border:`1px solid ${T.border}`}}>
         <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:10}}>{t("prog.message")}</p>
         <p style={{fontSize:15,color:T.text,lineHeight:1.7,fontStyle:"italic",margin:0}}>"{motivMsg}"</p>
@@ -10317,25 +10374,37 @@ const handleSaveProfile = async () => {
     return;
   }
 
+  const pick = (key, fallback = "") => {
+    const value = profileForm[key];
+    return value !== undefined && value !== null && String(value).trim() !== "" ? value : fallback;
+  };
   const updatedData = {
-  ...userData,
-  ...profileForm,
-  age: profileForm.age ? Number(profileForm.age) : null,
-  height: profileForm.height ? Number(profileForm.height) : null,
-  weight: profileForm.weight ? Number(profileForm.weight) : null,
-  targetWeight: profileForm.target_weight ? Number(profileForm.target_weight) : (userData?.targetWeight || null),
-  targetBf: profileForm.target_body_fat ? Number(profileForm.target_body_fat) : (userData?.targetBf || null),
-  workoutDays: profileForm.workout_days ? String(profileForm.workout_days) : (userData?.workoutDays || "0"),
-  workoutDuration: profileForm.workout_duration || userData?.workoutDuration || "45-60",
-  workoutIntensity: profileForm.workout_intensity || userData?.workoutIntensity || "moderata",
-  dailySteps: profileForm.daily_steps || userData?.dailySteps || "unknown",
-  sedentaryDays: profileForm.sedentary_days ? Number(profileForm.sedentary_days) : (userData?.sedentaryDays || 0),
-  trainingTime: profileForm.training_time || userData?.trainingTime || "varies",
-  breakfastPref: profileForm.breakfast_pref || userData?.breakfastPref || "entrambi",
-  dayStart: profileForm.day_start ? Number(profileForm.day_start) : (userData?.dayStart || 7),
-  dayEnd: profileForm.day_end ? Number(profileForm.day_end) : (userData?.dayEnd || 22),
-  wearable: profileForm.wearable_provider || userData?.wearable || "none"
-};
+    ...userData,
+    name: pick("name", userData?.name || ""),
+    gender: pick("gender", userData?.gender || "M"),
+    age: Number(pick("age", userData?.age || 18)),
+    height: Number(pick("height", userData?.height || 170)),
+    weight: Number(pick("weight", userData?.weight || 70)),
+    goal: pick("goal", userData?.goal || "maintain"),
+    targetWeight: pick("target_weight", userData?.targetWeight || null) ? Number(pick("target_weight", userData?.targetWeight || null)) : null,
+    targetBf: pick("target_body_fat", userData?.targetBf || null) ? Number(pick("target_body_fat", userData?.targetBf || null)) : null,
+    competitionSport: pick("competition_sport", userData?.competitionSport || null),
+    competitionDate: pick("competition_date", userData?.competitionDate || null),
+    occupation: pick("occupation", userData?.occupation || "sedentary"),
+    workoutDays: String(pick("workout_days", userData?.workoutDays || "0")),
+    workoutDuration: pick("workout_duration", userData?.workoutDuration || "45-60"),
+    workoutIntensity: pick("workout_intensity", userData?.workoutIntensity || "moderata"),
+    dailySteps: pick("daily_steps", userData?.dailySteps || "unknown"),
+    sedentaryDays: Number(pick("sedentary_days", userData?.sedentaryDays || 0)),
+    diet: pick("diet", userData?.diet || "omnivore"),
+    allergies: pick("allergies", userData?.allergies || ""),
+    sport: pick("sport", userData?.sport || ""),
+    trainingTime: pick("training_time", userData?.trainingTime || "varies"),
+    breakfastPref: pick("breakfast_pref", userData?.breakfastPref || "entrambi"),
+    dayStart: Number(pick("day_start", userData?.dayStart || 7)),
+    dayEnd: Number(pick("day_end", userData?.dayEnd || 22)),
+    wearable: pick("wearable_provider", userData?.wearable || "none")
+  };
 
   setSavingProfile(true);
 
