@@ -2694,7 +2694,10 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.logout":"Esci", "set.logout.q":"Sei sicuro di voler uscire?", "set.logout.cancel":"Annulla",
     "trend.summary.kicker":"BODY TREND", "trend.summary.title":"Il tuo corpo sta rispondendo", "trend.summary.body":"DUBI legge peso, aderenza, recupero, sonno e dati wearable per capire se il piano e giusto per il tuo fisico.",
     "trend.personalized":"Calcolato sul tuo profilo: {goal}, {kcal} kcal, {meals} pasti e dati biometrici wearable.", "trend.open.weight":"Peso e grafico", "trend.open.metrics":"Metriche wearable", "trend.open.report":"Report completo", "trend.back":"Torna al riassunto",
-    "trend.card.weight":"Peso", "trend.card.recovery":"Recupero", "trend.card.adherence":"Aderenza", "trend.card.energy":"Energia", "trend.explain.weight":"Serve a capire se il ritmo e coerente con il tuo obiettivo, non solo se il numero scende o sale.", "trend.explain.recovery":"HRV e sonno dicono se il corpo sta assorbendo allenamento e dieta.", "trend.explain.adherence":"Mostra quanto il risultato dipende dalla costanza sui pasti.", "trend.explain.energy":"Confronta calorie del piano, TDEE e movimento reale."
+    "trend.card.weight":"Peso", "trend.card.recovery":"Recupero", "trend.card.adherence":"Aderenza", "trend.card.energy":"Energia", "trend.explain.weight":"Serve a capire se il ritmo e coerente con il tuo obiettivo, non solo se il numero scende o sale.", "trend.explain.recovery":"HRV e sonno dicono se il corpo sta assorbendo allenamento e dieta.", "trend.explain.adherence":"Mostra quanto il risultato dipende dalla costanza sui pasti.", "trend.explain.energy":"Confronta calorie del piano, TDEE e movimento reale.",
+    "prog.save":"Salva progressi", "prog.saving":"Salvataggio...", "prog.history":"Storico progressi", "prog.empty":"Nessuna registrazione ancora.", "prog.edit":"Modifica", "prog.delete":"Elimina", "prog.cancel":"Annulla", "prog.save.short":"Salva",
+    "prog.err.weight":"Inserisci prima il peso attuale.", "prog.err.validWeight":"Inserisci un peso valido.", "prog.delete.confirm":"Vuoi eliminare questa registrazione?", "prog.note.manual":"Check-in manuale progressi",
+    "prog.msg.regenerated":"Progressi salvati. DUBI ha aggiornato il piano in base al nuovo trend peso.", "prog.msg.saved":"Progressi salvati correttamente.", "prog.msg.delete":"Registrazione eliminata.", "prog.msg.deleteErr":"Non sono riuscito a eliminare la registrazione. Riprova.", "prog.msg.update":"Registrazione aggiornata.", "prog.msg.updateErr":"Non sono riuscito ad aggiornare la registrazione. Riprova.", "prog.msg.saveErr":"Non sono riuscito a salvare i progressi. Riprova."
   },
   en: {
     "set.hero.kicker":"PROFILE CENTER", "set.hero.sub":"Manage the data that drives DUBI plans, meals and adaptations.",
@@ -2712,7 +2715,10 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.logout":"Log out", "set.logout.q":"Are you sure you want to log out?", "set.logout.cancel":"Cancel",
     "trend.summary.kicker":"BODY TREND", "trend.summary.title":"Your body is responding", "trend.summary.body":"DUBI reads weight, adherence, recovery, sleep and wearable data to understand whether the plan fits your body.",
     "trend.personalized":"Calculated for your profile: {goal}, {kcal} kcal, {meals} meals and wearable biometric data.", "trend.open.weight":"Weight and chart", "trend.open.metrics":"Wearable metrics", "trend.open.report":"Full report", "trend.back":"Back to summary",
-    "trend.card.weight":"Weight", "trend.card.recovery":"Recovery", "trend.card.adherence":"Adherence", "trend.card.energy":"Energy", "trend.explain.weight":"Shows whether the pace matches your goal, not just whether the number moves.", "trend.explain.recovery":"HRV and sleep show whether your body is absorbing training and nutrition.", "trend.explain.adherence":"Shows how much progress depends on meal consistency.", "trend.explain.energy":"Compares plan calories, TDEE and real movement."
+    "trend.card.weight":"Weight", "trend.card.recovery":"Recovery", "trend.card.adherence":"Adherence", "trend.card.energy":"Energy", "trend.explain.weight":"Shows whether the pace matches your goal, not just whether the number moves.", "trend.explain.recovery":"HRV and sleep show whether your body is absorbing training and nutrition.", "trend.explain.adherence":"Shows how much progress depends on meal consistency.", "trend.explain.energy":"Compares plan calories, TDEE and real movement.",
+    "prog.save":"Save progress", "prog.saving":"Saving...", "prog.history":"Progress history", "prog.empty":"No progress entries yet.", "prog.edit":"Edit", "prog.delete":"Delete", "prog.cancel":"Cancel", "prog.save.short":"Save",
+    "prog.err.weight":"Please enter your current weight first.", "prog.err.validWeight":"Please enter a valid weight.", "prog.delete.confirm":"Do you want to delete this progress entry?", "prog.note.manual":"Manual progress check-in",
+    "prog.msg.regenerated":"Progress saved. DUBI updated your plan from the new weight trend.", "prog.msg.saved":"Progress saved successfully.", "prog.msg.delete":"Progress entry deleted.", "prog.msg.deleteErr":"Could not delete this entry. Please try again.", "prog.msg.update":"Progress entry updated.", "prog.msg.updateErr":"Could not update this entry. Please try again.", "prog.msg.saveErr":"Progress could not be saved. Please try again."
   },
   fr: {
     "set.edit.open":"Choisir quoi modifier", "set.edit.title":"Modification intelligente", "set.edit.sub":"Modifie seulement ce dont tu as besoin. Si cela impacte la nutrition, DUBI explique pourquoi avant de mettre a jour le plan.", "set.logout":"Se deconnecter", "set.logout.cancel":"Annuler"
@@ -9554,7 +9560,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const weightValue = Number(newWeight || currentWeight || userData?.weight || 0);
 
   if (!weightValue) {
-    setProgressMessage("Please enter your current weight first.");
+    setProgressMessage(t("prog.err.weight"));
     return;
   }
 
@@ -9566,7 +9572,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
     meals_completed: mealsTotal,
     meals_total: mealsTotal,
     adherence_percent: 100,
-    note: "Manual progress check-in"
+    note: t("prog.note.manual")
   };
 
   setSavingProgress(true);
@@ -9586,14 +9592,14 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
 
     if (aiWeightResult?.regenerated && aiWeightResult.plan && onAiPlanRefresh) {
       onAiPlanRefresh(aiWeightResult.plan, weightValue);
-      setProgressMessage("Progress saved. DUBI regenerated your plan from the new weight trend.");
+      setProgressMessage(t("prog.msg.regenerated"));
     } else if (aiWeightResult?.decision?.explanation) {
-      setProgressMessage(`Progress saved. ${aiWeightResult.decision.explanation}`);
+      setProgressMessage(`${t("prog.msg.saved")} ${aiWeightResult.decision.explanation}`);
     } else {
-      setProgressMessage("Progress saved successfully.");
+      setProgressMessage(t("prog.msg.saved"));
     }
   } else {
-    setProgressMessage("Progress could not be saved. Please try again.");
+    setProgressMessage(t("prog.msg.saveErr"));
   }
 };
   const refreshProgressHistory = async () => {
@@ -9602,17 +9608,17 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
 };
 
 const handleDeleteProgress = async (id) => {
-  const confirmed = window.confirm("Are you sure you want to delete this progress entry?");
+  const confirmed = window.confirm(t("prog.delete.confirm"));
 
   if (!confirmed) return;
 
   const result = await deleteProgressEntry(id);
 
   if (result) {
-    setProgressMessage("Progress entry deleted successfully.");
+    setProgressMessage(t("prog.msg.delete"));
     refreshProgressHistory();
   } else {
-    setProgressMessage("Could not delete progress entry. Please try again.");
+    setProgressMessage(t("prog.msg.deleteErr"));
   }
 };
 
@@ -9630,7 +9636,7 @@ const handleUpdateProgress = async (id) => {
   const weightValue = Number(editingWeight);
 
   if (!weightValue) {
-    setProgressMessage("Please enter a valid weight.");
+    setProgressMessage(t("prog.err.validWeight"));
     return;
   }
 
@@ -9639,12 +9645,12 @@ const handleUpdateProgress = async (id) => {
   });
 
   if (result) {
-    setProgressMessage("Progress entry updated successfully.");
+    setProgressMessage(t("prog.msg.update"));
     setEditingProgressId(null);
     setEditingWeight("");
     refreshProgressHistory();
   } else {
-    setProgressMessage("Could not update progress entry. Please try again.");
+    setProgressMessage(t("prog.msg.updateErr"));
   }
 };
 
@@ -9780,13 +9786,13 @@ const handleUpdateProgress = async (id) => {
     opacity:savingProgress ? 0.7 : 1
   }}
 >
-  {savingProgress ? "Saving..." : "Save progress"}
+  {savingProgress ? t("prog.saving") : t("prog.save")}
 </button>
 
 {progressMessage && (
   <p style={{
     fontSize:12,
-    color:progressMessage.includes("successfully") ? "#2F855A" : "#B91C1C",
+    color:progressMessage.includes("Non ") || progressMessage.includes("Could not") || progressMessage.includes("Please") || progressMessage.includes("Inserisci") ? "#B91C1C" : "#2F855A",
     marginTop:10,
     marginBottom:0
   }}>
@@ -9795,12 +9801,12 @@ const handleUpdateProgress = async (id) => {
 )}
           <div style={{marginTop:16}}>
   <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:10,fontWeight:700}}>
-    Progress history
+    {t("prog.history")}
   </p>
 
   {progressHistory.length === 0 ? (
     <p style={{fontSize:12,color:T.muted,margin:0}}>
-      No progress entries yet.
+      {t("prog.empty")}
     </p>
   ) : (
     progressHistory.map(entry => (
@@ -9856,7 +9862,7 @@ const handleUpdateProgress = async (id) => {
                 fontWeight:800
               }}
             >
-              Save
+              {t("prog.save.short")}
             </button>
 
             <button
@@ -9871,7 +9877,7 @@ const handleUpdateProgress = async (id) => {
                 fontWeight:800
               }}
             >
-              Cancel
+              {t("prog.cancel")}
             </button>
           </div>
         ) : (
@@ -9888,7 +9894,7 @@ const handleUpdateProgress = async (id) => {
                 fontWeight:800
               }}
             >
-              Edit
+              {t("prog.edit")}
             </button>
 
             <button
@@ -9903,7 +9909,7 @@ const handleUpdateProgress = async (id) => {
                 fontWeight:800
               }}
             >
-              Delete
+              {t("prog.delete")}
             </button>
           </div>
         )}
