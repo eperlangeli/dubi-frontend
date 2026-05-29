@@ -2685,7 +2685,7 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.edit.value":"Nuovo valore", "set.edit.save":"Salva modifica", "set.edit.saving":"Salvataggio...", "set.edit.confirm":"Conferma aggiornamento",
     "set.edit.confirmDiet":"Questa modifica puo cambiare calorie, macro, ingredienti o distribuzione dei pasti.",
     "set.edit.confirmNoDiet":"Questa modifica aggiorna il profilo, ma non dovrebbe cambiare il piano nutrizionale gia generato.",
-    "set.edit.reason":"Motivo", "set.edit.double":"Confermo, aggiorna DUBI", "set.edit.cancel":"Annulla", "set.edit.success":"Profilo aggiornato. DUBI ha riallineato il piano.",
+    "set.edit.reason":"Motivo", "set.edit.double":"Confermo, aggiorna DUBI", "set.edit.cancel":"Annulla", "set.edit.success":"Profilo aggiornato. DUBI ha riallineato il piano.", "set.edit.error":"Non sono riuscito a salvare la modifica. Riprova tra poco.",
     "set.edit.selectField":"Seleziona un campo da modificare.", "set.edit.profile":"Profilo", "set.edit.body":"Corpo e obiettivo", "set.edit.training":"Allenamento", "set.edit.nutrition":"Nutrizione", "set.edit.routine":"Routine",
     "set.field.name":"Nome", "set.field.gender":"Sesso", "set.field.age":"Eta", "set.field.height":"Altezza", "set.field.weight":"Peso attuale", "set.field.goal":"Obiettivo", "set.field.targetWeight":"Peso target", "set.field.targetBf":"Body fat target",
     "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita", "set.field.dailySteps":"Passi medi", "set.field.sedentaryDays":"Giorni sedentari", "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.dayStart":"Inizio giornata", "set.field.dayEnd":"Fine giornata", "set.field.wearable":"Wearable",
@@ -2703,7 +2703,7 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.edit.value":"New value", "set.edit.save":"Save change", "set.edit.saving":"Saving...", "set.edit.confirm":"Confirm update",
     "set.edit.confirmDiet":"This change may alter calories, macros, ingredients or meal distribution.",
     "set.edit.confirmNoDiet":"This updates your profile and should not change the current nutrition plan.",
-    "set.edit.reason":"Reason", "set.edit.double":"I confirm, update DUBI", "set.edit.cancel":"Cancel", "set.edit.success":"Profile updated. DUBI realigned the plan.",
+    "set.edit.reason":"Reason", "set.edit.double":"I confirm, update DUBI", "set.edit.cancel":"Cancel", "set.edit.success":"Profile updated. DUBI realigned the plan.", "set.edit.error":"I could not save this change. Please try again shortly.",
     "set.edit.selectField":"Select a field to edit.", "set.edit.profile":"Profile", "set.edit.body":"Body and goal", "set.edit.training":"Training", "set.edit.nutrition":"Nutrition", "set.edit.routine":"Routine",
     "set.field.name":"Name", "set.field.gender":"Gender", "set.field.age":"Age", "set.field.height":"Height", "set.field.weight":"Current weight", "set.field.goal":"Goal", "set.field.targetWeight":"Target weight", "set.field.targetBf":"Target body fat",
     "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity", "set.field.dailySteps":"Average steps", "set.field.sedentaryDays":"Sedentary days", "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.dayStart":"Day start", "set.field.dayEnd":"Day end", "set.field.wearable":"Wearable",
@@ -10290,6 +10290,7 @@ const [confirmProfileSave, setConfirmProfileSave] = useState(false);
 
 
   const handleProfileFieldChange = (field, value) => {
+  setProfileMessage("");
   setProfileForm(prev => ({
     ...prev,
     [field]: value
@@ -10362,6 +10363,12 @@ const currentProfileValue = (key) => ({
 }[key] ?? userData?.[key] ?? "");
 const changedProfileFields = () => PROFILE_FIELDS.filter(f => String(profileForm[f.key] ?? "") !== String(currentProfileValue(f.key) || ""));
 const selectedProfileImpactsDiet = changedProfileFields().some(f => f.impactsDiet);
+const parseProfileHour = (value, fallback) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  const hour = parseInt(String(value).split(":")[0], 10);
+  return Number.isFinite(hour) ? hour : fallback;
+};
 const handleSaveProfile = async () => {
   setProfileMessage("");
   const changed = changedProfileFields();
@@ -10401,33 +10408,38 @@ const handleSaveProfile = async () => {
     sport: pick("sport", userData?.sport || ""),
     trainingTime: pick("training_time", userData?.trainingTime || "varies"),
     breakfastPref: pick("breakfast_pref", userData?.breakfastPref || "entrambi"),
-    dayStart: Number(pick("day_start", userData?.dayStart || 7)),
-    dayEnd: Number(pick("day_end", userData?.dayEnd || 22)),
+    dayStart: parseProfileHour(pick("day_start", userData?.dayStart || userData?.day_start || 7), 7),
+    dayEnd: parseProfileHour(pick("day_end", userData?.dayEnd || userData?.day_end || 22), 22),
     wearable: pick("wearable_provider", userData?.wearable || "none")
   };
 
   setSavingProfile(true);
-
-  const saved = await saveOnboardingToBackend(updatedData);
-
-  if (!saved) {
-    setSavingProfile(false);
-    setProfileMessage("Could not save profile changes. Please try again.");
-    return;
-  }
-
-  setUserData(updatedData);
-  saveDubiProfile(updatedData);
-  if (selectedProfileImpactsDiet) {
-    const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData);
-    setPlan(updatedPlan);
-    if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
-  }
-
-  setSavingProfile(false);
-  setEditingProfile(false);
   setConfirmProfileSave(false);
-  setProfileMessage(t("set.edit.success"));
+
+  try {
+    const saved = await saveOnboardingToBackend(updatedData);
+
+    if (!saved) {
+      setProfileMessage(t("set.edit.error"));
+      return;
+    }
+
+    setUserData(updatedData);
+    saveDubiProfile(updatedData);
+    if (selectedProfileImpactsDiet) {
+      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData);
+      setPlan(updatedPlan);
+      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+    }
+
+    setEditingProfile(false);
+    setProfileMessage(t("set.edit.success"));
+  } catch (error) {
+    console.error("Profile update error:", error);
+    setProfileMessage(t("set.edit.error"));
+  } finally {
+    setSavingProfile(false);
+  }
 };
 
   const GOAL_LABELS = {
