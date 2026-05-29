@@ -519,6 +519,28 @@ const authorizeWearableProviderInBackend = async (provider) => {
     return { error: "network_error" };
   }
 };
+
+const seedDemoWearableDataInBackend = async (scenario = "balanced") => {
+  const token = getAuthToken();
+  if (!token) return { error: "missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/demo/seed`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ scenario })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: data.error || "demo_seed_failed" };
+    return data;
+  } catch (error) {
+    console.error("Demo wearable seed failed:", error);
+    return { error: "network_error" };
+  }
+};
     const fetchProgressHistory = async () => {
   const token = getAuthToken();
 
@@ -11017,6 +11039,31 @@ const handleConnectWearable = async (providerId) => {
   }
 };
 
+const handleSeedDemoWearable = async (scenario = "balanced") => {
+  setWearableBusy(true);
+  setWearableMessage("");
+
+  try {
+    const result = await seedDemoWearableDataInBackend(scenario);
+    if (result.error) {
+      setWearableMessage("Non riesco a caricare i dati demo ora. Riprova tra poco.");
+      return;
+    }
+
+    const status = await fetchWearableStatusFromBackend();
+    setWearableStatus(status?.connection || { provider: "demo", status: "demo_seeded" });
+    const aiResult = await generateAiPlanFromBackend(userData);
+    if (aiResult?.plan) setPlan(aiResult.plan);
+    setWearableMessage(
+      scenario === "low_recovery"
+        ? `Demo caricata: ${result.importedCount} giorni con recupero basso recente. Piano rigenerato per testare l'adattamento.`
+        : `Demo caricata: ${result.importedCount} giorni con recupero normale. Piano rigenerato per testare l'adattamento.`
+    );
+  } finally {
+    setWearableBusy(false);
+  }
+};
+
 
   const handleProfileFieldChange = (field, value) => {
   setProfileMessage("");
@@ -11385,8 +11432,25 @@ const handleSaveProfile = async () => {
       ))}
     </div>
 
+    <div style={{marginTop:12,padding:12,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
+      <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Test senza wearable</p>
+      <p style={{margin:"4px 0 10px",fontSize:11,color:T.muted,lineHeight:1.45}}>
+        Carica dati biometrici demo per provare subito recupero, sonno, HRV e adattamento del piano.
+      </p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <button onClick={()=>handleSeedDemoWearable("balanced")} disabled={wearableBusy}
+          style={{padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
+          Demo normale
+        </button>
+        <button onClick={()=>handleSeedDemoWearable("low_recovery")} disabled={wearableBusy}
+          style={{padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
+          Demo recupero basso
+        </button>
+      </div>
+    </div>
+
     {wearableMessage && (
-      <p style={{margin:"12px 0 0",fontSize:11,fontWeight:700,color:wearableMessage.includes("OPENWEARABLES") || wearableMessage.includes("Serve") ? "#B7791F" : "#B91C1C",lineHeight:1.45}}>
+      <p style={{margin:"12px 0 0",fontSize:11,fontWeight:700,color:wearableMessage.includes("Demo caricata") ? T.accentD : wearableMessage.includes("OPENWEARABLES") || wearableMessage.includes("Serve") ? "#B7791F" : "#B91C1C",lineHeight:1.45}}>
         {wearableMessage}
       </p>
     )}
