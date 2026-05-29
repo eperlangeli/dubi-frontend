@@ -3518,16 +3518,18 @@ function runSafetyChecks(data) {
   const allergyText = (data.allergies || "").toLowerCase().trim();
   if (allergyText && allergyText.length >= 2 && !/^(nessun|no|none)/i.test(allergyText)) {
     const known = {
-      "glutine":   ["pane","pasta","avena","farro","orzo","cous","couscous","seitan","pancake","crackers","gallette","granola","muesli","waffle","french toast"],
+      "glutine":   ["pane","pasta","avena","farro","orzo","cous","couscous","seitan","pancake","crackers","gallette","granola","muesli","waffle","french toast","english muffin","segale","bulgur"],
       "lattosio":  ["yogurt","latte","ricotta","skyr","kefir","fiocchi di latte","parmigiano","mozzarella","formaggio","burro","cottage"],
       "latte":     ["yogurt","latte","ricotta","skyr","kefir","fiocchi di latte","parmigiano","mozzarella","formaggio","burro","cottage"],
       "uova":      ["uovo","uova","albume","frittata","pancake","french toast"],
       "pesce":     ["salmone","merluzzo","orata","branzino","sgombro","tonno","trota","pesce"],
       "crostacei": ["gamberi","gambero","aragosta","scampi"],
-      "frutta secca":["mandorl","noc","pistacch","anacard","nocciol","burro di arachid","burro di mandorle","tahini","pecan"],
-      "noci":      ["mandorl","noc","pistacch","anacard","nocciol","burro di arachid","burro di mandorle","tahini","pecan"],
+      "frutta secca":["mandorl","noc","pistacch","anacard","nocciol","pinoli","burro di arachid","burro di mandorle","pecan"],
+      "noci":      ["mandorl","noc","pistacch","anacard","nocciol","pinoli","burro di arachid","burro di mandorle","pecan"],
       "arachidi":  ["arachid","burro di arachid"],
-      "soia":      ["tofu","soia","tempeh","edamame","seitan"],
+      "sesamo":    ["sesamo","tahini","tahina"],
+      "semi":      ["semi","chia","lino","canapa","zucca","girasole","sesamo"],
+      "soia":      ["tofu","soia","tempeh","edamame"],
     };
     const matched = Object.keys(known).filter(k => allergyText.includes(k));
     if (matched.length > 0) {
@@ -4092,12 +4094,15 @@ function applyAllergyFilter(item, allergyText) {
   let result = item;
 
   // ── Gruppi allergenici riconosciuti ──────────────────────────────────────
-  const isLactoseFree = /latt(osio|icini?|e\b)|dairy|formagg|yogurt|ricotta|kefir|burro di mucca/.test(allrg);
+  const isLactoseFree = /latt(osio|icini?|e\b)|dairy|milk|formagg|yogurt|ricotta|kefir|burro di mucca/.test(allrg);
   const isEggFree     = /\buov[ao]?\b|uova|egg\b|albume|albumi/.test(allrg);
-  const isFishFree    = /\bpesce\b|fish\b|crostac|seafood|mollusch|salmone|tonno|gamberi|sgombro|merluzzo|orata|branzino/.test(allrg);
-  const isGlutenFree  = /glutin|celiac|celiach|frumento|grano\b|farro|orzo\b|bulgur/.test(allrg);
-  const isNutFree     = /frutta secca|noci\b|mandorl|arachid|pistacch|nocciole?|nuts\b/.test(allrg);
-  const isSoyFree     = /\bsoia\b|soy\b/.test(allrg);
+  const isFishFree    = /\bpesce\b|fish\b|crostac|seafood|mollusch|salmone|tonno|gamberi|sgombro|merluzzo|orata|branzino|spigola/.test(allrg);
+  const isGlutenFree  = /glutin|celiac|celiach|frumento|grano\b|segale|farro|orzo\b|bulgur|seitan|kamut/.test(allrg);
+  const isNutFree     = /frutta secca|noci\b|mandorl|arachid|pistacch|nocciole?|anacard|pinoli|pecan|nuts\b/.test(allrg);
+  const isPeanutFree  = /arachid|peanut/.test(allrg) || isNutFree;
+  const isSesameFree  = /sesamo|tahini|tahina|sesame/.test(allrg);
+  const isSeedFree    = /semi\b|seeds?\b|chia|lino|canapa|zucca|girasole/.test(allrg);
+  const isSoyFree     = /\bsoia\b|soy\b|tofu|tempeh|edamame/.test(allrg);
   const isChickenFree = /\bpollo\b|chicken/.test(allrg);
   const isBeefFree    = /\bmanzo\b|carne rossa|beef|bistecca|tagliata/.test(allrg);
   const isPorkFree    = /\bmaiale\b|prosciutto|pancetta|salame|pork/.test(allrg);
@@ -4133,6 +4138,7 @@ function applyAllergyFilter(item, allergyText) {
       .replace(/\bfrittata di albumi\b/gi,   "Frittata di ceci")
       .replace(/\bfrittata\b/gi,             "Frittata di ceci")
       .replace(/\bomelette\b/gi,             "Frittata di farina di ceci")
+      .replace(/\balbume\b/gi,               "Proteine vegetali in polvere")
       .replace(/\balbumi\b/gi,               "Proteine vegetali in polvere")
       .replace(/\buov[ao]\b/gi,              "Tofu morbido");
   }
@@ -4159,11 +4165,20 @@ function applyAllergyFilter(item, allergyText) {
       .replace(/\bpasta\b/gi,                "Pasta di riso")
       .replace(/\bpane integrale\b/gi,       "Pane senza glutine")
       .replace(/\bpane\b(?! senza glutine)/gi, "Pane senza glutine")
+      .replace(/\bfiocchi d'avena\b/gi,      "Fiocchi di riso")
+      .replace(/\bavena\b/gi,                "Fiocchi di riso")
       .replace(/\bfarro\b/gi,                "Riso integrale")
       .replace(/\borzo perlato\b/gi,         "Riso basmati")
       .replace(/\borzo\b/gi,                 "Riso basmati")
       .replace(/\bbulgur\b/gi,               "Riso basmati")
       .replace(/\bcous cous\b/gi,            "Riso basmati")
+      .replace(/\bseitan\b/gi,               "Legumi cotti")
+      .replace(/\bgranola\b/gi,              "Riso soffiato")
+      .replace(/\bmuesli\b/gi,               "Riso soffiato")
+      .replace(/\benglish muffin\b/gi,       "Pane senza glutine")
+      .replace(/\bfrench toast\b/gi,         "Toast senza glutine")
+      .replace(/\bpancake\b/gi,              "Pancake senza glutine")
+      .replace(/\bwaffle\b/gi,               "Waffle senza glutine")
       .replace(/\bgallette di riso\b/gi,     "Gallette di riso")
       .replace(/\bcrackers\b/gi,             "Gallette di riso")
       .replace(/\bgrissini\b/gi,             "Gallette di mais");
@@ -4180,15 +4195,40 @@ function applyAllergyFilter(item, allergyText) {
       .replace(/\bnocciole?\b/gi,            "Semi di girasole")
       .replace(/\barachidi\b/gi,             "Semi di girasole")
       .replace(/\bpinoli\b/gi,               "Semi di girasole")
-      .replace(/\bburro di mandorle\b/gi,    "Tahini (pasta di sesamo)")
-      .replace(/\bburro di arachidi\b/gi,    "Tahini (pasta di sesamo)");
+      .replace(/\bburro di mandorle\b/gi,    "Crema di semi di girasole")
+      .replace(/\bburro di arachidi\b/gi,    "Crema di semi di girasole");
+  }
+
+  if (isPeanutFree) {
+    result = result
+      .replace(/\barachidi\b/gi,             "Semi di girasole")
+      .replace(/\bburro di arachidi\b/gi,    "Crema di semi di girasole");
+  }
+
+  if (isSesameFree) {
+    result = result
+      .replace(/\bsemi di sesamo\b/gi,       "Semi di zucca")
+      .replace(/\bsesamo\b/gi,               "Semi di zucca")
+      .replace(/\btahini\b/gi,               "Hummus")
+      .replace(/\btahina\b/gi,               "Hummus");
+  }
+
+  if (isSeedFree) {
+    result = result
+      .replace(/\bsemi di chia\b/gi,         "Fiocchi di riso")
+      .replace(/\bsemi di lino\b/gi,         "Fiocchi di riso")
+      .replace(/\bsemi di canapa\b/gi,       "Fiocchi di riso")
+      .replace(/\bsemi di zucca\b/gi,        "Fiocchi di riso")
+      .replace(/\bsemi di girasole\b/gi,     "Fiocchi di riso")
+      .replace(/\bmix di semi\b/gi,          "Fiocchi di riso")
+      .replace(/\bcrema di semi di girasole\b/gi, "Hummus");
   }
 
   // ── Soia ─────────────────────────────────────────────────────────────────
   if (isSoyFree) {
     result = result
-      .replace(/\btofu\b/gi,                 "Petto di pollo")
-      .replace(/\btempeh\b/gi,               "Petto di pollo")
+      .replace(/\btofu\b/gi,                 "Hummus")
+      .replace(/\btempeh\b/gi,               "Ceci cotti")
       .replace(/\bedamame\b/gi,              "Piselli freschi")
       .replace(/\blatte di soia\b/gi,        "Latte di avena")
       .replace(/\byogurt di soia\b/gi,       "Yogurt di cocco");
@@ -4449,7 +4489,8 @@ function getWeeklyQualityCopy(lang) {
       promptNo:"No, aggiungilo",
       promptYes:"Si, ce l'ho",
       notifTitle:"Ingrediente aggiornato",
-      notifShopping:"Lista della spesa aggiornata automaticamente."
+      notifShopping:"Lista della spesa aggiornata automaticamente.",
+      allergyReason:"DUBI ha adattato ingredienti e alternative alle allergie/intolleranze dichiarate, mantenendo calorie, macro e qualita nutrizionale."
     },
     en: {
       title:"Daily quality check",
@@ -4465,7 +4506,8 @@ function getWeeklyQualityCopy(lang) {
       promptNo:"No, add it",
       promptYes:"Yes, I have it",
       notifTitle:"Ingredient updated",
-      notifShopping:"Shopping list updated automatically."
+      notifShopping:"Shopping list updated automatically.",
+      allergyReason:"DUBI adapted ingredients and alternatives to your declared allergies/intolerances while preserving calories, macros and nutritional quality."
     },
     fr: {
       title:"Controle qualite du jour",
@@ -4481,7 +4523,8 @@ function getWeeklyQualityCopy(lang) {
       promptNo:"Non, l'ajouter",
       promptYes:"Oui, je l'ai",
       notifTitle:"Ingredient mis a jour",
-      notifShopping:"Liste de courses mise a jour automatiquement."
+      notifShopping:"Liste de courses mise a jour automatiquement.",
+      allergyReason:"DUBI adapte les ingredients et alternatives a tes allergies/intolerances declarees, tout en gardant calories, macros et qualite nutritionnelle."
     },
     es: {
       title:"Control de calidad del dia",
@@ -4497,7 +4540,8 @@ function getWeeklyQualityCopy(lang) {
       promptNo:"No, anadirlo",
       promptYes:"Si, lo tengo",
       notifTitle:"Ingrediente actualizado",
-      notifShopping:"Lista de compra actualizada automaticamente."
+      notifShopping:"Lista de compra actualizada automaticamente.",
+      allergyReason:"DUBI adapto ingredientes y alternativas a tus alergias/intolerancias declaradas, manteniendo calorias, macros y calidad nutricional."
     },
     de: {
       title:"Qualitatscheck des Tages",
@@ -4513,7 +4557,8 @@ function getWeeklyQualityCopy(lang) {
       promptNo:"Nein, hinzufugen",
       promptYes:"Ja, habe ich",
       notifTitle:"Zutat aktualisiert",
-      notifShopping:"Einkaufsliste automatisch aktualisiert."
+      notifShopping:"Einkaufsliste automatisch aktualisiert.",
+      allergyReason:"DUBI passt Zutaten und Alternativen an deine angegebenen Allergien/Unvertraglichkeiten an und erhalt Kalorien, Makros und Ernahrungsqualitat."
     },
     pt: {
       title:"Controlo de qualidade do dia",
@@ -4529,7 +4574,8 @@ function getWeeklyQualityCopy(lang) {
       promptNo:"Nao, adicionar",
       promptYes:"Sim, tenho",
       notifTitle:"Ingrediente atualizado",
-      notifShopping:"Lista de compras atualizada automaticamente."
+      notifShopping:"Lista de compras atualizada automaticamente.",
+      allergyReason:"O DUBI adapta ingredientes e alternativas as alergias/intolerancias declaradas, mantendo calorias, macros e qualidade nutricional."
     }
   };
   return map[lang] || map.en;
@@ -4540,6 +4586,14 @@ function summarizeMealScience(meal, lang) {
   const raw = meal?.source || meal?.whyEN || meal?.why || "WHO/EFSA dietary quality principles";
   const text = localizeScientificText(raw, lang).replace(/^Fonte scientifica:\s*/i, "").trim();
   return `${copy.sciencePrefix} ${text}`;
+}
+
+function getMealReasonText(meal, lang, userData) {
+  const allergies = String(userData?.allergies || "").trim();
+  if (allergies && !/^(nessun|no|none)$/i.test(allergies)) {
+    return getWeeklyQualityCopy(lang).allergyReason;
+  }
+  return localizeScientificText((lang === "en" && meal?.whyEN) || meal?.why, lang);
 }
 
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
@@ -4577,11 +4631,15 @@ function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
   const allrg = (userData?.allergies || "").toLowerCase();
   const isVegan  = diet.includes("vegan");
   const isVeget  = isVegan || diet.includes("vegetar");
-  const noFish   = allrg.includes("pesce") || allrg.includes("crostac");
-  const noEgg    = allrg.includes("uov") || isVegan;
-  const noMilk   = allrg.includes("latt") || allrg.includes("lattosio") || isVegan;
-  const noNuts   = allrg.includes("frutta secca") || allrg.includes("noci") || allrg.includes("mandorl");
-  const noPeanut = allrg.includes("arachid") || noNuts;
+  const noFish   = /pesce|fish|crostac|seafood|mollusch|salmone|tonno|gamberi|sgombro|merluzzo|orata|branzino|spigola/.test(allrg);
+  const noEgg    = /uov|egg|albume/.test(allrg) || isVegan;
+  const noMilk   = /latt|lattosio|dairy|milk|formagg|yogurt|ricotta|kefir/.test(allrg) || isVegan;
+  const noGluten = /glutin|celiac|celiach|frumento|grano\b|segale|farro|orzo\b|bulgur|seitan|kamut/.test(allrg);
+  const noNuts   = /frutta secca|noci\b|mandorl|arachid|pistacch|nocciole?|anacard|pinoli|pecan|nuts\b/.test(allrg);
+  const noPeanut = /arachid|peanut/.test(allrg) || noNuts;
+  const noSesame = /sesamo|tahini|tahina|sesame/.test(allrg);
+  const noSeeds  = /semi\b|seeds?\b|chia|lino|canapa|zucca|girasole/.test(allrg);
+  const noSoy    = /soia|soy|tofu|tempeh|edamame/.test(allrg);
   const s = Math.min(2, Math.max(0.6, (plan?.calories || 2000) / 2000));
 
   // ── Estrai ingredienti direttamente da WEEKLY_MEALS ──
@@ -4655,8 +4713,12 @@ function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
           if (noFish && /salmone|tonno|sgombro|merluzzo|orata|branzino|spigola|gamberi?|crostac/i.test(n)) return;
           if (noEgg  && /uov[ao]|albumi/i.test(n)) return;
           if (noMilk && /\b(yogurt|ricotta|mozzarella|parmigian|formaggio|skyr|kefir|latte(?! di [a-z]))\b/i.test(n)) return;
+          if (noGluten && /\b(pane|pasta|avena|farro|orzo|bulgur|cous|seitan|granola|muesli|crackers|muffin|pancake|waffle|toast)\b/i.test(n)) return;
           if (noNuts && /\b(mandorl|noci|noce|pistacchi|anacardi|pinoli|nocciole?)\b/i.test(n)) return;
           if (noPeanut && /arachid|burro di arachidi/i.test(n)) return;
+          if (noSesame && /sesamo|tahini|tahina/i.test(n)) return;
+          if (noSeeds && /\b(semi|chia|lino|canapa|zucca|girasole)\b/i.test(n)) return;
+          if (noSoy && /\b(soia|tofu|tempeh|edamame)\b/i.test(n)) return;
           addIng(name, qty, unit);
         });
       });
@@ -8745,7 +8807,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                   )}
                   {showWhy[mt.id] && meal.why && (
                     <div style={{padding:14,marginBottom:12,background:T.bg,borderRadius:12,border:`1px solid ${T.border}`}}>
-                      <p style={{fontSize:13,color:T.text,lineHeight:1.6,margin:0}}>{localizeScientificText((lang==="en"&&meal.whyEN)||meal.why, lang)}</p>
+                        <p style={{fontSize:13,color:T.text,lineHeight:1.6,margin:0}}>{getMealReasonText(meal, lang, userData)}</p>
                     </div>
                   )}
                   <div style={{display:"flex",gap:8}}>
