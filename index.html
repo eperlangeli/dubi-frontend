@@ -9992,6 +9992,52 @@ const METRIC_CFG = {
   calorie: {labelKey:"prog.metric.cal", icon:"flame", unit:" kcal",color:"#C9A87C", inv:false, noteKey:"prog.imp.cal.l"},
 };
 
+function getWeightDecisionCopy(lang) {
+  const map = {
+    it: {
+      early:"Peso salvato. DUBI osserva ancora: servono almeno 3-4 check-in per distinguere trend reale e oscillazioni.",
+      anomaly:"Peso salvato, ma DUBI non rigenera: questo salto sembra temporaneo. Controlla sonno, sale, stress, ciclo, caffeina o allenamento intenso e registra il prossimo peso.",
+      onTrack:"Peso salvato. Il trend e coerente con il tuo obiettivo: DUBI mantiene il piano attuale.",
+      plateau:"Peso salvato. Plateau reale rilevato su piu check-in: DUBI puo aggiornare il piano.",
+      slow:"Peso salvato. Il ritmo e piu lento del previsto, ma non basta ancora per rigenerare: DUBI aspetta un altro check-in."
+    },
+    en: {
+      early:"Weight saved. DUBI is still observing: at least 3-4 check-ins are needed to separate real trend from noise.",
+      anomaly:"Weight saved, but DUBI will not regenerate: this jump looks temporary. Check sleep, salt, stress, cycle, caffeine or intense training and log the next weight.",
+      onTrack:"Weight saved. The trend matches your goal: DUBI keeps the current plan.",
+      plateau:"Weight saved. Real plateau detected across multiple check-ins: DUBI can update the plan.",
+      slow:"Weight saved. Pace is slower than expected, but not enough to regenerate yet: DUBI waits for another check-in."
+    }
+  };
+  return map[lang] || map.en;
+}
+
+function evaluateWeightPlanDecision(weightLog, nextWeight, plan, userData, lang) {
+  const copy = getWeightDecisionCopy(lang);
+  const points = [...(weightLog || []), {weight: Number(nextWeight)}]
+    .map(p => Number(p.weight))
+    .filter(v => Number.isFinite(v) && v > 20 && v < 350);
+  if (points.length < 3) return {state:"early", allowRegeneration:false, explanation:copy.early};
+  const prev = points[points.length - 2];
+  const current = points[points.length - 1];
+  const jumpAbs = Math.abs(current - prev);
+  const jumpPct = prev ? jumpAbs / prev : 0;
+  if (jumpAbs >= 2 || jumpPct >= 0.025) return {state:"anomaly", allowRegeneration:false, explanation:copy.anomaly};
+
+  const recent = points.slice(-4);
+  const deltas = recent.slice(1).map((v, i) => v - recent[i]);
+  const avgDelta = deltas.reduce((a,b)=>a+b,0) / Math.max(1, deltas.length);
+  const expected = Number(plan?.weeklyLossKg || 0);
+  const goal = userData?.goal || plan?.goal || "";
+  const wantsGain = goal === "gain" || expected < 0;
+  const expectedAbs = Math.max(0.15, Math.abs(expected || (wantsGain ? -0.25 : 0.35)));
+  const actualProgress = wantsGain ? avgDelta : -avgDelta;
+  const plateau = recent.length >= 4 && deltas.every(d => Math.abs(d) <= 0.15);
+  if (plateau) return {state:"plateau", allowRegeneration:true, explanation:copy.plateau};
+  if (actualProgress >= expectedAbs * 0.55) return {state:"onTrack", allowRegeneration:false, explanation:copy.onTrack};
+  return {state:"slow", allowRegeneration:false, explanation:copy.slow};
+}
+
 const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const { t, lang } = useT();
 
@@ -10099,6 +10145,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   };
 
   setSavingProgress(true);
+  const localWeightDecision = evaluateWeightPlanDecision(weightLog, weightValue, plan, userData, lang);
 
   const [result, aiWeightResult] = await Promise.all([
     saveProgressToBackend(progressPayload),
@@ -10113,9 +10160,11 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
     setNewWeight("");
     refreshProgressHistory();
 
-    if (aiWeightResult?.regenerated && aiWeightResult.plan && onAiPlanRefresh) {
+    if (aiWeightResult?.regenerated && aiWeightResult.plan && onAiPlanRefresh && localWeightDecision.allowRegeneration) {
       onAiPlanRefresh(aiWeightResult.plan, weightValue);
       setProgressMessage(t("prog.msg.regenerated"));
+    } else if (localWeightDecision?.explanation) {
+      setProgressMessage(localWeightDecision.explanation);
     } else if (aiWeightResult?.decision?.explanation) {
       setProgressMessage(`${t("prog.msg.saved")} ${aiWeightResult.decision.explanation}`);
     } else {
