@@ -10964,6 +10964,7 @@ const [wearableStatus, setWearableStatus] = useState(null);
 const [wearableProviders, setWearableProviders] = useState([]);
 const [wearableMessage, setWearableMessage] = useState("");
 const [wearableBusy, setWearableBusy] = useState(false);
+const [realWearablesReady, setRealWearablesReady] = useState(true);
 
 useEffect(() => {
   let cancelled = false;
@@ -10976,10 +10977,11 @@ useEffect(() => {
     if (cancelled) return;
 
     if (providersResult.error) {
+      setRealWearablesReady(false);
       setWearableMessage(
         providersResult.error === "OPENWEARABLES_API_KEY is not configured"
-          ? "OpenWearables non e ancora configurato su Render: aggiungi OPENWEARABLES_API_KEY."
-          : "Provider wearable non disponibili ora. Riprova tra poco."
+          ? "Collegamento reale non ancora attivo: manca la configurazione OpenWearables su Render. Puoi usare il test demo."
+          : "Provider wearable reali non disponibili ora. Puoi usare il test demo."
       );
       setWearableProviders([]);
       return;
@@ -10988,6 +10990,7 @@ useEffect(() => {
     const normalizedProviders = Array.isArray(providersResult.providers)
       ? providersResult.providers
       : Object.values(providersResult.providers || {});
+    setRealWearablesReady(normalizedProviders.length > 0);
     setWearableProviders(normalizedProviders);
   };
 
@@ -11009,7 +11012,7 @@ const wearableProviderList = wearableProviders.length
       id: provider.id || provider.slug || provider.name,
       name: provider.display_name || provider.name || provider.id || provider.slug
     })).filter(provider => provider.id)
-  : fallbackWearableProviders;
+  : (realWearablesReady ? fallbackWearableProviders : []);
 
 const handleConnectWearable = async (providerId) => {
   setWearableBusy(true);
@@ -11423,14 +11426,23 @@ const handleSaveProfile = async () => {
       </div>
     )}
 
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-      {wearableProviderList.map(provider => (
-        <button key={provider.id} onClick={()=>handleConnectWearable(provider.id)} disabled={wearableBusy}
-          style={{padding:"12px 10px",borderRadius:14,border:`1.5px solid ${T.border}`,background:T.bg,color:T.text,fontSize:12,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1,textAlign:"left"}}>
-          {provider.name}
-        </button>
-      ))}
-    </div>
+    {wearableProviderList.length > 0 ? (
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {wearableProviderList.map(provider => (
+          <button key={provider.id} onClick={()=>handleConnectWearable(provider.id)} disabled={wearableBusy}
+            style={{padding:"12px 10px",borderRadius:14,border:`1.5px solid ${T.border}`,background:T.bg,color:T.text,fontSize:12,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1,textAlign:"left"}}>
+            {provider.name}
+          </button>
+        ))}
+      </div>
+    ) : (
+      <div style={{padding:12,borderRadius:16,background:T.bg,border:`1px solid ${T.border}`,marginBottom:12}}>
+        <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Collegamento reale in preparazione</p>
+        <p style={{margin:"4px 0 0",fontSize:11,color:T.muted,lineHeight:1.45}}>
+          Quando OpenWearables sara configurato, qui appariranno WHOOP, Polar, Garmin e gli altri provider autorizzabili.
+        </p>
+      </div>
+    )}
 
     <div style={{marginTop:12,padding:12,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
       <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Test senza wearable</p>
