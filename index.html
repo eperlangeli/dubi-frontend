@@ -5718,8 +5718,36 @@ const ASK_DUBI_SUGGESTION_KEYS = [
 // ── PLAN CHANGE DETECTION ──
 // Ritorna un oggetto planChange se il messaggio implica una modifica al piano di oggi.
 // action: "skip_meal" | "shift_times" | "light_day"
+function getPlanDecisionCopy(lang) {
+  const map = {
+    it: {today:"Adattamento di oggi",todaySub:"Non rigenera la settimana: corregge solo orari, pasto o guida pratica per la giornata.",regenerate:"Richiede rigenerazione piano",regenerateSub:"Questa modifica cambia fabbisogno, allergie, obiettivo o struttura dei pasti: passa da Impostazioni per confermare.",ask:"Doppia conferma richiesta",temporary:"Temporaneo"},
+    en: {today:"Today's adaptation",todaySub:"It does not regenerate the week: it only adjusts timing, a meal or practical guidance for today.",regenerate:"Plan regeneration required",regenerateSub:"This changes needs, allergies, goal or meal structure: use Settings to confirm.",ask:"Double check required",temporary:"Temporary"},
+    fr: {today:"Adaptation du jour",todaySub:"Ne regenere pas la semaine : ajuste seulement les horaires, un repas ou une consigne du jour.",regenerate:"Regeneration du plan requise",regenerateSub:"Cela change besoins, allergies, objectif ou structure des repas : confirme dans Reglages.",ask:"Double confirmation requise",temporary:"Temporaire"},
+    es: {today:"Adaptacion de hoy",todaySub:"No regenera la semana: solo ajusta horarios, una comida o una guia practica para hoy.",regenerate:"Requiere regenerar el plan",regenerateSub:"Cambia necesidades, alergias, objetivo o estructura: confirma desde Ajustes.",ask:"Doble confirmacion requerida",temporary:"Temporal"},
+    de: {today:"Anpassung fur heute",todaySub:"Regeneriert nicht die Woche: passt nur Zeiten, eine Mahlzeit oder Tageshinweise an.",regenerate:"Plan-Regeneration erforderlich",regenerateSub:"Das andert Bedarf, Allergien, Ziel oder Mahlzeitenstruktur: bitte in Einstellungen bestatigen.",ask:"Doppelte Bestatigung erforderlich",temporary:"Temporar"},
+    pt: {today:"Adaptacao de hoje",todaySub:"Nao regenera a semana: ajusta apenas horarios, uma refeicao ou orientacao pratica de hoje.",regenerate:"Requer regeneracao do plano",regenerateSub:"Isto altera necessidades, alergias, objetivo ou estrutura: confirma nas Definicoes.",ask:"Dupla confirmacao necessaria",temporary:"Temporario"}
+  };
+  return map[lang] || map.en;
+}
+
+function classifyPlanDecision(planChange, lang) {
+  if (!planChange) return null;
+  const c = getPlanDecisionCopy(lang);
+  const regenerationActions = ["regenerate_plan", "profile_change", "allergy_change", "goal_change"];
+  if (regenerationActions.includes(planChange.action)) return {label:c.regenerate, sub:c.regenerateSub, badge:c.ask, tone:"regen"};
+  return {label:c.today, sub:c.todaySub, badge:c.temporary, tone:"today"};
+}
+
 function detectPlanChange(t, plan) {
   const slots = plan?.mealCount || 4;
+  if (/(nuov[ao].*(allerg|intoller)|sono allerg|sono intoller|ho scoperto.*allerg|glutine|lattosio|celiach|cambio.*obiettivo|voglio.*massa|voglio.*definizione|devo.*dimagrire|peso.*cambiato|sono ingrassat|sono dimagrit|regenera.*piano|rifai.*piano|nuova dieta|new allergy|intoleran|change.*goal|regenerate.*plan|new diet)/i.test(t)) {
+    return {
+      action: "regenerate_plan",
+      banner: "Rigenerazione piano richiesta",
+      planNote: "Questa modifica non va applicata solo a oggi: puo cambiare calorie, macro, ingredienti sicuri e lista della spesa. Vai in Impostazioni > Modifica intelligente, aggiorna il campo corretto e conferma: DUBI rigenera il piano spiegando il motivo.",
+      confirmLabel: "Ho capito",
+    };
+  }
 
   // Sveglio tardi → salta colazione, aggiunge spuntino extra metà mattina
   if (/(svegliato|alzato|dormito).*(tardi|mezzogiorno|pranzo|ora di pranzo|a pranzo)|mi.*sveglio.*tard|noon|wake.*up.*late/i.test(t) ||
@@ -6402,6 +6430,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
             // messaggio DUBI
             const a = msg.ans;
             if (!a) return null;
+            const decision = classifyPlanDecision(a.planChange, lang);
             return (
               <div key={msg.id} style={{marginBottom:16}}>
                 {/* Card risposta */}
@@ -6442,6 +6471,15 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
                       <Ico n="refresh" size={13} c={T.accentD}/>
                       <span style={{fontSize:10,fontWeight:700,color:T.accentD,letterSpacing:0.5}}>{t("askdubi.adapt.label")}</span>
                     </div>
+                    {decision && (
+                      <div style={{margin:"0 0 10px",padding:"9px 10px",borderRadius:12,background:T.card,border:`1px solid ${decision.tone==="regen"?"#C9A87C":T.border}`}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:4}}>
+                          <span style={{fontSize:12,fontWeight:800,color:T.text}}>{decision.label}</span>
+                          <span style={{fontSize:9,fontWeight:800,color:decision.tone==="regen"?"#B8893A":T.accentD,textTransform:"uppercase",letterSpacing:.6}}>{decision.badge}</span>
+                        </div>
+                        <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>{decision.sub}</p>
+                      </div>
+                    )}
                     <p style={{fontSize:13,color:T.text,lineHeight:1.5,margin:"0 0 12px"}}>{a.planChange.planNote}</p>
                     <button onClick={()=>applyChange(msg.id, a.planChange)}
                       style={{width:"100%",padding:"12px",background:T.accentD,color:"#fff",border:"none",
@@ -8390,6 +8428,12 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
         note: change.planNote,
         customTimes: change.customTimes,
         trainingHour: change.trainingHour,
+      }));
+    } else if (change.action === "regenerate_plan") {
+      setPlanAdaptations(a => ({
+        ...a,
+        banner: change.banner,
+        note: change.planNote,
       }));
     }
   };
