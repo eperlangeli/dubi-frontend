@@ -4388,6 +4388,160 @@ function splitIngredientDisplay(item) {
   return { name: text, quantity: "", full: text };
 }
 
+const WEEKLY_REPEAT_STAPLES = [
+  "olio", "sale", "pepe", "spezie", "limone", "aceto", "erbe", "mais"
+];
+
+function weeklyIngredientKey(item) {
+  const name = splitIngredientDisplay(item).name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(integrale|integrali|cotti|cotto|cotta|fresco|fresca|magro|magra|naturale|extra vergine|evo|bio)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name;
+}
+
+function isWeeklyStaple(key) {
+  return WEEKLY_REPEAT_STAPLES.some(staple => key.includes(staple));
+}
+
+function optimizeWeeklyPlanQuality(weekMeals) {
+  const recent = [];
+  return (weekMeals || []).map(day => {
+    const nextDay = {};
+    Object.entries(day || {}).forEach(([mealKey, meal]) => {
+      if (!meal || !Array.isArray(meal.items)) { nextDay[mealKey] = meal; return; }
+      const nextMeal = {...meal, items:[...meal.items]};
+      nextMeal.items = nextMeal.items.map((item, idx) => {
+        const key = weeklyIngredientKey(item);
+        if (!key || isWeeklyStaple(key)) return item;
+        const repeated = recent.slice(-18).filter(k => k === key).length >= 2;
+        if (!repeated || !meal.alts?.[idx]?.length) return item;
+        const alt = meal.alts[idx].find(candidate => {
+          const altKey = weeklyIngredientKey(candidate);
+          return altKey && !isWeeklyStaple(altKey) && !recent.slice(-18).includes(altKey);
+        });
+        return alt || item;
+      });
+      nextMeal.items.forEach(item => {
+        const key = weeklyIngredientKey(item);
+        if (key && !isWeeklyStaple(key)) recent.push(key);
+      });
+      nextDay[mealKey] = nextMeal;
+    });
+    return nextDay;
+  });
+}
+
+function getWeeklyQualityCopy(lang) {
+  const map = {
+    it: {
+      title:"Controllo qualita del giorno",
+      variety:"Varieta settimanale",
+      varietyOk:"ingredienti principali ruotati",
+      macro:"Macro del giorno",
+      macroOk:"allineati ai tuoi target",
+      science:"Scienza collegata",
+      scienceOk:"fonti leggibili per ogni pasto",
+      sciencePrefix:"DUBI lo collega a",
+      promptTitle:"Lo hai gia' in casa?",
+      promptBody:"non risulta gia' spuntato nella lista della spesa.",
+      promptNo:"No, aggiungilo",
+      promptYes:"Si, ce l'ho",
+      notifTitle:"Ingrediente aggiornato",
+      notifShopping:"Lista della spesa aggiornata automaticamente."
+    },
+    en: {
+      title:"Daily quality check",
+      variety:"Weekly variety",
+      varietyOk:"main ingredients rotated",
+      macro:"Daily macros",
+      macroOk:"aligned with your targets",
+      science:"Science link",
+      scienceOk:"readable sources for every meal",
+      sciencePrefix:"DUBI links this to",
+      promptTitle:"Do you already have it?",
+      promptBody:"is not checked in the shopping list yet.",
+      promptNo:"No, add it",
+      promptYes:"Yes, I have it",
+      notifTitle:"Ingredient updated",
+      notifShopping:"Shopping list updated automatically."
+    },
+    fr: {
+      title:"Controle qualite du jour",
+      variety:"Variete semaine",
+      varietyOk:"ingredients principaux alternes",
+      macro:"Macros du jour",
+      macroOk:"alignees avec tes objectifs",
+      science:"Lien scientifique",
+      scienceOk:"sources lisibles pour chaque repas",
+      sciencePrefix:"DUBI le relie a",
+      promptTitle:"Tu l'as deja a la maison ?",
+      promptBody:"n'est pas encore coche dans la liste de courses.",
+      promptNo:"Non, l'ajouter",
+      promptYes:"Oui, je l'ai",
+      notifTitle:"Ingredient mis a jour",
+      notifShopping:"Liste de courses mise a jour automatiquement."
+    },
+    es: {
+      title:"Control de calidad del dia",
+      variety:"Variedad semanal",
+      varietyOk:"ingredientes principales rotados",
+      macro:"Macros del dia",
+      macroOk:"alineados con tus objetivos",
+      science:"Vinculo cientifico",
+      scienceOk:"fuentes claras por comida",
+      sciencePrefix:"DUBI lo vincula a",
+      promptTitle:"Ya lo tienes en casa?",
+      promptBody:"todavia no aparece marcado en la lista de compra.",
+      promptNo:"No, anadirlo",
+      promptYes:"Si, lo tengo",
+      notifTitle:"Ingrediente actualizado",
+      notifShopping:"Lista de compra actualizada automaticamente."
+    },
+    de: {
+      title:"Qualitatscheck des Tages",
+      variety:"Wochenvielfalt",
+      varietyOk:"Hauptzutaten rotiert",
+      macro:"Tagesmakros",
+      macroOk:"auf deine Ziele abgestimmt",
+      science:"Wissenschaftlicher Bezug",
+      scienceOk:"lesbare Quellen pro Mahlzeit",
+      sciencePrefix:"DUBI verbindet es mit",
+      promptTitle:"Hast du es schon zuhause?",
+      promptBody:"ist in der Einkaufsliste noch nicht abgehakt.",
+      promptNo:"Nein, hinzufugen",
+      promptYes:"Ja, habe ich",
+      notifTitle:"Zutat aktualisiert",
+      notifShopping:"Einkaufsliste automatisch aktualisiert."
+    },
+    pt: {
+      title:"Controlo de qualidade do dia",
+      variety:"Variedade semanal",
+      varietyOk:"ingredientes principais rodados",
+      macro:"Macros do dia",
+      macroOk:"alinhados com os teus objetivos",
+      science:"Ligacao cientifica",
+      scienceOk:"fontes claras por refeicao",
+      sciencePrefix:"DUBI liga isto a",
+      promptTitle:"Ja tens isto em casa?",
+      promptBody:"ainda nao esta assinalado na lista de compras.",
+      promptNo:"Nao, adicionar",
+      promptYes:"Sim, tenho",
+      notifTitle:"Ingrediente atualizado",
+      notifShopping:"Lista de compras atualizada automaticamente."
+    }
+  };
+  return map[lang] || map.en;
+}
+
+function summarizeMealScience(meal, lang) {
+  const copy = getWeeklyQualityCopy(lang);
+  const raw = meal?.source || meal?.whyEN || meal?.why || "WHO/EFSA dietary quality principles";
+  const text = localizeScientificText(raw, lang).replace(/^Fonte scientifica:\s*/i, "").trim();
+  return `${copy.sciencePrefix} ${text}`;
+}
+
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
   if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
     const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
@@ -8643,6 +8797,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
 // ═══════════════════════════════════════════════
 const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const { t, lang } = useT();
+  const qCopy = getWeeklyQualityCopy(lang);
 
   const todayIdx = (new Date().getDay()+6)%7;
   const [selDay,setSelDay] = useState(todayIdx);
@@ -8677,7 +8832,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const [dayBfPrefs,setDayBfPrefs] = useState(Array(7).fill(defBf));
   const days = [0,1,2,3,4,5,6].map(i=>t("days.short."+i));
 
-  const weekMeals = getDietMeals(userData?.diet, null, userData?.allergies);
+  const weekMeals = optimizeWeeklyPlanQuality(getDietMeals(userData?.diet, null, userData?.allergies));
   const dayMeals = weekMeals[selDay] || weekMeals[0];
   const bfKey = dayBfPrefs[selDay]==="salata" ? "colazione_salata" : "colazione_dolce";
 
@@ -8723,6 +8878,15 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     c:   Math.round(mx.c   * wScaleC),
     f:   Math.round(mx.f   * wScaleF),
   });
+  const dayScaledTotals = adjustedMealEntries.reduce((acc, entry) => {
+    const smx = wScaleMx(entry.meal?.macros || {cal:0,p:0,c:0,f:0});
+    return {cal:acc.cal+smx.cal, p:acc.p+smx.p, c:acc.c+smx.c, f:acc.f+smx.f};
+  }, {cal:0,p:0,c:0,f:0});
+  const dayIngredientKeys = new Set();
+  adjustedMealEntries.forEach(entry => (entry.meal?.items || []).forEach(item => {
+    const key = weeklyIngredientKey(item);
+    if (key && !isWeeklyStaple(key)) dayIngredientKeys.add(key);
+  }));
 
   const applyIngredientSwap = ({swapKey, mealKey, itemIdx, oldItem, replacement, hadAtHome = null}) => {
     if (hadAtHome) rememberOwnedShoppingIngredient(userData, replacement);
@@ -8769,13 +8933,13 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
           animation:"slideDown .25s ease"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <Ico n="check" size={16} c="#fff"/>
-            <span style={{fontSize:14,fontWeight:700}}>Ingrediente aggiornato</span>
+            <span style={{fontSize:14,fontWeight:700}}>{qCopy.notifTitle}</span>
           </div>
           <p style={{fontSize:12,opacity:.88,lineHeight:1.4,paddingLeft:24}}>
             <span style={{textDecoration:"line-through",opacity:.65}}>{swapNotif.from.split("(")[0].trim()}</span>
             {" → "}<strong>{swapNotif.to.split("(")[0].trim()}</strong>
           </p>
-          <p style={{fontSize:11,opacity:.75,paddingLeft:24}}>📋 Lista della spesa aggiornata automaticamente.</p>
+          <p style={{fontSize:11,opacity:.75,paddingLeft:24}}>📋 {qCopy.notifShopping}</p>
         </div>
       )}
 
@@ -8793,10 +8957,10 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <p style={{fontSize:15,fontWeight:800,color:T.text,margin:"0 0 5px"}}>
-                  Lo hai gia' in casa?
+                  {qCopy.promptTitle}
                 </p>
                 <p style={{fontSize:13,color:T.muted,lineHeight:1.5,margin:0}}>
-                  <strong style={{color:T.text}}>{localizeFood(shoppingPrompt.replacement, lang)}</strong> non risulta gia' spuntato nella lista della spesa.
+                  <strong style={{color:T.text}}>{localizeFood(shoppingPrompt.replacement, lang)}</strong> {qCopy.promptBody}
                 </p>
               </div>
             </div>
@@ -8804,12 +8968,12 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
               <button onClick={()=>applyIngredientSwap({...shoppingPrompt, hadAtHome:false})}
                 style={{flex:1,padding:"13px 12px",borderRadius:14,background:T.card,
                   border:`1.5px solid ${T.border}`,color:T.text,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                No, aggiungilo
+                {qCopy.promptNo}
               </button>
               <button onClick={()=>applyIngredientSwap({...shoppingPrompt, hadAtHome:true})}
                 style={{flex:1,padding:"13px 12px",borderRadius:14,background:T.accentD,
                   border:`1.5px solid ${T.accentD}`,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                Si, ce l'ho
+                {qCopy.promptYes}
               </button>
             </div>
           </div>
@@ -8880,6 +9044,25 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
             <div style={{fontSize:10,color:T.muted}}>{m.l}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{margin:"0 24px 16px",padding:14,background:T.sel,border:`1px solid ${T.border}`,borderRadius:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <Ico n="check" size={15} c={T.accentD}/>
+          <p style={{fontSize:13,fontWeight:800,color:T.text,margin:0}}>{qCopy.title}</p>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {[
+            {l:qCopy.variety,v:`${dayIngredientKeys.size} ${qCopy.varietyOk}`,c:T.accentD},
+            {l:qCopy.macro,v:`${dayScaledTotals.cal} kcal · P ${dayScaledTotals.p}g · C ${dayScaledTotals.c}g · G ${dayScaledTotals.f}g`,c:"#C9A87C"},
+            {l:qCopy.science,v:qCopy.scienceOk,c:"#9A8FBF"}
+          ].map((item,idx)=>(
+            <div key={idx} style={{gridColumn:idx===2?"1 / -1":"auto",padding:"9px 10px",borderRadius:12,background:T.card,border:`1px solid ${T.border}`}}>
+              <p style={{fontSize:10,fontWeight:800,color:item.c,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:.6}}>{item.l}</p>
+              <p style={{fontSize:12,color:T.text,lineHeight:1.35,margin:0}}>{item.v}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Carboidrati note */}
@@ -8968,7 +9151,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
                 border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7}}>
                 <Ico n="info" size={13} c={T.accentD}/>
                 <span style={{fontSize:11,color:T.accentD,lineHeight:1.35}}>
-                  {t("meal.source.linked")} {localizeScientificText(meal.source, lang)}
+                  {summarizeMealScience(meal, lang)}
                 </span>
               </div>
             )}
