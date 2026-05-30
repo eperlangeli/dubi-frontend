@@ -11057,10 +11057,11 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
     setWearableStatus(status?.connection || { provider: "demo", status: "demo_seeded" });
     const aiResult = await generateAiPlanFromBackend(userData);
     if (aiResult?.plan) setPlan(aiResult.plan);
+    const demoDays = result.importedCount || 14;
     setWearableMessage(
       scenario === "low_recovery"
-        ? `Demo caricata: ${result.importedCount} giorni con recupero basso recente. Piano rigenerato per testare l'adattamento.`
-        : `Demo caricata: ${result.importedCount} giorni con recupero normale. Piano rigenerato per testare l'adattamento.`
+        ? `Demo caricata: ${demoDays} giorni con recupero basso recente. Piano rigenerato per testare l'adattamento.`
+        : `Demo caricata: ${demoDays} giorni con recupero normale. Piano rigenerato per testare l'adattamento.`
     );
   } finally {
     setWearableBusy(false);
