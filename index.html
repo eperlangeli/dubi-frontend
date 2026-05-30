@@ -127,11 +127,36 @@ const API_BASE_URL = "https://dubi-backend.onrender.com";
     dayStart: parseHour(data.day_start ?? data.dayStart, 7),
     dayEnd: parseHour(data.day_end ?? data.dayEnd, 22),
 
-    wearable: data.wearable_provider ?? data.wearable ?? "none"
+    wearable: data.wearable_provider ?? data.wearable ?? "none",
+    wearables: Array.isArray(data.wearables)
+      ? data.wearables
+      : String(data.wearable_provider ?? data.wearable ?? "none").split(",").filter(Boolean),
+    wearableConsent: Boolean(data.wearable_consent ?? data.wearableConsent)
   };
 };
 const getAuthToken = () => {
   return localStorage.getItem("dubi_token") || "";
+};
+
+const getSelectedWearables = (data = {}) => {
+  const aliases = {
+    apple_health: "apple",
+    oura_ring: "oura",
+    samsung_health: "samsung",
+    google_health_connect: "google"
+  };
+  const raw = Array.isArray(data.wearables)
+    ? data.wearables
+    : String(data.wearable || data.wearable_provider || "none").split(",");
+  const selected = raw
+    .map(item => aliases[String(item).trim()] || String(item).trim())
+    .filter(Boolean);
+  return selected.length ? selected : ["none"];
+};
+
+const getPrimaryWearable = (data = {}) => {
+  const selected = getSelectedWearables(data).filter(item => item !== "none");
+  return selected[0] || "none";
 };
 
 const saveOnboardingToBackend = async (data) => {
@@ -172,7 +197,9 @@ const saveOnboardingToBackend = async (data) => {
     day_start: `${String(data.dayStart).padStart(2, "0")}:00`,
     day_end: `${String(data.dayEnd).padStart(2, "0")}:00`,
 
-    wearable_provider: data.wearable || "none"
+    wearable_provider: getPrimaryWearable(data),
+    wearable_providers: getSelectedWearables(data),
+    wearable_consent: Boolean(data.wearableConsent)
   };
 
   const response = await fetch(`${API_BASE_URL}/api/onboarding/save`, {
@@ -1009,6 +1036,9 @@ const TRANSLATIONS = {
     "wear.samsung.d":"Galaxy Watch · attività e sonno",
     "wear.google.d":"Dati salute unificati su Android",
     "wear.none.d2":"Piano basato solo sui dati inseriti",
+    "wear.consent.title":"Autorizzo DUBI a usare i dati wearable",
+    "wear.consent.body":"DUBI usera sonno, HRV, battito a riposo, attivita e recupero solo per personalizzare dieta, timing dei pasti e adattamenti del piano. Puoi revocare il consenso dalle Impostazioni.",
+    "wear.primary.note":"Puoi collegare piu wearable. Per ora DUBI salva {provider} come fonte principale e prepara gli altri per la sincronizzazione.",
     "wear.intro.full":"DUBI usa i dati del tuo wearable per adattare la dieta automaticamente — senza che tu debba fare nulla.",
     "pref.dayStart.plain":"INIZIO GIORNATA ALIMENTARE","pref.dayEnd.plain":"FINE GIORNATA ALIMENTARE",
     "pref.bf.plain.sweet":"Dolce","pref.bf.plain.salty":"Salata","pref.bf.plain.both":"Entrambi",
@@ -2830,6 +2860,37 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
 };
 Object.keys(SETTINGS_EXTRA_TRANSLATIONS).forEach(code => {
   TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...SETTINGS_EXTRA_TRANSLATIONS[code]};
+});
+
+const WEARABLE_ONBOARDING_TRANSLATIONS = {
+  en: {
+    "wear.consent.title":"I authorize DUBI to use wearable data",
+    "wear.consent.body":"DUBI will use sleep, HRV, resting heart rate, activity and recovery only to personalize nutrition, meal timing and plan adaptations. You can revoke consent from Settings.",
+    "wear.primary.note":"You can connect multiple wearables. For now DUBI saves {provider} as the primary source and prepares the others for sync."
+  },
+  fr: {
+    "wear.consent.title":"J'autorise DUBI a utiliser les donnees wearable",
+    "wear.consent.body":"DUBI utilise sommeil, VFC, frequence au repos, activite et recuperation uniquement pour personnaliser nutrition, horaires des repas et adaptations du plan. Tu peux retirer ce consentement dans Reglages.",
+    "wear.primary.note":"Tu peux connecter plusieurs wearables. Pour l'instant DUBI enregistre {provider} comme source principale et prepare les autres a la synchronisation."
+  },
+  es: {
+    "wear.consent.title":"Autorizo a DUBI a usar datos del wearable",
+    "wear.consent.body":"DUBI usara sueno, VFC, frecuencia en reposo, actividad y recuperacion solo para personalizar nutricion, horarios de comidas y adaptaciones del plan. Puedes revocar el consentimiento en Ajustes.",
+    "wear.primary.note":"Puedes conectar varios wearables. Por ahora DUBI guarda {provider} como fuente principal y prepara los demas para sincronizacion."
+  },
+  de: {
+    "wear.consent.title":"Ich erlaube DUBI, Wearable-Daten zu nutzen",
+    "wear.consent.body":"DUBI nutzt Schlaf, HRV, Ruhepuls, Aktivitat und Erholung nur zur Personalisierung von Ernahrung, Mahlzeiten-Timing und Plananpassungen. Du kannst die Zustimmung in den Einstellungen widerrufen.",
+    "wear.primary.note":"Du kannst mehrere Wearables verbinden. Derzeit speichert DUBI {provider} als Hauptquelle und bereitet die anderen fur die Synchronisierung vor."
+  },
+  pt: {
+    "wear.consent.title":"Autorizo a DUBI a usar dados do wearable",
+    "wear.consent.body":"A DUBI usara sono, VFC, frequencia em repouso, atividade e recuperacao apenas para personalizar nutricao, horarios das refeicoes e adaptacoes do plano. Podes revogar nas Configuracoes.",
+    "wear.primary.note":"Podes ligar varios wearables. Por agora a DUBI guarda {provider} como fonte principal e prepara os outros para sincronizacao."
+  }
+};
+Object.keys(WEARABLE_ONBOARDING_TRANSLATIONS).forEach(code => {
+  TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...WEARABLE_ONBOARDING_TRANSLATIONS[code]};
 });
 
 const I18N_COMPLETION = {
@@ -7563,34 +7624,85 @@ const PreferencesStep = ({d,u}) => {
 
 const WearableStep = ({d,u}) => {
   const { t, lang } = useT();
+  const selected = getSelectedWearables(d);
+  const selectedReal = selected.filter(id => id !== "none");
+  const hasWearable = selectedReal.length > 0;
+  const providers = [
+    {id:"apple",   ic:"act",   l:"Apple Health",          ds:t("wear.apple.d2")},
+    {id:"whoop",   ic:"heart", l:"WHOOP",                 ds:t("wear.whoop.d2")},
+    {id:"strava",  ic:"act",   l:"Strava",                ds:t("wear.strava.d")},
+    {id:"garmin",  ic:"act",   l:"Garmin",                ds:t("wear.garmin.d")},
+    {id:"oura",    ic:"heart", l:"Oura Ring",             ds:t("wear.oura.d")},
+    {id:"polar",   ic:"act",   l:"Polar",                 ds:t("wear.polar.d")},
+    {id:"suunto",  ic:"act",   l:"Suunto",                ds:t("wear.suunto.d")},
+    {id:"samsung", ic:"act",   l:"Samsung Health",        ds:t("wear.samsung.d")},
+    {id:"google",  ic:"act",   l:"Google Health Connect", ds:t("wear.google.d")}
+  ];
+
+  const setWearables = (next) => {
+    const clean = next.length ? next : ["none"];
+    u("wearables", clean);
+    u("wearable", clean.find(id => id !== "none") || "none");
+    if (clean.includes("none")) u("wearableConsent", false);
+  };
+
+  const toggleProvider = (id) => {
+    const base = selected.filter(item => item !== "none");
+    const next = base.includes(id) ? base.filter(item => item !== id) : [...base, id];
+    setWearables(next);
+  };
+
   return (
   <div>
     <p style={{fontSize:15,color:T.muted,lineHeight:1.7,marginBottom:28,fontWeight:300}}>
       {t("wear.intro")}
     </p>
-    {[
-      {id:"apple",   ic:"act",   l:"Apple Health",        ds:t("wear.apple.d2")},
-      {id:"garmin",  ic:"act",   l:"Garmin",              ds:t("wear.garmin.d")},
-      {id:"whoop",   ic:"heart", l:"WHOOP",               ds:t("wear.whoop.d2")},
-      {id:"oura",    ic:"heart", l:"Oura Ring",           ds:t("wear.oura.d")},
-      {id:"strava",  ic:"act",   l:"Strava",              ds:t("wear.strava.d")},
-      {id:"polar",   ic:"act",   l:"Polar",               ds:t("wear.polar.d")},
-      {id:"suunto",  ic:"act",   l:"Suunto",              ds:t("wear.suunto.d")},
-      {id:"samsung", ic:"act",   l:"Samsung Health",      ds:t("wear.samsung.d")},
-      {id:"google",  ic:"act",   l:"Google Health Connect",ds:t("wear.google.d")},
-      {id:"none",    ic:"info",  l:t("wear.none"),        ds:t("wear.none.d2")},
-    ].map(w=>(
-      <button key={w.id} onClick={()=>u("wearable",w.id)}
-        style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:18,marginBottom:10,borderRadius:16,border:`1.5px solid ${d.wearable===w.id?T.accent:T.border}`,background:d.wearable===w.id?T.sel:T.card,cursor:"pointer",textAlign:"left"}}>
-        <div style={{width:48,height:48,borderRadius:14,background:d.wearable===w.id?T.accentD+"22":T.bg,
-          border:`1px solid ${d.wearable===w.id?T.accent:T.border}`,
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+      {providers.map(w=>{
+        const active = selectedReal.includes(w.id);
+        return (
+      <button key={w.id} onClick={()=>toggleProvider(w.id)}
+        style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:13,minHeight:92,borderRadius:16,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,cursor:"pointer",textAlign:"left"}}>
+        <div style={{width:38,height:38,borderRadius:13,background:active?T.accentD+"22":T.bg,
+          border:`1px solid ${active?T.accent:T.border}`,
           display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <Ico n={w.ic} size={22} c={d.wearable===w.id?T.accentD:T.muted}/>
+          <Ico n={w.ic} size={19} c={active?T.accentD:T.muted}/>
         </div>
-        <div style={{flex:1}}><div style={{fontSize:16,fontWeight:600,color:T.text}}>{w.l}</div><div style={{fontSize:13,color:T.muted,marginTop:2}}>{w.ds}</div></div>
-        {d.wearable===w.id && <div style={{width:22,height:22,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={12} c={T.bg}/></div>}
+        <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:900,color:T.text}}>{w.l}</div><div style={{fontSize:10.5,color:T.muted,marginTop:3,lineHeight:1.25}}>{w.ds}</div></div>
+        {active && <div style={{width:20,height:20,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={11} c={T.bg}/></div>}
       </button>
-    ))}
+    )})}
+    </div>
+
+    <button onClick={()=>setWearables(["none"])}
+      style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:16,marginBottom:12,borderRadius:16,border:`1.5px solid ${!hasWearable?T.accent:T.border}`,background:!hasWearable?T.sel:T.card,cursor:"pointer",textAlign:"left"}}>
+      <div style={{width:44,height:44,borderRadius:14,background:!hasWearable?T.accentD+"22":T.bg,border:`1px solid ${!hasWearable?T.accent:T.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <Ico n="info" size={20} c={!hasWearable?T.accentD:T.muted}/>
+      </div>
+      <div style={{flex:1}}><div style={{fontSize:15,fontWeight:900,color:T.text}}>{t("wear.none")}</div><div style={{fontSize:12,color:T.muted,marginTop:2}}>{t("wear.none.d2")}</div></div>
+      {!hasWearable && <div style={{width:22,height:22,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={12} c={T.bg}/></div>}
+    </button>
+
+    {hasWearable && (
+      <div style={{padding:14,borderRadius:16,background:T.sel,border:`1px solid ${d.wearableConsent?T.accent:T.border}`}}>
+        <button onClick={()=>u("wearableConsent",!d.wearableConsent)}
+          style={{display:"flex",alignItems:"flex-start",gap:12,width:"100%",background:"transparent",border:"none",padding:0,textAlign:"left",cursor:"pointer"}}>
+          <div style={{width:24,height:24,borderRadius:8,border:`1.5px solid ${d.wearableConsent?T.accent:T.border}`,background:d.wearableConsent?T.accentD:T.card,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
+            {d.wearableConsent && <Ico n="check" size={13} c={T.bg}/>}
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:900,color:T.text}}>{t("wear.consent.title")}</div>
+            <div style={{fontSize:11.5,color:T.muted,lineHeight:1.45,marginTop:4}}>{t("wear.consent.body")}</div>
+          </div>
+        </button>
+      </div>
+    )}
+
+    {hasWearable && (
+      <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"10px 2px 0"}}>
+        {t("wear.primary.note",{provider:String(selectedReal[0] || "").toUpperCase()})}
+      </p>
+    )}
   </div>
 );};
 
@@ -7625,7 +7737,9 @@ const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing
   breakfastPref:"entrambi",
   dayStart:"07:00",
   dayEnd:"22:00",
-  wearable:"apple"
+  wearable:"none",
+  wearables:["none"],
+  wearableConsent:false
 };
 
   const safeTime = (value, fallback = "07:00") => {
@@ -7689,7 +7803,9 @@ const normalizeInitialOnboardingData = (source) => {
     breakfastPref: source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref,
     dayStart: safeTime(source.day_start || source.dayStart, "07:00"),
     dayEnd: safeTime(source.day_end || source.dayEnd, "22:00"),
-    wearable: source.wearable_provider || source.wearable || defaultOnboardingData.wearable
+    wearable: getPrimaryWearable(source) || defaultOnboardingData.wearable,
+    wearables: getSelectedWearables(source),
+    wearableConsent: Boolean(source.wearable_consent ?? source.wearableConsent)
   };
 };
 
@@ -7716,6 +7832,9 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
     <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u}/>,
   ];
+  const selectedWearables = getSelectedWearables(data).filter(id => id !== "none");
+  const wearableConsentRequired = step === 4 && selectedWearables.length > 0;
+  const canContinueStep = !wearableConsentRequired || Boolean(data.wearableConsent);
 
   
   return (
@@ -7751,7 +7870,8 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
       <div style={{padding:"16px 24px 40px",background:T.bg,borderTop:`1px solid ${T.border}`,position:"sticky",bottom:0}}>
         <div style={{display:"flex",gap:10}}>
           {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:52,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:18,cursor:"pointer",flexShrink:0}}>←</button>}
-          <button onClick={async () => {
+          <button disabled={!canContinueStep} onClick={async () => {
+  if (!canContinueStep) return;
   if (step < 4) {
     setStep(s => s + 1);
   } else {
@@ -7759,7 +7879,7 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
     onComplete(data);
   }
 }}
-            style={{flex:1,background:T.text,color:T.bg,border:"none",borderRadius:50,padding:18,fontSize:15,fontWeight:600,cursor:"pointer"}}>
+            style={{flex:1,background:canContinueStep?T.text:T.border,color:T.bg,border:"none",borderRadius:50,padding:18,fontSize:15,fontWeight:600,cursor:canContinueStep?"pointer":"default",opacity:canContinueStep?1:.75}}>
             {step<4?t("onb.continue"):t("onb.generate")}
           </button>
         </div>
