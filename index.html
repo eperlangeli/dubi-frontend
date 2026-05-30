@@ -11009,7 +11009,7 @@ const fallbackWearableProviders = [
 
 const wearableProviderList = wearableProviders.length
   ? wearableProviders.map((provider) => ({
-      id: provider.id || provider.slug || provider.name,
+      id: provider.provider || provider.id || provider.slug || provider.name,
       name: provider.display_name || provider.name || provider.id || provider.slug
     })).filter(provider => provider.id)
   : (realWearablesReady ? fallbackWearableProviders : []);
