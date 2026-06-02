@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <meta name="color-scheme" content="light" />
   <meta name="theme-color" content="#FAF9F7" />
+  <meta name="application-name" content="DUBI" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="DUBI" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icons/dubi-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/dubi-icon.svg" />
   <title>DUBI — Data-Driven Understanding of Body Intelligence</title>
 
   <!-- CDN primario: cdnjs (Cloudflare) — più veloce su mobile rispetto a unpkg -->
@@ -93,6 +100,23 @@
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 const API_BASE_URL = "https://dubi-backend.onrender.com";
+const DUBI_BETA_COPY = {
+  it: {
+    badge:"BETA GRATUITA", title:"Il tuo piano DUBI e pronto.",
+    subtitle:"Durante la beta DUBI e completamente gratuito: piano personalizzato, adattamenti, lista della spesa, progressi e wearable inclusi.",
+    cta:"Entra nel mio piano gratuito", note:"Nessuna carta richiesta. Nessun abbonamento. Tutte le funzionalita della beta sono incluse.",
+    settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Tutto incluso", settingsNote:"Piano completo gratuito per i primi utenti beta.",
+    features:["Piano nutrizionale personalizzato","Adattamenti automatici sui tuoi dati","Lista della spesa e alternative","Progressi, trend e wearable"]
+  },
+  en: {
+    badge:"FREE BETA", title:"Your DUBI plan is ready.",
+    subtitle:"During the beta DUBI is completely free: personalized plan, adaptations, shopping list, progress and wearables included.",
+    cta:"Open my free plan", note:"No card required. No subscription. All beta features are included.",
+    settingsTitle:"FREE BETA", settingsPlan:"DUBI Beta · Everything included", settingsNote:"Full plan free for early beta users.",
+    features:["Personalized nutrition plan","Automatic adaptations from your data","Shopping list and alternatives","Progress, trends and wearables"]
+  }
+};
+const getDubiBetaCopy = (lang) => DUBI_BETA_COPY[lang] || DUBI_BETA_COPY.en;
 
     const normalizeOnboarding = (data) => {
   if (!data) return null;
@@ -6894,6 +6918,10 @@ const WelcomeScreen = ({onStart}) => {
       <p style={{fontSize:16,color:T.muted,lineHeight:1.7,marginTop:18,fontWeight:400}}>
         {t("welcome.subhead")}
       </p>
+      <div style={{display:"inline-flex",alignItems:"center",gap:7,background:T.sel,border:`1px solid ${T.accent}`,borderRadius:999,padding:"7px 10px",marginTop:18}}>
+        <span style={{width:7,height:7,borderRadius:99,background:T.accentD}} />
+        <span style={{fontSize:10,fontWeight:900,color:T.accentD,letterSpacing:1.1}}>{getDubiBetaCopy(lang).badge} · TUTTO INCLUSO</span>
+      </div>
     </div>
     <div>
       <div style={{display:"flex",gap:8,marginBottom:32,flexWrap:"wrap"}}>
@@ -8226,6 +8254,44 @@ const SafetyReviewScreen = ({findings, rawData, onContinue, onEdit}) => {
 // ═══════════════════════════════════════════════
 // PAYWALL SCREEN  (€10.99/month)
 // ═══════════════════════════════════════════════
+const FreeBetaAccessScreen = ({ userData, plan, onContinue }) => {
+  const { lang } = useT();
+  const copy = getDubiBetaCopy(lang);
+  const features = copy.features;
+
+  return (
+    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",padding:"54px 24px 40px"}}>
+      <div style={{display:"inline-flex",alignItems:"center",gap:7,background:T.sel,border:`1px solid ${T.accent}`,borderRadius:999,padding:"7px 10px",marginBottom:20}}>
+        <span style={{width:7,height:7,borderRadius:99,background:T.accentD}} />
+        <span style={{fontSize:10,fontWeight:900,color:T.accentD,letterSpacing:1.2}}>{copy.badge}</span>
+      </div>
+      <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:33,fontWeight:900,color:T.text,letterSpacing:-1.1,lineHeight:1.08,margin:"0 0 12px"}}>
+        {userData?.name ? `${userData.name.split(" ")[0]}, ${copy.title.toLowerCase()}` : copy.title}
+      </h1>
+      <p style={{fontSize:15,color:T.muted,lineHeight:1.65,margin:"0 0 20px"}}>{copy.subtitle}</p>
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:20,padding:18,marginBottom:16}}>
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          {[`${plan?.calories || 2000} kcal`,`${plan?.mealCount || 4} pasti`,`${plan?.protein || 0}g prot`].map(value => (
+            <div key={value} style={{flex:1,background:T.bg,borderRadius:12,padding:"11px 6px",textAlign:"center",fontSize:12,fontWeight:900,color:T.text}}>{value}</div>
+          ))}
+        </div>
+        {features.map(feature => (
+          <div key={feature} style={{display:"flex",alignItems:"center",gap:9,marginTop:10}}>
+            <div style={{width:18,height:18,borderRadius:99,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <Ico n="check" size={10} c="#fff"/>
+            </div>
+            <span style={{fontSize:13,color:T.text,fontWeight:650}}>{feature}</span>
+          </div>
+        ))}
+      </div>
+      <button onClick={onContinue} style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:T.accentD,color:"#fff",fontSize:15,fontWeight:900,cursor:"pointer"}}>
+        {copy.cta}
+      </button>
+      <p style={{fontSize:11,color:T.muted,textAlign:"center",lineHeight:1.5,margin:"12px 8px 0"}}>{copy.note}</p>
+    </div>
+  );
+};
+
 const PaywallScreen = ({ userData, plan, onContinue }) => {
   const { t } = useT();
   const isComp = userData?.goal === "competition";
@@ -11796,29 +11862,22 @@ const handleSaveProfile = async () => {
     )}
   </Card>
 
-        {/* Subscription */}
-        <SectionLabel lk="set.subscription" />
+        {/* Free beta access */}
+        <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>{getDubiBetaCopy(lang).settingsTitle}</p>
         <Card>
-          <div style={{padding:"16px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:isPremium?"none":`1px solid ${T.border}`}}>
+          <div style={{padding:"16px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:38,height:38,borderRadius:10,background:isPremium?"linear-gradient(135deg,#C9A87C,#8B6914)":"T.sel",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <Ico n={isPremium?"star2":"zap"} size={18} c={isPremium?"#fff":T.muted}/>
+              <div style={{width:38,height:38,borderRadius:10,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <Ico n="check" size={18} c={T.accentD}/>
               </div>
               <div>
-                <p style={{margin:0,fontSize:15,fontWeight:700,color:T.text}}>{isPremium?t("set.plan.premium"):t("set.plan.free")}</p>
-                <p style={{margin:"2px 0 0",fontSize:11,color:T.muted}}>{isPremium?"DUBI Pro":"Basic plan"}</p>
+                <p style={{margin:0,fontSize:15,fontWeight:800,color:T.text}}>{getDubiBetaCopy(lang).settingsTitle}</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:T.muted}}>{getDubiBetaCopy(lang).settingsPlan}</p>
               </div>
             </div>
-            {isPremium && <Ico n="check" size={18} c={T.accentD}/>}
+            <Ico n="check" size={18} c={T.accentD}/>
           </div>
-          {!isPremium && (
-            <button onClick={onUpgrade}
-              style={{width:"100%",padding:"14px 16px",background:"none",border:"none",cursor:"pointer",
-                      display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              <span style={{fontSize:14,fontWeight:700,color:T.accentD}}>{t("set.plan.upgrade")}</span>
-              <Ico n="chev" size={14} c={T.accentD}/>
-            </button>
-          )}
+          <p style={{padding:"0 16px 16px",fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{getDubiBetaCopy(lang).settingsNote}</p>
         </Card>
 
         {/* Language */}
@@ -12169,7 +12228,7 @@ function DUBIApp() {
   const [showWrap,setShowWrap] = useState(false);
   const [isFirstAccess,setIsFirstAccess] = useState(true);
   const [safetyReview,setSafetyReview] = useState(null);
-  const [isPremium,setIsPremium] = useState(false);
+  const [isPremium,setIsPremium] = useState(true);
   const handlePremiumUpgrade = () => setIsPremium(true);
 const handleLogout = () => {
   localStorage.removeItem("dubi_token");
@@ -12303,7 +12362,7 @@ if (data.age && data.age < 18) {
         {phase==="consent" && (
           <ConsentScreen
             userData={userData}
-            onAccept={(c)=>{ setConsentData(c); setPhase("paywall"); }}
+            onAccept={(c)=>{ setConsentData(c); setPhase("free-beta"); }}
             onDecline={()=>setPhase("welcome")}
           />
         )}
@@ -12314,7 +12373,7 @@ if (data.age && data.age < 18) {
             onBack={()=>setPhase("onboarding")}
           />
         )}
-        {phase==="paywall" && <PaywallScreen userData={userData} plan={plan} onContinue={()=>setPhase("loading")} />}
+        {phase==="free-beta" && <FreeBetaAccessScreen userData={userData} plan={plan} onContinue={()=>setPhase("loading")} />}
         {phase==="loading" && <LoadingScreen onDone={() => {
   setActiveTab("today");
   setPhase("app");
@@ -12363,6 +12422,15 @@ if (data.age && data.age < 18) {
     if (bootEl) {
       bootEl.classList.add('hidden');
       setTimeout(function() { bootEl.style.display = 'none'; }, 350);
+    }
+  </script>
+  <script>
+    if ("serviceWorker" in navigator && window.location.protocol === "https:") {
+      window.addEventListener("load", function() {
+        navigator.serviceWorker.register("/sw.js").catch(function(error) {
+          console.warn("DUBI service worker registration failed:", error);
+        });
+      });
     }
   </script>
 </body>
