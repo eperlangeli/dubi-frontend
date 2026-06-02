@@ -103,14 +103,18 @@ const API_BASE_URL = "https://dubi-backend.onrender.com";
 const DUBI_BETA_COPY = {
   it: {
     badge:"BETA GRATUITA", title:"Il tuo piano DUBI e pronto.",
-    subtitle:"Durante la beta DUBI e completamente gratuito: piano personalizzato, adattamenti, lista della spesa, progressi e wearable inclusi.",
+    hero:"DUBI nasce da una scelta precisa: rendere la conoscenza nutrizionale accessibile, chiara e utile a tutti.",
+    mission:"Il founder e il team hanno costruito DUBI per aiutare le persone a ritrovare un rapporto piu consapevole con alimentazione e benessere. In un campo spesso affollato da informazioni confuse o contraddittorie, vogliamo offrire orientamento, educazione e strumenti concreti a chi desidera vivere meglio e a chi attraversa un momento di difficolta.",
+    subtitle:"Per questo il servizio e il tuo piano personalizzato sono offerti gratuitamente: adattamenti, lista della spesa, progressi e wearable inclusi.",
     cta:"Entra nel mio piano gratuito", note:"Nessuna carta richiesta. Nessun abbonamento. Tutte le funzionalita della beta sono incluse.",
     settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Tutto incluso", settingsNote:"Piano completo gratuito per i primi utenti beta.",
     features:["Piano nutrizionale personalizzato","Adattamenti automatici sui tuoi dati","Lista della spesa e alternative","Progressi, trend e wearable"]
   },
   en: {
     badge:"FREE BETA", title:"Your DUBI plan is ready.",
-    subtitle:"During the beta DUBI is completely free: personalized plan, adaptations, shopping list, progress and wearables included.",
+    hero:"DUBI was born from a deliberate choice: making nutrition knowledge accessible, clear and useful to everyone.",
+    mission:"The founder and the team built DUBI to help people develop a more informed relationship with nutrition and wellbeing. In a field often crowded with confusing or conflicting information, we want to offer guidance, education and practical tools to those who wish to live better and to those going through a difficult moment.",
+    subtitle:"That is why the service and your personalized plan are offered free of charge: adaptations, shopping list, progress and wearables included.",
     cta:"Open my free plan", note:"No card required. No subscription. All beta features are included.",
     settingsTitle:"FREE BETA", settingsPlan:"DUBI Beta · Everything included", settingsNote:"Full plan free for early beta users.",
     features:["Personalized nutrition plan","Automatic adaptations from your data","Shopping list and alternatives","Progress, trends and wearables"]
@@ -544,6 +548,27 @@ const fetchCurrentWearableDataFromBackend = async () => {
     return await response.json();
   } catch (error) {
     console.error("Wearable current data request failed:", error);
+    return null;
+  }
+};
+
+const submitBetaFeedbackToBackend = async (score, comment) => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/nps/submit`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ score, comment, context: "beta_settings" })
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("Beta feedback request failed:", error);
     return null;
   }
 };
@@ -6939,6 +6964,10 @@ const WelcomeScreen = ({onStart}) => {
         <span style={{width:7,height:7,borderRadius:99,background:T.accentD}} />
         <span style={{fontSize:10,fontWeight:900,color:T.accentD,letterSpacing:1.1}}>{getDubiBetaCopy(lang).badge} · TUTTO INCLUSO</span>
       </div>
+      <div style={{background:T.sel,border:`1px solid ${T.accent}`,borderRadius:20,padding:"15px 16px",marginTop:12}}>
+        <p style={{fontSize:14,fontWeight:850,color:T.text,lineHeight:1.45,margin:0}}>{getDubiBetaCopy(lang).hero}</p>
+        <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:"7px 0 0"}}>{getDubiBetaCopy(lang).subtitle}</p>
+      </div>
     </div>
     <div>
       <div style={{display:"flex",gap:8,marginBottom:32,flexWrap:"wrap"}}>
@@ -8291,6 +8320,10 @@ const FreeBetaAccessScreen = ({ userData, plan, onContinue }) => {
       <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:33,fontWeight:900,color:T.text,letterSpacing:-1.1,lineHeight:1.08,margin:"0 0 12px"}}>
         {userData?.name ? `${userData.name.split(" ")[0]}, ${copy.title.toLowerCase()}` : copy.title}
       </h1>
+      <div style={{background:T.sel,border:`1px solid ${T.accent}`,borderRadius:20,padding:"17px 16px",margin:"0 0 16px"}}>
+        <p style={{fontSize:15,fontWeight:900,color:T.text,lineHeight:1.5,margin:0}}>{copy.hero}</p>
+        <p style={{fontSize:13,color:T.muted,lineHeight:1.65,margin:"10px 0 0"}}>{copy.mission}</p>
+      </div>
       <p style={{fontSize:15,color:T.muted,lineHeight:1.65,margin:"0 0 20px"}}>{copy.subtitle}</p>
       <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:20,padding:18,marginBottom:16}}>
         <div style={{display:"flex",gap:10,marginBottom:16}}>
@@ -10521,6 +10554,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const [progressHistory, setProgressHistory] = useState([]);
   const [editingProgressId, setEditingProgressId] = useState(null);
   const [editingWeight, setEditingWeight] = useState("");
+  const [wearableSnapshot, setWearableSnapshot] = useState(null);
   
   useEffect(() => {
   const loadProgressHistory = async () => {
@@ -10530,6 +10564,13 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
 
   loadProgressHistory();
 }, []);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCurrentWearableDataFromBackend().then(snapshot => {
+      if (!cancelled) setWearableSnapshot(snapshot);
+    });
+    return () => { cancelled = true; };
+  }, []);
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
 
   const startWeight = weightLog[0]?.weight || userData?.weight || 78;
@@ -10555,10 +10596,26 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
     setNewWeight("");
   };
 
+  const wearableRecent = wearableSnapshot?.recent || [];
+  const latestWearable = wearableSnapshot?.latest || wearableRecent[wearableRecent.length - 1] || {};
+  const metricFromWearable = (key, fallback) => {
+    const rows = wearableRecent
+      .filter(row => row[key] !== null && row[key] !== undefined && row[key] !== "")
+      .map(row => ({label:String(row.data_date || "").slice(5,10) || "-", value:Number(row[key])}))
+      .filter(row => Number.isFinite(row.value));
+    return rows.length >= 2 ? rows : fallback.map(d=>({label:d.w, value:d.v}));
+  };
+  const wearableMetricData = {
+    hrv: metricFromWearable("hrv", MOCK_METRIC_DATA.hrv),
+    sonno: metricFromWearable("sleep_quality", MOCK_METRIC_DATA.sonno),
+    passi: metricFromWearable("steps", MOCK_METRIC_DATA.passi),
+    calorie: metricFromWearable("activity_kcal", MOCK_METRIC_DATA.calorie)
+  };
+
   // Build chart data for active metric
   const metricRaw = activeMetric==="peso"
     ? weightLog.map(d=>({label:d.week, value:d.weight}))
-    : MOCK_METRIC_DATA[activeMetric].map(d=>({label:d.w, value:d.v}));
+    : wearableMetricData[activeMetric];
 
   const cfg = METRIC_CFG[activeMetric];
 
@@ -10573,10 +10630,10 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const improvements = [
     {icon:"dumbbell",color:"#C47B7B", labelKey:"prog.imp.lean.l", value:"+0.3 kg", noteKey:"prog.imp.lean.n"},
     {icon:"zap",color:"#C9A87C", labelKey:"prog.imp.tdee.l", value:`${plan?.tdee || 2100} kcal`, noteKey:"prog.imp.tdee.n"},
-    {icon:"moon",    color:"#9A8FBF", label:t("prog.imp.sleep.l"),        value:"76/100",                   note:t("prog.imp.sleep.n")},
-    {icon:"heart",   color:"#C47B7B", label:t("prog.imp.hrv.l"),            value:"52 ms",                    note:t("prog.imp.hrv.n")},
-    {icon:"flame",   color:"#C9A87C", label:t("prog.imp.cal.l"), value:"2.840 kcal",               note:undefined},
-    {icon:"steps",   color:T.accentD, label:t("prog.metric.steps"),       value:"8.234",                    note:undefined},
+    {icon:"moon",    color:"#9A8FBF", label:t("prog.imp.sleep.l"),        value:`${latestWearable.sleep_quality || 76}/100`, note:t("prog.imp.sleep.n")},
+    {icon:"heart",   color:"#C47B7B", label:t("prog.imp.hrv.l"),            value:`${latestWearable.hrv || 52} ms`, note:t("prog.imp.hrv.n")},
+    {icon:"flame",   color:"#C9A87C", label:t("prog.imp.cal.l"), value:`${Number(latestWearable.activity_kcal || 2840).toLocaleString("it-IT")} kcal`, note:undefined},
+    {icon:"steps",   color:T.accentD, label:t("prog.metric.steps"),       value:Number(latestWearable.steps || 8234).toLocaleString("it-IT"), note:undefined},
     {icon:"drop",    color:"#7BA8C4", label:t("prog.imp.water.l"),          value:`2.1 ${t("prog.water.unit")}`,             note:t("prog.imp.water.n")},
     {icon:"trend",   color:T.accentD, label:t("prog.imp.adherence.l"),          value:"87%",                      note:t("prog.imp.adherence.n")},
   ];
@@ -10589,7 +10646,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   }[userData?.goal || plan?.goal] || userData?.goal || "DUBI";
   const trendCards = [
     {id:"weight", icon:"weight", label:t("trend.card.weight"), value:`${currentWeight} kg`, note:t("trend.explain.weight"), color:T.text, view:"weight", metric:"peso"},
-    {id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:"HRV 52 ms", note:t("trend.explain.recovery"), color:"#C47B7B", view:"metrics", metric:"hrv"},
+    {id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:`HRV ${latestWearable.hrv || 52} ms`, note:t("trend.explain.recovery"), color:"#C47B7B", view:"metrics", metric:"hrv"},
     {id:"adherence", icon:"check", label:t("trend.card.adherence"), value:"87%", note:t("trend.explain.adherence"), color:T.accentD, view:"report", metric:"sonno"},
     {id:"energy", icon:"zap", label:t("trend.card.energy"), value:`${plan?.tdee || 2100} kcal`, note:t("trend.explain.energy"), color:"#C9A87C", view:"report", metric:"calorie"},
   ];
@@ -11344,6 +11401,10 @@ const [wearableProviders, setWearableProviders] = useState([]);
 const [wearableMessage, setWearableMessage] = useState("");
 const [wearableBusy, setWearableBusy] = useState(false);
 const [realWearablesReady, setRealWearablesReady] = useState(true);
+const [feedbackScore, setFeedbackScore] = useState(null);
+const [feedbackComment, setFeedbackComment] = useState("");
+const [feedbackMessage, setFeedbackMessage] = useState("");
+const [feedbackSending, setFeedbackSending] = useState(false);
 
 useEffect(() => {
   let cancelled = false;
@@ -11445,6 +11506,20 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
   } finally {
     setWearableBusy(false);
   }
+};
+
+const handleSubmitBetaFeedback = async () => {
+  if (!feedbackScore || feedbackSending) return;
+  setFeedbackSending(true);
+  setFeedbackMessage("");
+  const result = await submitBetaFeedbackToBackend(feedbackScore, feedbackComment);
+  setFeedbackSending(false);
+  if (!result) {
+    setFeedbackMessage("Non riesco a inviare il feedback ora. Riprova tra poco.");
+    return;
+  }
+  setFeedbackComment("");
+  setFeedbackMessage("Grazie. Il tuo feedback aiuta il team a rendere DUBI piu utile.");
 };
 
 
@@ -11904,6 +11979,30 @@ const handleSaveProfile = async () => {
             <Ico n="check" size={18} c={T.accentD}/>
           </div>
           <p style={{padding:"0 16px 16px",fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{getDubiBetaCopy(lang).settingsNote}</p>
+        </Card>
+
+        <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>AIUTACI A MIGLIORARE DUBI</p>
+        <Card>
+          <div style={{padding:16}}>
+            <p style={{margin:0,fontSize:14,fontWeight:900,color:T.text}}>Come valuti la tua esperienza beta?</p>
+            <p style={{margin:"4px 0 12px",fontSize:11,color:T.muted,lineHeight:1.45}}>Ogni risposta viene letta dal team. Il tuo punto di vista ci aiuta a costruire un servizio davvero utile.</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5, 1fr)",gap:6}}>
+              {Array.from({length:10},(_,index)=>index+1).map(score=>(
+                <button key={score} onClick={()=>setFeedbackScore(score)}
+                  style={{padding:"9px 0",borderRadius:10,border:`1px solid ${feedbackScore===score?T.accent:T.border}`,background:feedbackScore===score?T.sel:T.bg,color:T.text,fontWeight:900,fontSize:12,cursor:"pointer"}}>
+                  {score}
+                </button>
+              ))}
+            </div>
+            <textarea value={feedbackComment} onChange={event=>setFeedbackComment(event.target.value)} maxLength={2000}
+              placeholder="Raccontaci cosa funziona e cosa possiamo migliorare..."
+              style={{width:"100%",minHeight:76,marginTop:10,padding:"11px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12,resize:"vertical",boxSizing:"border-box"}} />
+            <button onClick={handleSubmitBetaFeedback} disabled={!feedbackScore || feedbackSending}
+              style={{width:"100%",padding:"12px",marginTop:8,borderRadius:12,border:"none",background:T.accentD,color:"#fff",fontWeight:900,fontSize:12,cursor:feedbackScore&&!feedbackSending?"pointer":"default",opacity:feedbackScore&&!feedbackSending?1:.55}}>
+              {feedbackSending ? "Invio..." : "Invia feedback"}
+            </button>
+            {feedbackMessage && <p style={{margin:"9px 0 0",fontSize:11,color:feedbackMessage.startsWith("Grazie")?T.accentD:"#B91C1C",lineHeight:1.4}}>{feedbackMessage}</p>}
+          </div>
         </Card>
 
         {/* Language */}
