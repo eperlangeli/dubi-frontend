@@ -162,6 +162,23 @@ const getAuthToken = () => {
   return localStorage.getItem("dubi_token") || "";
 };
 
+const deleteAccountFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return { success:false, error:"missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? { success:true } : { success:false, error:data.error || "delete_failed" };
+  } catch (error) {
+    console.error("Account delete request failed:", error);
+    return { success:false, error:"network_error" };
+  }
+};
+
 const getSelectedWearables = (data = {}) => {
   const aliases = {
     apple_health: "apple",
@@ -11305,9 +11322,12 @@ const WrapScreen = ({userData, plan, onClose}) => {
 // ═══════════════════════════════════════════════
 // SETTINGS SCREEN
 // ═══════════════════════════════════════════════
-const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgrade, onLogout, onEditOnboarding}) => {
+const SettingsScreen = ({userData, setUserData, plan, setPlan, isPremium, onUpgrade, onLogout, onDeleteAccount, onEditOnboarding}) => {
   const { t, lang, setLang } = useT();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [accountDeleteMessage, setAccountDeleteMessage] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
 const [profileMessage, setProfileMessage] = useState("");
 const [savingProfile, setSavingProfile] = useState(false);
@@ -11931,6 +11951,40 @@ const handleSaveProfile = async () => {
           </div>
         )}
 
+        <div style={{marginTop:12}}>
+          {!showDeleteConfirm ? (
+            <button onClick={() => setShowDeleteConfirm(true)}
+              style={{width:"100%",padding:"13px 16px",borderRadius:16,border:"none",background:"transparent",color:"#B91C1C",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+              Delete my account and data
+            </button>
+          ) : (
+            <div style={{background:"#FDF5F5",borderRadius:16,border:`1px solid #E8C4C4`,padding:"16px",marginTop:8}}>
+              <p style={{fontSize:13,color:T.text,fontWeight:700,lineHeight:1.45,margin:"0 0 12px"}}>
+                Delete your DUBI account and all saved data? This cannot be undone.
+              </p>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={() => { setShowDeleteConfirm(false); setAccountDeleteMessage(""); }} disabled={deletingAccount}
+                  style={{flex:1,padding:"11px",borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontWeight:700,cursor:"pointer"}}>
+                  Cancel
+                </button>
+                <button onClick={async () => {
+                  setDeletingAccount(true);
+                  setAccountDeleteMessage("");
+                  const result = await onDeleteAccount();
+                  if (!result?.success) {
+                    setAccountDeleteMessage("Could not delete the account. Please try again.");
+                    setDeletingAccount(false);
+                  }
+                }} disabled={deletingAccount}
+                  style={{flex:1,padding:"11px",borderRadius:12,border:"none",background:"#B91C1C",color:"#fff",fontWeight:800,cursor:deletingAccount?"default":"pointer",opacity:deletingAccount?.7:1}}>
+                  {deletingAccount ? "Deleting..." : "Delete permanently"}
+                </button>
+              </div>
+              {accountDeleteMessage && <p style={{fontSize:12,color:"#B91C1C",margin:"10px 0 0"}}>{accountDeleteMessage}</p>}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
@@ -11980,13 +12034,13 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
             <div style={{flex:1}}>
               <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:T.text}}>I consent to the processing of my health data</p>
               <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
-                DUBI Health (a division of HON, Dubai UAE) will process your wearable data, body metrics, and dietary preferences exclusively to generate and adapt your personalised nutrition plan. Your data is encrypted, stored on secure servers (EU + UAE), and never sold.
+                DUBI processes your body metrics, dietary preferences and optional wearable data only to generate and adapt your personalised nutrition plan. Your data is never sold.
               </p>
               <p style={{margin:"8px 0 0",fontSize:11,color:T.muted}}>
                 This consent is required by GDPR Art. 9 and UAE PDPL to process special category health data.
               </p>
               <div
-                onClick={()=>window.open("https://dubi.health/privacy","_blank")}
+                onClick={()=>window.open("/privacy.html","_blank")}
                 style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,cursor:"pointer"}}
               >
                 <span style={{fontSize:12,color:T.accentD,fontWeight:600}}>Read full Privacy Policy →</span>
@@ -11996,7 +12050,7 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </div>
 
         {/* Insurance Consent — opzionale */}
-        <div style={{background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:24}}>
+        <div style={{display:"none",background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:24}}>
           <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
             <div
               onClick={()=>setInsuranceConsent(!insuranceConsent)}
@@ -12021,7 +12075,7 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </p>
 
         <button
-          onClick={()=> gdprConsent ? onAccept({gdpr:true, insurance:insuranceConsent}) : null}
+          onClick={()=> gdprConsent ? onAccept({gdpr:true}) : null}
           style={{
             width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:gdprConsent?"pointer":"not-allowed",
             background:gdprConsent?"linear-gradient(135deg,#6B8A64,#4A6844)":"#ccc",
@@ -12238,6 +12292,12 @@ const handleLogout = () => {
   setActiveTab("today");
   setPhase("welcome");
 };
+const handleDeleteAccount = async () => {
+  const result = await deleteAccountFromBackend();
+  if (!result.success) return result;
+  handleLogout();
+  return result;
+};
   const [swaps, setSwaps] = useState({});
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
@@ -12395,6 +12455,7 @@ if (data.age && data.age < 18) {
     isPremium={isPremium}
     onUpgrade={handlePremiumUpgrade}
     onLogout={handleLogout}
+    onDeleteAccount={handleDeleteAccount}
     onEditOnboarding={() => {
   setActiveTab("today");
   setPhase("onboarding");

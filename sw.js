@@ -1,5 +1,5 @@
-const CACHE_NAME = "dubi-beta-v1";
-const APP_SHELL = ["/", "/index.html", "/offline.html", "/manifest.webmanifest", "/icons/dubi-icon.svg"];
+const CACHE_NAME = "dubi-beta-v2";
+const APP_SHELL = ["/", "/index.html", "/offline.html", "/privacy.html", "/manifest.webmanifest", "/icons/dubi-icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
