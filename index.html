@@ -490,6 +490,23 @@ const fetchWearableStatusFromBackend = async () => {
   }
 };
 
+const fetchCurrentWearableDataFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/current`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error("Wearable current data request failed:", error);
+    return null;
+  }
+};
+
 const fetchWearableProvidersFromBackend = async () => {
   const token = getAuthToken();
   if (!token) return { providers: [], error: "missing_token" };
@@ -818,6 +835,9 @@ const TRANSLATIONS = {
     "today.wearable.cal": "Cal. attive",
     "today.wearable.sleep": "Sonno",
     "today.wearable.hrv": "HRV",
+    "today.wearable.live": "Dati live",
+    "today.wearable.demo": "Dati demo",
+    "today.wearable.preview": "Anteprima",
     "today.kcalConsumed": "CALORIE CONSUMATE",
     "today.mealsDone": "{a}/{b} pasti",
     "today.macro.prot": "Proteine",
@@ -1226,7 +1246,7 @@ TRANSLATIONS.en = {
   "wear.none":"No wearable","wear.none.d":"Plan based only on the data you entered",
   "load.1":"Profile analysis...","load.2":"Multi-variable TDEE calculation...","load.3":"Computing optimal meals and times...","load.4":"Applying guidelines (WHO·EFSA·Harvard)...","load.5":"Distributing carbs by sport...","load.6":"Plan ready ✓",
   "today.hi":"Hi 👋","today.subtitle":"Here's your plan for today · {n} meals","today.subtitle.first":"Here is your personalized plan · {n} meals",
-  "today.wearable.label":"WEARABLE — TAP FOR DETAILS","today.wearable.steps":"Steps","today.wearable.cal":"Active cal.","today.wearable.sleep":"Sleep","today.wearable.hrv":"HRV",
+  "today.wearable.label":"WEARABLE — TAP FOR DETAILS","today.wearable.steps":"Steps","today.wearable.cal":"Active cal.","today.wearable.sleep":"Sleep","today.wearable.hrv":"HRV","today.wearable.live":"Live data","today.wearable.demo":"Demo data","today.wearable.preview":"Preview",
   "today.kcalConsumed":"CALORIES CONSUMED","today.mealsDone":"{a}/{b} meals","today.macro.prot":"Protein","today.macro.carb":"Carbs","today.macro.fat":"Fat",
   "today.meals":"YOUR MEALS","today.why":"Why these ingredients?","today.done":"✓ Done","today.skip":"Skipped",
   "today.skip.q":"Did you eat something else? (optional)","today.skip.ph":"e.g. a toast, a salad...","today.skip.confirm":"Confirm",
@@ -1540,7 +1560,7 @@ TRANSLATIONS.fr = {
   "wear.apple":"Apple Health","wear.apple.d":"Pas, calories, sommeil et VFC via HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"VFC, récupération et sommeil via HealthKit","wear.none":"Aucun wearable","wear.none.d":"Plan basé uniquement sur les données saisies",
   "load.1":"Analyse du profil...","load.2":"Calcul TDEE multi-variable...","load.3":"Calcul des repas et horaires optimaux...","load.4":"Application des recommandations (OMS·EFSA·Harvard)...","load.5":"Distribution des glucides selon le sport...","load.6":"Plan prêt ✓",
   "today.hi":"Salut 👋","today.subtitle":"Voici ton plan d'aujourd'hui · {n} repas","today.subtitle.first":"Voici ton plan personnalisé · {n} repas",
-  "today.wearable.label":"WEARABLE — APPUIE POUR LES DÉTAILS","today.wearable.steps":"Pas","today.wearable.cal":"Cal. actives","today.wearable.sleep":"Sommeil","today.wearable.hrv":"VFC",
+  "today.wearable.label":"WEARABLE — APPUIE POUR LES DÉTAILS","today.wearable.steps":"Pas","today.wearable.cal":"Cal. actives","today.wearable.sleep":"Sommeil","today.wearable.hrv":"VFC","today.wearable.live":"Données live","today.wearable.demo":"Données démo","today.wearable.preview":"Aperçu",
   "today.kcalConsumed":"CALORIES CONSOMMÉES","today.mealsDone":"{a}/{b} repas","today.macro.prot":"Protéines","today.macro.carb":"Glucides","today.macro.fat":"Lipides",
   "today.meals":"TES REPAS","today.why":"Pourquoi ces ingrédients ?","today.done":"✓ Fait","today.skip":"Sauté","today.skip.q":"Tu as mangé autre chose ? (optionnel)","today.skip.ph":"Ex. un toast, une salade...","today.skip.confirm":"Confirmer",
   "today.adapt.t":"Adaptation automatique active","today.adapt.d":"DUBI met à jour calories, macros et portions selon tes données réelles sur 7 jours.",
@@ -1701,7 +1721,7 @@ TRANSLATIONS.es = {
   "wear.apple":"Apple Watch","wear.apple.d":"A través de Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"VFC, recuperación y sueño vía HealthKit","wear.none":"Sin wearable","wear.none.d":"Plan basado solo en los datos introducidos",
   "load.1":"Análisis del perfil...","load.2":"Cálculo TDEE multivariable...","load.3":"Cálculo de comidas y horarios óptimos...","load.4":"Aplicación de directrices (OMS·EFSA·Harvard)...","load.5":"Distribución de carbohidratos por deporte...","load.6":"Plan listo ✓",
   "today.hi":"Hola 👋","today.subtitle":"Aquí tienes tu plan de hoy · {n} comidas","today.subtitle.first":"Aquí está tu plan personalizado · {n} comidas",
-  "today.wearable.label":"WEARABLE — TOCA PARA VER DETALLES","today.wearable.steps":"Pasos","today.wearable.cal":"Cal. activas","today.wearable.sleep":"Sueño","today.wearable.hrv":"VFC",
+  "today.wearable.label":"WEARABLE — TOCA PARA VER DETALLES","today.wearable.steps":"Pasos","today.wearable.cal":"Cal. activas","today.wearable.sleep":"Sueño","today.wearable.hrv":"VFC","today.wearable.live":"Datos en vivo","today.wearable.demo":"Datos demo","today.wearable.preview":"Vista previa",
   "today.kcalConsumed":"CALORÍAS CONSUMIDAS","today.mealsDone":"{a}/{b} comidas","today.macro.prot":"Proteínas","today.macro.carb":"Carbohidratos","today.macro.fat":"Grasas",
   "today.meals":"TUS COMIDAS","today.why":"¿Por qué estos ingredientes?","today.done":"✓ Hecho","today.skip":"Saltada","today.skip.q":"¿Comiste otra cosa? (opcional)","today.skip.ph":"Ej. una tostada, una ensalada...","today.skip.confirm":"Confirmar",
   "today.adapt.t":"Adaptación automática activa","today.adapt.d":"DUBI actualiza calorías, macros y porciones según tus datos reales de los últimos 7 días.",
@@ -1862,7 +1882,7 @@ TRANSLATIONS.de = {
   "wear.apple":"Apple Watch","wear.apple.d":"Über Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"HRV, Erholung und Schlaf via HealthKit","wear.none":"Kein Wearable","wear.none.d":"Plan nur basierend auf eingegebenen Daten",
   "load.1":"Profilanalyse...","load.2":"Multivariable TDEE-Berechnung...","load.3":"Optimale Mahlzeiten und Zeiten...","load.4":"Anwendung der Richtlinien (WHO·EFSA·Harvard)...","load.5":"Kohlenhydratverteilung nach Sport...","load.6":"Plan bereit ✓",
   "today.hi":"Hi 👋","today.subtitle":"Hier ist dein heutiger Plan · {n} Mahlzeiten","today.subtitle.first":"Hier ist dein personalisierter Plan · {n} Mahlzeiten",
-  "today.wearable.label":"WEARABLE — TIPPEN FÜR DETAILS","today.wearable.steps":"Schritte","today.wearable.cal":"Aktive Kal.","today.wearable.sleep":"Schlaf","today.wearable.hrv":"HRV",
+  "today.wearable.label":"WEARABLE — TIPPEN FÜR DETAILS","today.wearable.steps":"Schritte","today.wearable.cal":"Aktive Kal.","today.wearable.sleep":"Schlaf","today.wearable.hrv":"HRV","today.wearable.live":"Live-Daten","today.wearable.demo":"Demo-Daten","today.wearable.preview":"Vorschau",
   "today.kcalConsumed":"VERZEHRTE KALORIEN","today.mealsDone":"{a}/{b} Mahlzeiten","today.macro.prot":"Protein","today.macro.carb":"Kohlenhydrate","today.macro.fat":"Fett",
   "today.meals":"DEINE MAHLZEITEN","today.why":"Warum diese Zutaten?","today.done":"✓ Erledigt","today.skip":"Übersprungen","today.skip.q":"Hast du etwas anderes gegessen? (optional)","today.skip.ph":"z.B. Toast, Salat...","today.skip.confirm":"Bestätigen",
   "today.adapt.t":"Automatische Anpassung aktiv","today.adapt.d":"DUBI aktualisiert Kalorien, Makros und Portionen anhand deiner echten 7-Tage-Daten.",
@@ -2023,7 +2043,7 @@ TRANSLATIONS.ar = {
   "wear.apple":"Apple Watch","wear.apple.d":"عبر Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"HRV والتعافي والنوم عبر HealthKit","wear.none":"بدون جهاز","wear.none.d":"خطة معتمدة على البيانات المُدخَلة فقط",
   "load.1":"تحليل الملف الشخصي...","load.2":"حساب TDEE متعدد المتغيرات...","load.3":"حساب الوجبات والأوقات المثلى...","load.4":"تطبيق الإرشادات (WHO·EFSA·Harvard)...","load.5":"توزيع الكربوهيدرات حسب الرياضة...","load.6":"الخطة جاهزة ✓",
   "today.hi":"مرحباً 👋","today.subtitle":"خطتك اليوم · {n} وجبات","today.subtitle.first":"إليك خطتك المخصَّصة · {n} وجبات",
-  "today.wearable.label":"الجهاز — اضغط للتفاصيل","today.wearable.steps":"خطوات","today.wearable.cal":"سعرات نشطة","today.wearable.sleep":"نوم","today.wearable.hrv":"HRV",
+  "today.wearable.label":"الجهاز — اضغط للتفاصيل","today.wearable.steps":"خطوات","today.wearable.cal":"سعرات نشطة","today.wearable.sleep":"نوم","today.wearable.hrv":"HRV","today.wearable.live":"بيانات مباشرة","today.wearable.demo":"بيانات تجريبية","today.wearable.preview":"معاينة",
   "today.kcalConsumed":"السعرات المستهلكة","today.mealsDone":"{a}/{b} وجبات","today.macro.prot":"بروتين","today.macro.carb":"كربوهيدرات","today.macro.fat":"دهون",
   "today.meals":"وجباتك","today.why":"لماذا هذه المكونات؟","today.done":"✓ تم","today.skip":"تخطّيت","today.skip.q":"هل أكلت شيئاً آخر؟ (اختياري)","today.skip.ph":"مثلاً توست أو سلطة...","today.skip.confirm":"تأكيد",
   "today.adapt.t":"التكيّف التلقائي مفعَّل","today.adapt.d":"تحدِّث DUBI السعرات والماكروز والحصص بناءً على بياناتك الحقيقية لآخر 7 أيام.",
@@ -2184,7 +2204,7 @@ TRANSLATIONS.pt = {
   "wear.apple":"Apple Watch","wear.apple.d":"Via Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"VFC, recuperação e sono via HealthKit","wear.none":"Sem wearable","wear.none.d":"Plano baseado apenas nos dados introduzidos",
   "load.1":"Análise do perfil...","load.2":"Cálculo TDEE multivariável...","load.3":"Cálculo de refeições e horários ótimos...","load.4":"Aplicação de diretrizes (OMS·EFSA·Harvard)...","load.5":"Distribuição de hidratos por desporto...","load.6":"Plano pronto ✓",
   "today.hi":"Olá 👋","today.subtitle":"Aqui está o teu plano de hoje · {n} refeições","today.subtitle.first":"Aqui está o teu plano personalizado · {n} refeições",
-  "today.wearable.label":"WEARABLE — TOCA PARA DETALHES","today.wearable.steps":"Passos","today.wearable.cal":"Cal. ativas","today.wearable.sleep":"Sono","today.wearable.hrv":"VFC",
+  "today.wearable.label":"WEARABLE — TOCA PARA DETALHES","today.wearable.steps":"Passos","today.wearable.cal":"Cal. ativas","today.wearable.sleep":"Sono","today.wearable.hrv":"VFC","today.wearable.live":"Dados ao vivo","today.wearable.demo":"Dados demo","today.wearable.preview":"Prévia",
   "today.kcalConsumed":"CALORIAS CONSUMIDAS","today.mealsDone":"{a}/{b} refeições","today.macro.prot":"Proteínas","today.macro.carb":"Hidratos","today.macro.fat":"Gorduras",
   "today.meals":"AS TUAS REFEIÇÕES","today.why":"Porquê estes ingredientes?","today.done":"✓ Feito","today.skip":"Saltada","today.skip.q":"Comeste outra coisa? (opcional)","today.skip.ph":"Ex. uma tosta, uma salada...","today.skip.confirm":"Confirmar",
   "today.adapt.t":"Adaptação automática ativa","today.adapt.d":"A DUBI atualiza calorias, macros e porções com base nos teus dados reais dos últimos 7 dias.",
@@ -2345,7 +2365,7 @@ TRANSLATIONS.zh = {
   "wear.apple":"Apple Watch","wear.apple.d":"通过 Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"通过 HealthKit 同步 HRV、恢复与睡眠","wear.none":"无可穿戴","wear.none.d":"仅基于你输入的数据",
   "load.1":"分析个人资料...","load.2":"多变量 TDEE 计算...","load.3":"计算最佳餐食与时间...","load.4":"应用指南（WHO·EFSA·哈佛）...","load.5":"按运动分配碳水化合物...","load.6":"计划就绪 ✓",
   "today.hi":"嗨 👋","today.subtitle":"今天的计划 · {n} 餐","today.subtitle.first":"这是你的个性化方案 · {n} 餐",
-  "today.wearable.label":"可穿戴 — 点击查看详情","today.wearable.steps":"步数","today.wearable.cal":"活动卡路里","today.wearable.sleep":"睡眠","today.wearable.hrv":"HRV",
+  "today.wearable.label":"可穿戴 — 点击查看详情","today.wearable.steps":"步数","today.wearable.cal":"活动卡路里","today.wearable.sleep":"睡眠","today.wearable.hrv":"HRV","today.wearable.live":"实时数据","today.wearable.demo":"演示数据","today.wearable.preview":"预览",
   "today.kcalConsumed":"已摄入卡路里","today.mealsDone":"{a}/{b} 餐","today.macro.prot":"蛋白质","today.macro.carb":"碳水","today.macro.fat":"脂肪",
   "today.meals":"你的餐食","today.why":"为什么是这些食材？","today.done":"✓ 完成","today.skip":"跳过","today.skip.q":"你吃了别的吗？（可选）","today.skip.ph":"如：一份吐司、一份沙拉...","today.skip.confirm":"确认",
   "today.adapt.t":"自动适配已开启","today.adapt.d":"DUBI 根据你最近 7 天的真实数据更新卡路里、宏量与分量。",
@@ -2506,7 +2526,7 @@ TRANSLATIONS.ja = {
   "wear.apple":"Apple Watch","wear.apple.d":"Apple Health / HealthKit経由","wear.whoop":"WHOOP","wear.whoop.d":"HealthKit経由でHRV・回復・睡眠","wear.none":"ウェアラブルなし","wear.none.d":"入力データのみで作成",
   "load.1":"プロファイル分析中...","load.2":"多変数TDEE計算中...","load.3":"最適な食事と時刻を計算中...","load.4":"ガイドライン適用中（WHO·EFSA·ハーバード）...","load.5":"スポーツに応じた炭水化物配分...","load.6":"プラン完成 ✓",
   "today.hi":"こんにちは 👋","today.subtitle":"今日のプラン · {n} 食","today.subtitle.first":"あなたのパーソナライズプラン · {n} 食",
-  "today.wearable.label":"ウェアラブル — タップで詳細","today.wearable.steps":"歩数","today.wearable.cal":"アクティブカロリー","today.wearable.sleep":"睡眠","today.wearable.hrv":"HRV",
+  "today.wearable.label":"ウェアラブル — タップで詳細","today.wearable.steps":"歩数","today.wearable.cal":"アクティブカロリー","today.wearable.sleep":"睡眠","today.wearable.hrv":"HRV","today.wearable.live":"ライブデータ","today.wearable.demo":"デモデータ","today.wearable.preview":"プレビュー",
   "today.kcalConsumed":"摂取カロリー","today.mealsDone":"{a}/{b} 食","today.macro.prot":"タンパク質","today.macro.carb":"炭水化物","today.macro.fat":"脂質",
   "today.meals":"あなたの食事","today.why":"なぜこの食材？","today.done":"✓ 完了","today.skip":"スキップ","today.skip.q":"他のものを食べましたか？（任意）","today.skip.ph":"例：トースト、サラダ...","today.skip.confirm":"確定",
   "today.adapt.t":"自動適応 オン","today.adapt.d":"DUBIは過去7日の実データに基づきカロリー・マクロ・量を更新します。",
@@ -2667,7 +2687,7 @@ TRANSLATIONS.ru = {
   "wear.apple":"Apple Watch","wear.apple.d":"Через Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"HRV, восстановление и сон через HealthKit","wear.none":"Без носимого","wear.none.d":"План только по введённым данным",
   "load.1":"Анализ профиля...","load.2":"Расчёт TDEE по нескольким переменным...","load.3":"Расчёт оптимальных приёмов пищи и времени...","load.4":"Применение рекомендаций (ВОЗ·EFSA·Гарвард)...","load.5":"Распределение углеводов по виду спорта...","load.6":"План готов ✓",
   "today.hi":"Привет 👋","today.subtitle":"Твой план на сегодня · {n} приёмов пищи","today.subtitle.first":"Твой персональный план · {n} приёмов пищи",
-  "today.wearable.label":"НОСИМОЕ — НАЖМИ ДЛЯ ДЕТАЛЕЙ","today.wearable.steps":"Шаги","today.wearable.cal":"Активные ккал","today.wearable.sleep":"Сон","today.wearable.hrv":"HRV",
+  "today.wearable.label":"НОСИМОЕ — НАЖМИ ДЛЯ ДЕТАЛЕЙ","today.wearable.steps":"Шаги","today.wearable.cal":"Активные ккал","today.wearable.sleep":"Сон","today.wearable.hrv":"HRV","today.wearable.live":"Живые данные","today.wearable.demo":"Демо-данные","today.wearable.preview":"Превью",
   "today.kcalConsumed":"СЪЕДЕНО КАЛОРИЙ","today.mealsDone":"{a}/{b} приёмов","today.macro.prot":"Белки","today.macro.carb":"Углеводы","today.macro.fat":"Жиры",
   "today.meals":"ТВОИ ПРИЁМЫ ПИЩИ","today.why":"Почему эти ингредиенты?","today.done":"✓ Готово","today.skip":"Пропущено","today.skip.q":"Ел что-то другое? (опц.)","today.skip.ph":"Напр.: тост, салат...","today.skip.confirm":"Подтвердить",
   "today.adapt.t":"Авто-адаптация включена","today.adapt.d":"DUBI обновляет калории, макросы и порции по реальным данным за 7 дней.",
@@ -5254,6 +5274,34 @@ const Chip = ({icon,label,value,color=T.accent,onClick}) => (
   </div>
 );
 
+const WearableMetricCard = ({icon,label,value,color=T.accent,source,onClick}) => (
+  <button onClick={onClick} style={{
+    width:"100%", minHeight:104, border:"none", borderRadius:18, padding:14,
+    background:`linear-gradient(145deg, ${T.card} 0%, ${T.bg} 100%)`,
+    boxShadow:"0 10px 26px rgba(43,43,43,.06)",
+    outline:`1px solid ${T.border}`, cursor:"pointer", textAlign:"left",
+    display:"flex", flexDirection:"column", justifyContent:"space-between",
+    transition:"transform .16s ease, box-shadow .16s ease, outline-color .16s ease"
+  }}
+    onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 14px 30px rgba(43,43,43,.09)";e.currentTarget.style.outlineColor=color;}}
+    onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 10px 26px rgba(43,43,43,.06)";e.currentTarget.style.outlineColor=T.border;}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+      <div style={{width:36,height:36,borderRadius:13,background:`${color}18`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {icon}
+      </div>
+      <Ico n="chev" size={14} c={T.muted}/>
+    </div>
+    <div>
+      <div style={{fontSize:24,fontWeight:900,color:T.text,letterSpacing:-0.8,lineHeight:1}}>{value}</div>
+      <div style={{fontSize:11,color:T.muted,marginTop:5,lineHeight:1.2}}>{label}</div>
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <span style={{width:6,height:6,borderRadius:999,background:color,boxShadow:`0 0 0 4px ${color}14`}} />
+      <span style={{fontSize:10,fontWeight:700,color:T.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{source}</span>
+    </div>
+  </button>
+);
+
 const NumInput = ({label,unit,value,onChange,min,max}) => {
   const [raw, setRaw] = React.useState(String(value));
   const [focused, setFocused] = React.useState(false);
@@ -6865,8 +6913,85 @@ const WelcomeScreen = ({onStart}) => {
     </div>
   </div>
 );};
+
+const AUTH_COPY = {
+  it: {
+    tagline:"Il tuo pilota nutrizionale", registerTitle:"Inizia il tuo piano personalizzato.", loginTitle:"Bentornato.",
+    registerSub:"Crea un account per salvare onboarding, profilo e piano nutrizionale.", loginSub:"Accedi per continuare con il tuo profilo DUBI.",
+    signup:"Registrati", login:"Accedi", email:"Email", password:"Password", passwordHint:"La password deve avere almeno 6 caratteri.",
+    missing:"Inserisci email e password.", short:"La password deve avere almeno 6 caratteri.", registerError:"Questa email potrebbe essere gia registrata. Prova ad accedere oppure usa una password di almeno 6 caratteri.",
+    loginError:"Email o password non validi. Controlla i dati.", network:"Errore di connessione. Riprova.", loading:"Caricamento...", create:"Crea account", back:"Indietro"
+  },
+  en: {
+    tagline:"Your nutrition autopilot", registerTitle:"Start your personalized plan.", loginTitle:"Welcome back.",
+    registerSub:"Create an account to save your onboarding, profile and nutrition plan.", loginSub:"Log in to continue with your DUBI profile.",
+    signup:"Sign up", login:"Login", email:"Email", password:"Password", passwordHint:"Password must be at least 6 characters.",
+    missing:"Please enter email and password.", short:"Password must be at least 6 characters.", registerError:"This email may already be registered. Try Login, or use a password with at least 6 characters.",
+    loginError:"Invalid email or password. Please check your credentials.", network:"Connection error. Please try again.", loading:"Loading...", create:"Create account", back:"Back"
+  },
+  fr: {
+    tagline:"Ton pilote nutritionnel", registerTitle:"Commence ton plan personnalise.", loginTitle:"Bon retour.",
+    registerSub:"Cree un compte pour enregistrer ton onboarding, ton profil et ton plan nutritionnel.", loginSub:"Connecte-toi pour continuer avec ton profil DUBI.",
+    signup:"S'inscrire", login:"Connexion", email:"Email", password:"Mot de passe", passwordHint:"Le mot de passe doit contenir au moins 6 caracteres.",
+    missing:"Saisis ton email et ton mot de passe.", short:"Le mot de passe doit contenir au moins 6 caracteres.", registerError:"Cet email est peut-etre deja inscrit. Essaie de te connecter ou utilise un mot de passe d'au moins 6 caracteres.",
+    loginError:"Email ou mot de passe non valide.", network:"Erreur de connexion. Reessaie.", loading:"Chargement...", create:"Creer le compte", back:"Retour"
+  },
+  es: {
+    tagline:"Tu piloto nutricional", registerTitle:"Empieza tu plan personalizado.", loginTitle:"Bienvenido de nuevo.",
+    registerSub:"Crea una cuenta para guardar onboarding, perfil y plan nutricional.", loginSub:"Inicia sesion para continuar con tu perfil DUBI.",
+    signup:"Registrarse", login:"Entrar", email:"Email", password:"Contrasena", passwordHint:"La contrasena debe tener al menos 6 caracteres.",
+    missing:"Introduce email y contrasena.", short:"La contrasena debe tener al menos 6 caracteres.", registerError:"Este email puede estar ya registrado. Prueba a entrar o usa una contrasena de al menos 6 caracteres.",
+    loginError:"Email o contrasena no validos.", network:"Error de conexion. Intentalo de nuevo.", loading:"Cargando...", create:"Crear cuenta", back:"Atras"
+  },
+  de: {
+    tagline:"Dein Ernahrungs-Autopilot", registerTitle:"Starte deinen personalisierten Plan.", loginTitle:"Willkommen zuruck.",
+    registerSub:"Erstelle ein Konto, um Onboarding, Profil und Ernahrungsplan zu speichern.", loginSub:"Melde dich an, um mit deinem DUBI-Profil fortzufahren.",
+    signup:"Registrieren", login:"Anmelden", email:"E-Mail", password:"Passwort", passwordHint:"Das Passwort muss mindestens 6 Zeichen haben.",
+    missing:"Bitte E-Mail und Passwort eingeben.", short:"Das Passwort muss mindestens 6 Zeichen haben.", registerError:"Diese E-Mail ist eventuell schon registriert. Melde dich an oder nutze ein Passwort mit mindestens 6 Zeichen.",
+    loginError:"E-Mail oder Passwort ungultig.", network:"Verbindungsfehler. Bitte erneut versuchen.", loading:"Laden...", create:"Konto erstellen", back:"Zuruck"
+  },
+  ar: {
+    tagline:"مساعدك الغذائي الذكي", registerTitle:"ابدأ خطتك الشخصية.", loginTitle:"مرحباً بعودتك.",
+    registerSub:"أنشئ حساباً لحفظ بيانات البداية والملف والخطة الغذائية.", loginSub:"سجل الدخول للمتابعة مع ملفك في DUBI.",
+    signup:"إنشاء حساب", login:"تسجيل الدخول", email:"البريد الإلكتروني", password:"كلمة المرور", passwordHint:"يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.",
+    missing:"أدخل البريد الإلكتروني وكلمة المرور.", short:"يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.", registerError:"قد يكون هذا البريد مسجلاً بالفعل. جرب تسجيل الدخول أو استخدم كلمة مرور من 6 أحرف على الأقل.",
+    loginError:"البريد الإلكتروني أو كلمة المرور غير صحيحة.", network:"خطأ في الاتصال. حاول مرة أخرى.", loading:"جار التحميل...", create:"إنشاء الحساب", back:"رجوع"
+  },
+  pt: {
+    tagline:"O teu piloto nutricional", registerTitle:"Comeca o teu plano personalizado.", loginTitle:"Bem-vindo de volta.",
+    registerSub:"Cria uma conta para guardar onboarding, perfil e plano nutricional.", loginSub:"Inicia sessao para continuar com o teu perfil DUBI.",
+    signup:"Registar", login:"Entrar", email:"Email", password:"Palavra-passe", passwordHint:"A palavra-passe deve ter pelo menos 6 caracteres.",
+    missing:"Introduz email e palavra-passe.", short:"A palavra-passe deve ter pelo menos 6 caracteres.", registerError:"Este email pode ja estar registado. Tenta entrar ou usa uma palavra-passe com pelo menos 6 caracteres.",
+    loginError:"Email ou palavra-passe invalidos.", network:"Erro de ligacao. Tenta novamente.", loading:"A carregar...", create:"Criar conta", back:"Voltar"
+  },
+  zh: {
+    tagline:"你的营养自动驾驶", registerTitle:"开始你的个性化计划。", loginTitle:"欢迎回来。",
+    registerSub:"创建账户以保存引导信息、个人资料和营养计划。", loginSub:"登录以继续使用你的 DUBI 资料。",
+    signup:"注册", login:"登录", email:"邮箱", password:"密码", passwordHint:"密码至少需要 6 个字符。",
+    missing:"请输入邮箱和密码。", short:"密码至少需要 6 个字符。", registerError:"此邮箱可能已注册。请尝试登录，或使用至少 6 个字符的密码。",
+    loginError:"邮箱或密码无效。", network:"连接错误，请重试。", loading:"加载中...", create:"创建账户", back:"返回"
+  },
+  ja: {
+    tagline:"あなたの栄養オートパイロット", registerTitle:"パーソナルプランを開始しましょう。", loginTitle:"おかえりなさい。",
+    registerSub:"オンボーディング、プロフィール、栄養プランを保存するためにアカウントを作成します。", loginSub:"DUBIプロフィールを続けるにはログインしてください。",
+    signup:"登録", login:"ログイン", email:"メール", password:"パスワード", passwordHint:"パスワードは6文字以上です。",
+    missing:"メールとパスワードを入力してください。", short:"パスワードは6文字以上です。", registerError:"このメールは既に登録されている可能性があります。ログインするか、6文字以上のパスワードを使用してください。",
+    loginError:"メールまたはパスワードが正しくありません。", network:"接続エラーです。もう一度お試しください。", loading:"読み込み中...", create:"アカウント作成", back:"戻る"
+  },
+  ru: {
+    tagline:"Твой автопилот питания", registerTitle:"Начни персональный план.", loginTitle:"С возвращением.",
+    registerSub:"Создай аккаунт, чтобы сохранить onboarding, профиль и план питания.", loginSub:"Войди, чтобы продолжить с профилем DUBI.",
+    signup:"Регистрация", login:"Войти", email:"Email", password:"Пароль", passwordHint:"Пароль должен быть не короче 6 символов.",
+    missing:"Введи email и пароль.", short:"Пароль должен быть не короче 6 символов.", registerError:"Этот email, возможно, уже зарегистрирован. Попробуй войти или используй пароль от 6 символов.",
+    loginError:"Неверный email или пароль.", network:"Ошибка соединения. Попробуй ещё раз.", loading:"Загрузка...", create:"Создать аккаунт", back:"Назад"
+  }
+};
+
+const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
+
     const AuthScreen = ({ onSuccess, onBack }) => {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const copy = getAuthCopy(lang);
 
   // Default to "login" if there is already a saved token or saved email, otherwise "register"
   const hasExistingSession = !!(localStorage.getItem("dubi_token") || localStorage.getItem("dubi_email"));
@@ -6894,12 +7019,12 @@ const WelcomeScreen = ({onStart}) => {
     setError("");
 
     if (!email || !password) {
-      setError("Please enter email and password.");
+      setError(copy.missing);
       return;
     }
 
     if (mode === "register" && password.length < 6) {
-      setError("Password must be at least 6 characters.");
+      setError(copy.short);
       return;
     }
 
@@ -6945,37 +7070,36 @@ const WelcomeScreen = ({onStart}) => {
       }
 
       if (mode === "register") {
-        setError("This email may already be registered. Try Login, or use a password with at least 6 characters.");
+        setError(copy.registerError);
       } else {
-        setError("Invalid email or password. Please check your credentials.");
+        setError(copy.loginError);
       }
 
     } catch (err) {
       console.error("Auth error:", err);
-      setError("Connection error. Please try again.");
+      setError(copy.network);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column",justifyContent:"center",padding:"28px"}}>
+    <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column",justifyContent:"center",padding:"28px",position:"relative"}}>
+      <LanguageSelector />
       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:42}}>
         <DUBILogo size={52} variant="dark"/>
         <div>
           <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:32,fontWeight:800,color:T.text,margin:0}}>DUBI</h1>
-          <p style={{fontSize:9,color:T.muted,letterSpacing:1.8,textTransform:"uppercase",margin:0}}>Your nutrition autopilot</p>
+          <p style={{fontSize:9,color:T.muted,letterSpacing:1.8,textTransform:"uppercase",margin:0}}>{copy.tagline}</p>
         </div>
       </div>
 
       <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:34,fontWeight:800,color:T.text,lineHeight:1.05,margin:"0 0 12px"}}>
-        {mode === "register" ? "Start your personalized plan." : "Welcome back."}
+        {mode === "register" ? copy.registerTitle : copy.loginTitle}
       </h2>
 
       <p style={{fontSize:15,color:T.muted,lineHeight:1.6,margin:"0 0 28px"}}>
-        {mode === "register"
-          ? "Create an account to save your onboarding, profile and nutrition plan."
-          : "Log in to continue with your DUBI profile."}
+        {mode === "register" ? copy.registerSub : copy.loginSub}
       </p>
 
       <div style={{display:"flex",gap:8,marginBottom:20}}>
@@ -6985,7 +7109,7 @@ const WelcomeScreen = ({onStart}) => {
           background:mode==="register"?T.text:T.card,
           color:mode==="register"?T.bg:T.text, fontWeight:700
         }}>
-          Sign up
+          {copy.signup}
         </button>
         <button onClick={() => switchMode("login")} style={{
           flex:1, padding:"12px", borderRadius:20,
@@ -6993,14 +7117,14 @@ const WelcomeScreen = ({onStart}) => {
           background:mode==="login"?T.text:T.card,
           color:mode==="login"?T.bg:T.text, fontWeight:700
         }}>
-          Login
+          {copy.login}
         </button>
       </div>
 
       <input
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email"
+        placeholder={copy.email}
         type="email"
         autoComplete="email"
         style={{
@@ -7013,7 +7137,7 @@ const WelcomeScreen = ({onStart}) => {
       <input
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
+        placeholder={copy.password}
         type="password"
         autoComplete={mode === "register" ? "new-password" : "current-password"}
         style={{
@@ -7025,7 +7149,7 @@ const WelcomeScreen = ({onStart}) => {
 
       {mode === "register" && (
         <p style={{fontSize:12,color:T.muted,marginBottom:12,paddingLeft:4}}>
-          Password must be at least 6 characters.
+          {copy.passwordHint}
         </p>
       )}
 
@@ -7041,7 +7165,7 @@ const WelcomeScreen = ({onStart}) => {
         fontWeight:800, fontSize:15, marginTop:8,
         opacity:loading ? 0.7 : 1, cursor:loading?"not-allowed":"pointer"
       }}>
-        {loading ? "Loading..." : mode === "register" ? "Create account" : "Login"}
+        {loading ? copy.loading : mode === "register" ? copy.create : copy.login}
       </button>
 
       <button onClick={onBack} style={{
@@ -7049,7 +7173,7 @@ const WelcomeScreen = ({onStart}) => {
         border:"none", background:"transparent",
         color:T.muted, fontWeight:600, marginTop:12, cursor:"pointer"
       }}>
-        Back
+        {copy.back}
       </button>
     </div>
   );
@@ -8506,6 +8630,17 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const [ingModal,setIngModal] = useState(null);
   const [askOpen,setAskOpen] = useState(false);
   const [planAdaptations,setPlanAdaptations] = useState({skipped:[],banner:null,note:null,extraMeals:[]});
+  const [wearableSnapshot,setWearableSnapshot] = useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadWearableSnapshot = async () => {
+      const snapshot = await fetchCurrentWearableDataFromBackend();
+      if (!cancelled) setWearableSnapshot(snapshot);
+    };
+    loadWearableSnapshot();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Anomalia wearable — rilevamento sbalzi improvvisi ──
   const [anomalyState, setAnomalyState] = React.useState(null); // null | "pending" | "yes" | "no"
@@ -8702,6 +8837,30 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
     return {cal:a.cal+mx.cal, p:a.p+mx.p, f:a.f+mx.f, c:a.c+mx.c};
   },{cal:0,p:0,f:0,c:0});
   const today = new Date().toLocaleDateString((LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0]).locale, {weekday:"long",day:"numeric",month:"long"});
+  const latestWearable = wearableSnapshot?.latest || null;
+  const wearableConnection = wearableSnapshot?.connection || null;
+  const wearableProvider = wearableConnection?.provider && wearableConnection.provider !== "demo"
+    ? String(wearableConnection.provider).toUpperCase()
+    : null;
+  const wearableSource = latestWearable
+    ? `${wearableProvider || t("today.wearable.demo")} · ${String(latestWearable.data_date || latestWearable.synced_at || "").slice(0,10)}`
+    : t("today.wearable.preview");
+  const fmtInt = (value, fallback) => Number.isFinite(Number(value))
+    ? Number(value).toLocaleString((LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0]).locale)
+    : fallback;
+  const fmtSleep = (value) => {
+    const hours = Number(value);
+    if (!Number.isFinite(hours)) return "7h 12";
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${String(m).padStart(2,"0")}`;
+  };
+  const wearableMetrics = [
+    {type:"passi", icon:"steps", label:t("today.wearable.steps"), value:fmtInt(latestWearable?.steps, "8.234"), color:T.accent},
+    {type:"calorie", icon:"zap", label:t("today.wearable.cal"), value:fmtInt(latestWearable?.activity_kcal, "480"), color:"#C9A87C"},
+    {type:"sonno", icon:"moon", label:t("today.wearable.sleep"), value:fmtSleep(latestWearable?.sleep_hours ?? latestWearable?.sleep_duration), color:"#9A8FBF"},
+    {type:"hrv", icon:"heart", label:t("today.wearable.hrv"), value:latestWearable?.hrv ? `${Math.round(Number(latestWearable.hrv))}ms` : "52ms", color:"#C47B7B"},
+  ];
 
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
@@ -8778,13 +8937,25 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
       )}
 
       {/* Wearable — cliccabile */}
-      <div style={{padding:"0 24px",marginBottom:14}}>
-        <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:10}}>{t("today.wearable.label")}</p>
-        <div style={{display:"flex",gap:8}}>
-          <Chip icon={<Ico n="steps" size={16} c={T.accent}/>} label={t("today.wearable.steps")} value="8.234" color={T.accent} onClick={()=>setWearableModal("passi")}/>
-          <Chip icon={<Ico n="zap" size={16} c="#C9A87C"/>} label={t("today.wearable.cal")} value="480" color="#C9A87C" onClick={()=>setWearableModal("calorie")}/>
-          <Chip icon={<Ico n="moon" size={16} c="#9A8FBF"/>} label={t("today.wearable.sleep")} value="7h 12" color="#9A8FBF" onClick={()=>setWearableModal("sonno")}/>
-          <Chip icon={<Ico n="heart" size={16} c="#C47B7B"/>} label={t("today.wearable.hrv")} value="52ms" color="#C47B7B" onClick={()=>setWearableModal("hrv")}/>
+      <div style={{padding:"0 24px",marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+          <p style={{fontSize:11,color:T.muted,letterSpacing:1,margin:0}}>{t("today.wearable.label")}</p>
+          <span style={{fontSize:10,fontWeight:800,color:latestWearable ? T.accentD : T.muted,background:latestWearable ? T.sel : T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 9px"}}>
+            {latestWearable ? (wearableProvider ? t("today.wearable.live") : t("today.wearable.demo")) : t("today.wearable.preview")}
+          </span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {wearableMetrics.map(metric => (
+            <WearableMetricCard
+              key={metric.type}
+              icon={<Ico n={metric.icon} size={18} c={metric.color}/>}
+              label={metric.label}
+              value={metric.value}
+              color={metric.color}
+              source={wearableSource}
+              onClick={()=>setWearableModal(metric.type)}
+            />
+          ))}
         </div>
       </div>
 
