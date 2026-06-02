@@ -552,6 +552,28 @@ const fetchCurrentWearableDataFromBackend = async () => {
   }
 };
 
+const importWearableDataFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return { error: "missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/openwearables/import`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({})
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: data.error || "wearable_import_failed" };
+    return data;
+  } catch (error) {
+    console.error("Wearable import failed:", error);
+    return { error: "network_error" };
+  }
+};
+
 const submitBetaFeedbackToBackend = async (score, comment) => {
   const token = getAuthToken();
   if (!token) return null;
@@ -5340,22 +5362,22 @@ const Chip = ({icon,label,value,color=T.accent,onClick}) => (
   </div>
 );
 
-const WearableMetricCard = ({icon,label,value,color=T.accent,source,onClick}) => (
-  <button onClick={onClick} style={{
+const WearableMetricCard = ({icon,label,value,color=T.accent,source,onClick,available=true}) => (
+  <button onClick={available ? onClick : undefined} style={{
     width:"100%", minHeight:104, border:"none", borderRadius:18, padding:14,
     background:`linear-gradient(145deg, ${T.card} 0%, ${T.bg} 100%)`,
     boxShadow:"0 10px 26px rgba(43,43,43,.06)",
-    outline:`1px solid ${T.border}`, cursor:"pointer", textAlign:"left",
+    outline:`1px solid ${T.border}`, cursor:available&&onClick?"pointer":"default", textAlign:"left",
     display:"flex", flexDirection:"column", justifyContent:"space-between",
-    transition:"transform .16s ease, box-shadow .16s ease, outline-color .16s ease"
+    transition:"transform .16s ease, box-shadow .16s ease, outline-color .16s ease", opacity:available?1:.72
   }}
-    onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 14px 30px rgba(43,43,43,.09)";e.currentTarget.style.outlineColor=color;}}
-    onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 10px 26px rgba(43,43,43,.06)";e.currentTarget.style.outlineColor=T.border;}}>
+    onMouseEnter={e=>{if(available&&onClick){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 14px 30px rgba(43,43,43,.09)";e.currentTarget.style.outlineColor=color;}}}
+    onMouseLeave={e=>{if(available&&onClick){e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 10px 26px rgba(43,43,43,.06)";e.currentTarget.style.outlineColor=T.border;}}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
       <div style={{width:36,height:36,borderRadius:13,background:`${color}18`,display:"flex",alignItems:"center",justifyContent:"center"}}>
         {icon}
       </div>
-      <Ico n="chev" size={14} c={T.muted}/>
+      {available && onClick ? <Ico n="chev" size={14} c={T.muted}/> : <Ico n="info" size={14} c={T.muted}/>}
     </div>
     <div>
       <div style={{fontSize:24,fontWeight:900,color:T.text,letterSpacing:-0.8,lineHeight:1}}>{value}</div>
@@ -8769,6 +8791,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const [anomalyDecision, setAnomalyDecision] = React.useState(null);
 
   React.useEffect(() => {
+    if (!wearableSnapshot?.latest?.hrv) return;
     const today = new Date().toDateString();
     try {
       const stored = JSON.parse(sessionStorage.getItem("dubi_anomaly")||"{}");
@@ -8967,22 +8990,42 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const wearableSource = latestWearable
     ? `${wearableProvider || t("today.wearable.demo")} · ${String(latestWearable.data_date || latestWearable.synced_at || "").slice(0,10)}`
     : t("today.wearable.preview");
-  const fmtInt = (value, fallback) => Number.isFinite(Number(value))
+  const wearableUiCopy = lang === "it"
+    ? {
+        none:"Collega un wearable per attivare",
+        noData:"Nessun dato biometrico disponibile. Il piano resta utilizzabile e si basa sul tuo profilo e sui tuoi check-in.",
+        partialData:"Dati parziali ricevuti. DUBI mostra e utilizza solo i segnali forniti dal provider.",
+        unavailable: wearableProvider ? `Non fornito da ${wearableProvider}` : "Non disponibile",
+        statusNone:"Non collegato",
+        statusPartial:"Dati parziali"
+      }
+    : {
+        none:"Connect a wearable to activate",
+        noData:"No biometric data available. Your plan remains usable and is based on your profile and check-ins.",
+        partialData:"Partial data received. DUBI only shows and uses signals supplied by the provider.",
+        unavailable: wearableProvider ? `Not provided by ${wearableProvider}` : "Unavailable",
+        statusNone:"Not connected",
+        statusPartial:"Partial data"
+      };
+  const hasWearableMetric = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+  const fmtInt = (value) => hasWearableMetric(value)
     ? Number(value).toLocaleString((LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0]).locale)
-    : fallback;
+    : "--";
   const fmtSleep = (value) => {
     const hours = Number(value);
-    if (!Number.isFinite(hours)) return "7h 12";
+    if (!hasWearableMetric(value)) return "--";
     const h = Math.floor(hours);
     const m = Math.round((hours - h) * 60);
     return `${h}h ${String(m).padStart(2,"0")}`;
   };
   const wearableMetrics = [
-    {type:"passi", icon:"steps", label:t("today.wearable.steps"), value:fmtInt(latestWearable?.steps, "8.234"), color:T.accent},
-    {type:"calorie", icon:"zap", label:t("today.wearable.cal"), value:fmtInt(latestWearable?.activity_kcal, "480"), color:"#C9A87C"},
-    {type:"sonno", icon:"moon", label:t("today.wearable.sleep"), value:fmtSleep(latestWearable?.sleep_hours ?? latestWearable?.sleep_duration), color:"#9A8FBF"},
-    {type:"hrv", icon:"heart", label:t("today.wearable.hrv"), value:latestWearable?.hrv ? `${Math.round(Number(latestWearable.hrv))}ms` : "52ms", color:"#C47B7B"},
+    {type:"passi", icon:"steps", label:t("today.wearable.steps"), value:fmtInt(latestWearable?.steps), available:hasWearableMetric(latestWearable?.steps), color:T.accent},
+    {type:"calorie", icon:"zap", label:t("today.wearable.cal"), value:fmtInt(latestWearable?.activity_kcal), available:hasWearableMetric(latestWearable?.activity_kcal), color:"#C9A87C"},
+    {type:"sonno", icon:"moon", label:t("today.wearable.sleep"), value:fmtSleep(latestWearable?.sleep_hours ?? latestWearable?.sleep_duration), available:hasWearableMetric(latestWearable?.sleep_hours ?? latestWearable?.sleep_duration), color:"#9A8FBF"},
+    {type:"hrv", icon:"heart", label:t("today.wearable.hrv"), value:hasWearableMetric(latestWearable?.hrv) ? `${Math.round(Number(latestWearable.hrv))}ms` : "--", available:hasWearableMetric(latestWearable?.hrv), color:"#C47B7B"},
   ];
+  const availableWearableMetrics = wearableMetrics.filter(metric => metric.available);
+  const hasPartialWearableData = availableWearableMetrics.length > 0 && availableWearableMetrics.length < wearableMetrics.length;
 
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
@@ -9062,10 +9105,17 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
       <div style={{padding:"0 24px",marginBottom:18}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <p style={{fontSize:11,color:T.muted,letterSpacing:1,margin:0}}>{t("today.wearable.label")}</p>
-          <span style={{fontSize:10,fontWeight:800,color:latestWearable ? T.accentD : T.muted,background:latestWearable ? T.sel : T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 9px"}}>
-            {latestWearable ? (wearableProvider ? t("today.wearable.live") : t("today.wearable.demo")) : t("today.wearable.preview")}
+          <span style={{fontSize:10,fontWeight:800,color:availableWearableMetrics.length ? T.accentD : T.muted,background:availableWearableMetrics.length ? T.sel : T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 9px"}}>
+            {!availableWearableMetrics.length ? wearableUiCopy.statusNone : hasPartialWearableData ? wearableUiCopy.statusPartial : (wearableProvider ? t("today.wearable.live") : t("today.wearable.demo"))}
           </span>
         </div>
+        {(!availableWearableMetrics.length || hasPartialWearableData) && (
+          <div style={{padding:"11px 12px",marginBottom:10,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`}}>
+            <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>
+              {!availableWearableMetrics.length ? wearableUiCopy.noData : wearableUiCopy.partialData}
+            </p>
+          </div>
+        )}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           {wearableMetrics.map(metric => (
             <WearableMetricCard
@@ -9074,8 +9124,8 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
               label={metric.label}
               value={metric.value}
               color={metric.color}
-              source={wearableSource}
-              onClick={()=>setWearableModal(metric.type)}
+              source={metric.available ? wearableSource : (latestWearable ? wearableUiCopy.unavailable : wearableUiCopy.none)}
+              available={metric.available}
             />
           ))}
         </div>
@@ -10570,7 +10620,7 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
       if (!cancelled) setWearableSnapshot(snapshot);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [wearableSnapshot?.latest?.hrv]);
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
 
   const startWeight = weightLog[0]?.weight || userData?.weight || 78;
@@ -10598,19 +10648,37 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
 
   const wearableRecent = wearableSnapshot?.recent || [];
   const latestWearable = wearableSnapshot?.latest || wearableRecent[wearableRecent.length - 1] || {};
-  const metricFromWearable = (key, fallback) => {
-    const rows = wearableRecent
+  const metricFromWearable = (key) => wearableRecent
       .filter(row => row[key] !== null && row[key] !== undefined && row[key] !== "")
       .map(row => ({label:String(row.data_date || "").slice(5,10) || "-", value:Number(row[key])}))
       .filter(row => Number.isFinite(row.value));
-    return rows.length >= 2 ? rows : fallback.map(d=>({label:d.w, value:d.v}));
-  };
   const wearableMetricData = {
-    hrv: metricFromWearable("hrv", MOCK_METRIC_DATA.hrv),
-    sonno: metricFromWearable("sleep_quality", MOCK_METRIC_DATA.sonno),
-    passi: metricFromWearable("steps", MOCK_METRIC_DATA.passi),
-    calorie: metricFromWearable("activity_kcal", MOCK_METRIC_DATA.calorie)
+    hrv: metricFromWearable("hrv"),
+    sonno: metricFromWearable("sleep_quality"),
+    passi: metricFromWearable("steps"),
+    calorie: metricFromWearable("activity_kcal")
   };
+  const wearableProvider = wearableSnapshot?.connection?.provider && wearableSnapshot.connection.provider !== "demo"
+    ? String(wearableSnapshot.connection.provider).toUpperCase()
+    : null;
+  const trendWearableCopy = lang === "it"
+    ? {
+        noData:"Non ci sono ancora dati biometrici. DUBI continua a personalizzare il piano usando profilo e check-in. Collega un wearable per aggiungere trend automatici.",
+        partial:`${wearableProvider || "Il wearable"} invia dati parziali. DUBI utilizza solo le metriche realmente disponibili.`,
+        unavailable: wearableProvider ? `Non fornito da ${wearableProvider}` : "Collega un wearable per attivare",
+        activity:"Attivita rilevata"
+      }
+    : {
+        noData:"There is no biometric data yet. DUBI keeps personalizing your plan from your profile and check-ins. Connect a wearable to add automatic trends.",
+        partial:`${wearableProvider || "Your wearable"} sends partial data. DUBI only uses metrics that are actually available.`,
+        unavailable: wearableProvider ? `Not provided by ${wearableProvider}` : "Connect a wearable to activate",
+        activity:"Detected activity"
+      };
+  const wearableAvailability = Object.fromEntries(
+    Object.entries(wearableMetricData).map(([key, rows]) => [key, rows.length > 0])
+  );
+  const availableTrendMetrics = Object.values(wearableAvailability).filter(Boolean).length;
+  const hasPartialTrendData = availableTrendMetrics > 0 && availableTrendMetrics < Object.keys(wearableAvailability).length;
 
   // Build chart data for active metric
   const metricRaw = activeMetric==="peso"
@@ -10630,10 +10698,10 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const improvements = [
     {icon:"dumbbell",color:"#C47B7B", labelKey:"prog.imp.lean.l", value:"+0.3 kg", noteKey:"prog.imp.lean.n"},
     {icon:"zap",color:"#C9A87C", labelKey:"prog.imp.tdee.l", value:`${plan?.tdee || 2100} kcal`, noteKey:"prog.imp.tdee.n"},
-    {icon:"moon",    color:"#9A8FBF", label:t("prog.imp.sleep.l"),        value:`${latestWearable.sleep_quality || 76}/100`, note:t("prog.imp.sleep.n")},
-    {icon:"heart",   color:"#C47B7B", label:t("prog.imp.hrv.l"),            value:`${latestWearable.hrv || 52} ms`, note:t("prog.imp.hrv.n")},
-    {icon:"flame",   color:"#C9A87C", label:t("prog.imp.cal.l"), value:`${Number(latestWearable.activity_kcal || 2840).toLocaleString("it-IT")} kcal`, note:undefined},
-    {icon:"steps",   color:T.accentD, label:t("prog.metric.steps"),       value:Number(latestWearable.steps || 8234).toLocaleString("it-IT"), note:undefined},
+    {icon:"moon",    color:"#9A8FBF", label:t("prog.imp.sleep.l"), value:wearableAvailability.sonno?`${latestWearable.sleep_quality}/100`:"--", note:wearableAvailability.sonno?t("prog.imp.sleep.n"):trendWearableCopy.unavailable},
+    {icon:"heart",   color:"#C47B7B", label:t("prog.imp.hrv.l"), value:wearableAvailability.hrv?`${latestWearable.hrv} ms`:"--", note:wearableAvailability.hrv?t("prog.imp.hrv.n"):trendWearableCopy.unavailable},
+    {icon:"flame",   color:"#C9A87C", label:t("prog.imp.cal.l"), value:wearableAvailability.calorie?`${Number(latestWearable.activity_kcal).toLocaleString("it-IT")} kcal`:"--", note:wearableAvailability.calorie?undefined:trendWearableCopy.unavailable},
+    {icon:"steps",   color:T.accentD, label:t("prog.metric.steps"), value:wearableAvailability.passi?Number(latestWearable.steps).toLocaleString("it-IT"):"--", note:wearableAvailability.passi?undefined:trendWearableCopy.unavailable},
     {icon:"drop",    color:"#7BA8C4", label:t("prog.imp.water.l"),          value:`2.1 ${t("prog.water.unit")}`,             note:t("prog.imp.water.n")},
     {icon:"trend",   color:T.accentD, label:t("prog.imp.adherence.l"),          value:"87%",                      note:t("prog.imp.adherence.n")},
   ];
@@ -10646,8 +10714,8 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   }[userData?.goal || plan?.goal] || userData?.goal || "DUBI";
   const trendCards = [
     {id:"weight", icon:"weight", label:t("trend.card.weight"), value:`${currentWeight} kg`, note:t("trend.explain.weight"), color:T.text, view:"weight", metric:"peso"},
-    {id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:`HRV ${latestWearable.hrv || 52} ms`, note:t("trend.explain.recovery"), color:"#C47B7B", view:"metrics", metric:"hrv"},
-    {id:"adherence", icon:"check", label:t("trend.card.adherence"), value:"87%", note:t("trend.explain.adherence"), color:T.accentD, view:"report", metric:"sonno"},
+    {id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:wearableAvailability.hrv?`HRV ${latestWearable.hrv} ms`:"--", note:wearableAvailability.hrv?t("trend.explain.recovery"):trendWearableCopy.unavailable, color:"#C47B7B", view:wearableAvailability.hrv?"metrics":"summary", metric:"hrv"},
+    {id:"activity", icon:"steps", label:trendWearableCopy.activity, value:wearableAvailability.passi?Number(latestWearable.steps).toLocaleString("it-IT"):"--", note:wearableAvailability.passi?t("prog.metric.steps"):trendWearableCopy.unavailable, color:T.accentD, view:wearableAvailability.passi?"metrics":"summary", metric:"passi"},
     {id:"energy", icon:"zap", label:t("trend.card.energy"), value:`${plan?.tdee || 2100} kcal`, note:t("trend.explain.energy"), color:"#C9A87C", view:"report", metric:"calorie"},
   ];
 
@@ -10792,6 +10860,15 @@ const handleUpdateProgress = async (id) => {
       </div>
 
       {/* ── METRIC SELECTOR TABS ── */}
+      <div style={{margin:"0 24px 14px",padding:"12px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:9}}>
+          <Ico n={availableTrendMetrics ? "check" : "info"} size={15} c={availableTrendMetrics ? T.accentD : T.muted}/>
+          <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>
+            {!availableTrendMetrics ? trendWearableCopy.noData : hasPartialTrendData ? trendWearableCopy.partial : (wearableProvider ? `${wearableProvider} · ${availableTrendMetrics} metriche disponibili` : "Dati wearable demo disponibili")}
+          </p>
+        </div>
+      </div>
+
       <div style={{padding:"0 24px",marginBottom:18}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           {trendCards.map(card=>(
@@ -10826,10 +10903,10 @@ const handleUpdateProgress = async (id) => {
         <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:10}}>{t("prog.metric.title")}</p>
         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
           {Object.entries(METRIC_CFG).map(([key,mc])=>(
-            <button key={key} onClick={()=>setActiveMetric(key)}
+            <button key={key} onClick={()=>{if(key==="peso" || wearableAvailability[key]) setActiveMetric(key);}}
               style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 12px",borderRadius:14,
                 border:`1.5px solid ${activeMetric===key?mc.color:T.border}`,
-                background:activeMetric===key?T.sel:T.card,cursor:"pointer",minWidth:60}}>
+                background:activeMetric===key?T.sel:T.card,cursor:key==="peso"||wearableAvailability[key]?"pointer":"default",minWidth:60,opacity:key==="peso"||wearableAvailability[key]?1:.5}}>
               <div style={{marginBottom:4}}>
                 <Ico n={mc.icon} size={18} c={activeMetric===key?mc.color:T.muted}/>
               </div>
@@ -10841,6 +10918,13 @@ const handleUpdateProgress = async (id) => {
 
       {/* ── ACTIVE METRIC CHART ── */}
       <div style={{margin:"0 24px 12px",padding:"16px 12px",background:T.card,border:`1.5px solid ${cfg.color}22`,borderRadius:20}}>
+        {activeMetric!=="peso" && !wearableAvailability[activeMetric] ? (
+          <div style={{padding:"10px 6px"}}>
+            <p style={{fontSize:14,fontWeight:900,color:T.text,margin:"0 0 6px"}}>{t(cfg.labelKey)}</p>
+            <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{trendWearableCopy.unavailable}</p>
+          </div>
+        ) : (
+        <>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
           <div>
             <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,margin:0}}>{t(cfg.labelKey).toUpperCase()} — {t("prog.weight.trendN",{n:weightLog.length})}</p>
@@ -10855,6 +10939,8 @@ const handleUpdateProgress = async (id) => {
           </div>
         </div>
         <LineChart data={metricRaw} color={cfg.color} height={130} unit={cfg.unit}/>
+        </>
+        )}
       </div>
 
       {/* Aggiungi peso (solo per metrica peso) */}
@@ -11039,13 +11125,13 @@ const handleUpdateProgress = async (id) => {
             <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:12}}>{t("prog.weekly.compare")}</p>
             {[
               {label:t("prog.metric.weight"),cur:`${currentWeight} kg`,prev:`${weightLog.length>1?weightLog[weightLog.length-2].weight:startWeight} kg`,dir:currentWeight<(weightLog.length>1?weightLog[weightLog.length-2].weight:startWeight)},
-              {label:t("prog.imp.hrv.l"),cur:"52 ms",prev:"50 ms",dir:true},
-              {label:t("prog.imp.sleep.l"),cur:"76/100",prev:"73/100",dir:true},
-              {label:t("prog.metric.steps"),cur:"8.234",prev:"8.100",dir:true},
-              {label:t("prog.imp.cal.l"),cur:"2.840 kcal",prev:"2.720 kcal",dir:true},
+              ...(wearableAvailability.hrv ? [{label:t("prog.imp.hrv.l"),cur:`${wearableMetricData.hrv[wearableMetricData.hrv.length-1]?.value} ms`,prev:`${wearableMetricData.hrv[wearableMetricData.hrv.length-2]?.value || "—"} ms`,dir:true}] : []),
+              ...(wearableAvailability.sonno ? [{label:t("prog.imp.sleep.l"),cur:`${wearableMetricData.sonno[wearableMetricData.sonno.length-1]?.value}/100`,prev:`${wearableMetricData.sonno[wearableMetricData.sonno.length-2]?.value || "—"}/100`,dir:true}] : []),
+              ...(wearableAvailability.passi ? [{label:t("prog.metric.steps"),cur:Number(wearableMetricData.passi[wearableMetricData.passi.length-1]?.value).toLocaleString("it-IT"),prev:wearableMetricData.passi.length>1?Number(wearableMetricData.passi[wearableMetricData.passi.length-2]?.value).toLocaleString("it-IT"):"—",dir:true}] : []),
+              ...(wearableAvailability.calorie ? [{label:t("prog.imp.cal.l"),cur:`${Number(wearableMetricData.calorie[wearableMetricData.calorie.length-1]?.value).toLocaleString("it-IT")} kcal`,prev:wearableMetricData.calorie.length>1?`${Number(wearableMetricData.calorie[wearableMetricData.calorie.length-2]?.value).toLocaleString("it-IT")} kcal`:"—",dir:true}] : []),
               {label:t("prog.imp.adherence.l"),cur:"87%",prev:"82%",dir:true},
             ].map((row,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:i<5?`1px solid ${T.border}`:"none"}}>
+              <div key={i} style={{display:"flex",alignItems:"center",padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
                 <span style={{flex:1,fontSize:13,color:T.muted}}>{row.label}</span>
                 <span style={{fontSize:12,color:T.muted,marginRight:10}}>{row.prev}</span>
                 <span style={{fontSize:12,color:T.muted,marginRight:6}}>→</span>
@@ -11508,6 +11594,31 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
   }
 };
 
+const handleImportWearableData = async () => {
+  setWearableBusy(true);
+  setWearableMessage("");
+  try {
+    const result = await importWearableDataFromBackend();
+    if (result.error) {
+      setWearableMessage("Non riesco a sincronizzare i dati wearable ora. Riprova tra poco.");
+      return;
+    }
+    const importedTypes = (result.summaries || [])
+      .filter(summary => summary.importedCount > 0)
+      .map(summary => summary.type)
+      .join(", ");
+    const status = await fetchWearableStatusFromBackend();
+    setWearableStatus(status?.connection || wearableStatus);
+    setWearableMessage(
+      result.importedCount > 0
+        ? `Dati sincronizzati: ${importedTypes || "metriche disponibili"}. DUBI mostra solo i segnali realmente ricevuti.`
+        : "Sincronizzazione completata: il provider non ha ancora restituito nuovi dati disponibili."
+    );
+  } finally {
+    setWearableBusy(false);
+  }
+};
+
 const handleSubmitBetaFeedback = async () => {
   if (!feedbackScore || feedbackSending) return;
   setFeedbackSending(true);
@@ -11878,6 +11989,12 @@ const handleSaveProfile = async () => {
           Provider: <strong style={{color:T.text}}>{wearableStatus.provider || "OpenWearables"}</strong>
           {wearableStatus.last_synced_at ? ` · ultimo sync ${String(wearableStatus.last_synced_at).slice(0,10)}` : ""}
         </p>
+        {wearableStatus.provider && wearableStatus.provider !== "demo" && (
+          <button onClick={handleImportWearableData} disabled={wearableBusy}
+            style={{width:"100%",padding:"10px",marginTop:10,borderRadius:12,border:"none",background:T.accentD,color:"#fff",fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
+            {wearableBusy ? "Sincronizzazione..." : "Sincronizza dati disponibili"}
+          </button>
+        )}
       </div>
     )}
 
