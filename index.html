@@ -11587,6 +11587,8 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
     setWearableMessage(
       scenario === "low_recovery"
         ? `Demo caricata: ${demoDays} giorni con recupero basso recente. Piano rigenerato per testare l'adattamento.`
+        : scenario === "activity_only"
+          ? `Demo caricata: ${demoDays} giorni con dati attivita soltanto. DUBI mostra passi e calorie senza inventare HRV o sonno.`
         : `Demo caricata: ${demoDays} giorni con recupero normale. Piano rigenerato per testare l'adattamento.`
     );
   } finally {
@@ -12029,6 +12031,10 @@ const handleSaveProfile = async () => {
         <button onClick={()=>handleSeedDemoWearable("low_recovery")} disabled={wearableBusy}
           style={{padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
           Demo recupero basso
+        </button>
+        <button onClick={()=>handleSeedDemoWearable("activity_only")} disabled={wearableBusy}
+          style={{gridColumn:"1 / -1",padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
+          Demo solo attivita (tipo Strava)
         </button>
       </div>
     </div>
