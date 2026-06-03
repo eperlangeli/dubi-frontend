@@ -148,6 +148,7 @@ const getDubiBetaCopy = (lang) => DUBI_BETA_COPY[lang] || DUBI_BETA_COPY.en;
     workoutIntensity: data.workout_intensity ?? data.workoutIntensity ?? "moderata",
     dailySteps: data.daily_steps ?? data.dailySteps ?? "unknown",
     sedentaryDays: data.sedentary_days ?? data.sedentaryDays ?? 0,
+    dietIntensity: data.diet_intensity ?? data.dietIntensity ?? "balanced",
 
     trainingTime: data.training_time ?? data.trainingTime ?? "varies",
     breakfastPref: data.breakfast_pref ?? data.breakfastPref ?? "both",
@@ -234,6 +235,7 @@ const saveOnboardingToBackend = async (data) => {
     sedentary_days: parseInt(String(data.sedentaryDays).split("-")[0], 10),
 
     diet: data.diet,
+    diet_intensity: data.dietIntensity || "balanced",
     allergies: data.allergies || "",
     sport: data.sport || "",
     training_time: data.trainingTime,
@@ -795,7 +797,7 @@ const TRANSLATIONS = {
     "welcome.lead": "La prima dieta che <strong>si adatta da sola</strong>, in base ai dati reali del tuo corpo.",
     "welcome.start": "Inizia il percorso →",
     "welcome.start.short": "Inizia il percorso",
-    "welcome.basis": "Basato su WHO · EFSA · Harvard · 35 studi peer-reviewed",
+    "welcome.basis": "Basato su WHO · EFSA · Harvard · 40 studi peer-reviewed",
     "welcome.basis37": "Basato su WHO · EFSA · Harvard · 40 studi peer-reviewed",
     "welcome.headline": "La dieta che<br/><span style=\"color:#6B8A64\">si adatta da sola.</span>",
     "welcome.subhead": "Piano nutrizionale personalizzato in base ai dati reali del tuo corpo, wearable e obiettivi.",
@@ -872,6 +874,8 @@ const TRANSLATIONS = {
     "pref.diet.omni.d": "Carne, pesce, latticini, uova",
     "pref.diet.veg": "Vegetariano",
     "pref.diet.veg.d": "Latticini e uova, no carne né pesce",
+    "pref.diet.pesc": "Pescetariano",
+    "pref.diet.pesc.d": "Pesce, uova e latticini, senza carne",
     "pref.diet.vegan": "Vegano",
     "pref.diet.vegan.d": "Solo alimenti di origine vegetale",
     "pref.allergies": "ALLERGIE / INTOLLERANZE",
@@ -976,7 +980,7 @@ const TRANSLATIONS = {
 
     // Sources
     "src.title": "Fonti Scientifiche",
-    "src.subtitle": "35 studi peer-reviewed · 5 enti internazionali",
+    "src.subtitle": "40 studi peer-reviewed · 5 enti internazionali",
     "src.quote": "\"La scienza definisce i confini. L'AI costruisce il contenuto. L'utente vive la dieta.\"",
     "src.guidelines": "Linee guida istituzionali",
     "src.studies": "Studi peer-reviewed",
@@ -1290,7 +1294,7 @@ TRANSLATIONS.en = {
   "welcome.tagline":"Data-Driven Understanding\nof Body Intelligence",
   "welcome.lead":"The first diet that <strong>adapts itself</strong>, based on your body's real data.",
   "welcome.start":"Start your journey →","welcome.start.short":"Start your journey",
-  "welcome.basis":"Based on WHO · EFSA · Harvard · 32 peer-reviewed studies",
+  "welcome.basis":"Based on WHO · EFSA · Harvard · 40 peer-reviewed studies",
   "welcome.basis37":"Based on WHO · EFSA · Harvard · 40 peer-reviewed studies",
   "welcome.headline":"The diet that<br/><span style=\"color:#6B8A64\">adapts itself.</span>",
   "welcome.subhead":"Personalized nutrition plan based on your body's real data, wearable and goals.",
@@ -1316,6 +1320,7 @@ TRANSLATIONS.en = {
   "act.steps.unknown":"I don't know",
   "pref.diet":"DIET STYLE","pref.diet.omni":"Omnivore","pref.diet.omni.d":"Meat, fish, dairy, eggs",
   "pref.diet.veg":"Vegetarian","pref.diet.veg.d":"Dairy and eggs, no meat or fish",
+  "pref.diet.pesc":"Pescatarian","pref.diet.pesc.d":"Fish, eggs and dairy, no meat",
   "pref.diet.vegan":"Vegan","pref.diet.vegan.d":"Only plant-based foods",
   "pref.allergies":"ALLERGIES / INTOLERANCES","pref.allergies.ph":"List your allergies or intolerances...",
   "pref.sport":"WHICH SPORT DO YOU PRACTICE?","pref.sport.ph":"e.g. gym, crossfit, swimming, running, soccer...",
@@ -1345,7 +1350,7 @@ TRANSLATIONS.en = {
   "days.short.0":"Mon","days.short.1":"Tue","days.short.2":"Wed","days.short.3":"Thu","days.short.4":"Fri","days.short.5":"Sat","days.short.6":"Sun",
   "shop.title":"Shopping List","shop.progress":"{done} / {total} purchased",
   "shop.cat.proteins":"Proteins","shop.cat.grains":"Grains & Legumes","shop.cat.veg":"Fresh vegetables","shop.cat.fruit":"Fruit","shop.cat.fats":"Fats & Seeds",
-  "src.title":"Scientific Sources","src.subtitle":"35 peer-reviewed studies · 5 international bodies",
+  "src.title":"Scientific Sources","src.subtitle":"40 peer-reviewed studies · 5 international bodies",
   "src.quote":"\"Science defines the boundaries. AI builds the content. The user lives the diet.\"",
   "src.guidelines":"Institutional guidelines","src.studies":"Peer-reviewed studies",
   "prog.title":"Progress","prog.subtitle":"Weekly report · {n} weeks",
@@ -3434,7 +3439,9 @@ function calcTDEE({ gender, age, height, weight, occupation, workoutDays, workou
   // Validato vs. Harris-Benedict + PAL lookup per 12 profili tipo (errore medio ±5%).
   const intScore = { leggera:0.025, moderata:0.035, alta:0.05 }[workoutIntensity] || 0.03;
   const stepsAdd = { "<3000":-0.03, "3000-6000":0, "6000-8000":0.02, "8000-10000":0.04, "10000+":0.07, unknown:0.02 }[dailySteps] || 0;
-  return Math.round(bmr * (occMult + freqScore*durScore*intScore + stepsAdd));
+  const rawPal = occMult + freqScore*durScore*intScore + stepsAdd;
+  const pal = Math.min(1.9, Math.max(1.15, rawPal));
+  return Math.round(bmr * pal);
 }
 
 function calcMealCount({ goal, workoutIntensity, workoutDays, dayStart = "07:00", dayEnd = "22:00" }) {
@@ -3923,8 +3930,14 @@ function calcPlan(data) {
   // fatLoss:   -20%  → ~300–500 kcal/die per la maggior parte degli utenti (ACSM Guidelines 2021)
   // definition: -15% → deficit moderato ~250–350 kcal/die per recomposizione (Barakat et al., S&C 2020)
   // gain:      +15%  → surplus minimo per lean bulk (ISSN 2021)
+  const intensity = data.dietIntensity || data.diet_intensity || "balanced";
+  const goalAdjByIntensity = {
+    gentle:   { fatLoss:-0.12, maintain:0, gain:0.10, definition:-0.10 },
+    balanced: { fatLoss:-0.18, maintain:0, gain:0.14, definition:-0.14 },
+    focused:  { fatLoss:-0.20, maintain:0, gain:0.15, definition:-0.15 },
+  };
   const adj = data.goal === "competition" ? compAdj
-    : { fatLoss:-0.20, maintain:0, gain:0.15, definition:-0.15 }[data.goal] || 0;
+    : (goalAdjByIntensity[intensity] || goalAdjByIntensity.balanced)[data.goal] || 0;
   let kcal = Math.round(tdee*(1+adj));
 
   // ── Pavimento calorico: max(BMR×1.1, ACSM minimum) ──
@@ -4561,8 +4574,23 @@ function applySeasonalSub(item, month) {
 function applyDietSub(item, diet) {
   if (!diet || diet === 'omnivore') return item;
   const lower = item.toLowerCase();
+  const isPescatarian = diet === 'pescatarian';
   const isVeg = diet === 'vegetarian' || diet === 'vegan';
   const isVegan = diet === 'vegan';
+
+  if (isPescatarian) {
+    if (lower.includes('petto di pollo alla griglia')) return item.replace(/petto di pollo alla griglia/i,'Filetto di merluzzo alla griglia');
+    if (lower.includes('petto di pollo')) return item.replace(/petto di pollo/i,'Filetto di tonno');
+    if (lower.includes('pollo al curry')) return item.replace(/pollo al curry/i,'Gamberi al curry');
+    if (lower.includes('pollo al limone')) return item.replace(/pollo al limone/i,'Merluzzo al limone');
+    if (lower.includes('pollo arrosto')) return item.replace(/pollo arrosto/i,'Orata al forno');
+    if (lower.includes('pollo')) return item.replace(/pollo/i,'Pesce bianco');
+    if (lower.includes('tacchino ai ferri')) return item.replace(/tacchino ai ferri/i,'Tonno fresco ai ferri');
+    if (lower.includes('tacchino')) return item.replace(/tacchino/i,'Tonno fresco');
+    if (lower.includes('manzo magro')) return item.replace(/manzo magro/i,'Salmone');
+    if (lower.includes('manzo')) return item.replace(/manzo/i,'Sgombro');
+    return item;
+  }
 
   if (isVeg) {
     if (lower.includes('petto di pollo alla griglia')) return item.replace(/petto di pollo alla griglia/i,'Tofu alla griglia');
@@ -4639,6 +4667,35 @@ function getDietMeals(diet, month, allergyText) {
     }
     return newDay;
   });
+}
+
+function adaptMealForUserProfile(meal, slotId, userData) {
+  if (!meal?.items?.length) return meal;
+  const diet = userData?.diet || "omnivore";
+  const isActiveOmnivore = diet === "omnivore" && userData?.workoutDays && userData.workoutDays !== "0";
+  if (!isActiveOmnivore) return meal;
+
+  const proteinBySlot = {
+    snack_m: "Bresaola o tacchino - 80g",
+    pranzo: "Petto di pollo o tonno fresco - 150g",
+    cena: "Salmone, merluzzo o uova - 160g",
+    snack: "Yogurt greco o skyr - 170g",
+    snack_n: "Ricotta magra o skyr - 150g",
+  };
+  const plantPrimary = /\b(seitan|tofu|tempeh|edamame|burger vegetale|burger di vegetali|soia|vegan[oa]|vegetal[ei])\b/i;
+  let changed = false;
+  const items = meal.items.map((item, idx) => {
+    if (!plantPrimary.test(String(item))) return item;
+    changed = true;
+    return idx === 0 ? (proteinBySlot[slotId] || "Proteina magra animale - 150g") : item;
+  });
+  if (!changed) return meal;
+  return {
+    ...meal,
+    items,
+    why: "Pasto adattato al profilo onnivoro e all'allenamento: priorita a proteine complete, sazieta e aderenza pratica.",
+    whyEN: "Meal adapted to an omnivore training profile: priority to complete proteins, satiety and practical adherence.",
+  };
 }
 
 
@@ -4862,7 +4919,8 @@ function getMealReasonText(meal, lang, userData) {
   if (allergies && !/^(nessun|no|none)$/i.test(allergies)) {
     return getWeeklyQualityCopy(lang).allergyReason;
   }
-  return localizeScientificText((lang === "en" && meal?.whyEN) || meal?.why, lang);
+  const raw = lang === "en" ? (meal?.whyEN || meal?.why) : (meal?.why || meal?.whyEN);
+  return localizeScientificText(raw, lang);
 }
 
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
@@ -7755,17 +7813,43 @@ const ActivityStep = ({d,u}) => {
 
 const PreferencesStep = ({d,u}) => {
   const { t, lang } = useT();
+  const tx = (key, fallback) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
 
   const hours = Array.from({length:19},(_,i)=>i+5); // 5..23
   return (
     <div>
       {/* Stile alimentare */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:10}}>{t("pref.diet")}</p>
-      {[{id:"omnivore",l:t("pref.diet.omni"),ds:t("pref.diet.omni.d")},{id:"vegetarian",l:t("pref.diet.veg"),ds:t("pref.diet.veg.d")},{id:"vegan",l:t("pref.diet.vegan"),ds:t("pref.diet.vegan.d")}].map(x=>(
+      {[{id:"omnivore",l:t("pref.diet.omni"),ds:t("pref.diet.omni.d")},{id:"pescatarian",l:tx("pref.diet.pesc","Pescetariano"),ds:tx("pref.diet.pesc.d","Pesce, uova e latticini, senza carne")},{id:"vegetarian",l:t("pref.diet.veg"),ds:t("pref.diet.veg.d")},{id:"vegan",l:t("pref.diet.vegan"),ds:t("pref.diet.vegan.d")}].map(x=>(
         <button key={x.id} onClick={()=>u("diet",x.id)}
           style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",padding:16,marginBottom:8,borderRadius:14,border:`1.5px solid ${d.diet===x.id?T.accent:T.border}`,background:d.diet===x.id?T.sel:T.card,cursor:"pointer"}}>
           <div style={{textAlign:"left"}}><div style={{fontSize:15,fontWeight:600,color:T.text}}>{x.l}</div><div style={{fontSize:12,color:T.muted,marginTop:2}}>{x.ds}</div></div>
           {d.diet===x.id&&<div style={{width:22,height:22,borderRadius:7,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={12} c={T.bg}/></div>}
+        </button>
+      ))}
+
+      {/* Intensita dieta */}
+      <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{tx("pref.intensity","INTENSITA DELLA DIETA")}</p>
+      {[{
+        id:"gentle",
+        l:tx("pref.intensity.gentle","Graduale e sostenibile"),
+        ds:tx("pref.intensity.gentle.d","Piu gusto, porzioni meno aggressive e massima aderenza nelle prime settimane.")
+      },{
+        id:"balanced",
+        l:tx("pref.intensity.balanced","Bilanciata"),
+        ds:tx("pref.intensity.balanced.d","Deficit o surplus moderato, buono equilibrio tra risultati e costanza.")
+      },{
+        id:"focused",
+        l:tx("pref.intensity.focused","Piu precisa"),
+        ds:tx("pref.intensity.focused.d","Approccio piu rigoroso per chi e gia abituato a seguire una dieta.")
+      }].map(x=>(
+        <button key={x.id} onClick={()=>u("dietIntensity",x.id)}
+          style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",padding:14,marginBottom:8,borderRadius:14,border:`1.5px solid ${d.dietIntensity===x.id?T.accent:T.border}`,background:d.dietIntensity===x.id?T.sel:T.card,cursor:"pointer"}}>
+          <div style={{textAlign:"left"}}><div style={{fontSize:14,fontWeight:600,color:T.text}}>{x.l}</div><div style={{fontSize:12,color:T.muted,marginTop:2,lineHeight:1.4}}>{x.ds}</div></div>
+          {d.dietIntensity===x.id&&<div style={{width:22,height:22,borderRadius:7,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={12} c={T.bg}/></div>}
         </button>
       ))}
 
@@ -7957,6 +8041,7 @@ const OnboardingScreen = ({ onComplete, isPremium, initialData = null, isEditing
   dailySteps:"",
   sedentaryDays:"",
   diet:"omnivore",
+  dietIntensity:"balanced",
   allergies:"",
   sport:"",
   trainingTime:"sera",
@@ -8023,6 +8108,7 @@ const normalizeInitialOnboardingData = (source) => {
     dailySteps: source.daily_steps || source.dailySteps || "",
     sedentaryDays: source.sedentary_days || source.sedentaryDays || "",
     diet: source.diet || defaultOnboardingData.diet,
+    dietIntensity: source.diet_intensity || source.dietIntensity || defaultOnboardingData.dietIntensity,
     allergies: source.allergies || "",
     sport: source.sport || "",
     trainingTime: source.training_time || source.trainingTime || defaultOnboardingData.trainingTime,
@@ -8848,7 +8934,29 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
     const h = new Date().getHours();
     const slot = (h >= 6 && h < 14) ? "morning" : (h >= 17 && h < 23) ? "evening" : null;
     if (!slot) return;
-    const pool = DUBI_NOTIFICATIONS.filter(n=>n.slot===slot);
+    const latest = wearableSnapshot?.latest || null;
+    const hasMovementData = latest && (latest.steps || latest.activity_kcal);
+    const isItalian = lang === "it";
+    const contextual = [];
+    if (slot === "morning") {
+      contextual.push({
+        slot,
+        msg: isItalian ? "Check veloce: oggi ti alleni nell'orario giusto?" : "Quick check: are you training at the right time today?",
+        sub: isItalian ? "Se l'orario cambia, DUBI puo spostare carboidrati e pasti attorno all'allenamento." : "If timing changes, DUBI can move carbs and meals around training.",
+      });
+    }
+    if (slot === "evening") {
+      contextual.push({
+        slot,
+        msg: hasMovementData
+          ? (isItalian ? "Movimento di oggi: com'e andata?" : "Today's movement: how did it go?")
+          : (isItalian ? "Senza wearable: oggi sei stato sedentario o attivo?" : "No wearable: were you sedentary or active today?"),
+        sub: hasMovementData
+          ? (isItalian ? "Controlla passi e calorie attive prima della cena: DUBI usa solo i dati davvero disponibili." : "Check steps and active calories before dinner: DUBI only uses real available data.")
+          : (isItalian ? "Fai un check-in in Progressi: passi, attivita e peso aiutano DUBI a tenere preciso il piano." : "Use Progress check-in: steps, activity and weight help DUBI keep the plan precise."),
+      });
+    }
+    const pool = [...contextual, ...DUBI_NOTIFICATIONS.filter(n=>n.slot===slot)];
     if (!pool.length) return;
     const today = new Date().toDateString();
     const storedKey = `dubi_notif_${slot}`;
@@ -8862,7 +8970,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
       }, 1500);
       return () => clearTimeout(timer);
     } catch(e) {}
-  }, [notifDismissed]);
+  }, [notifDismissed, wearableSnapshot, lang, userData?.trainingTime]);
 
   const handlePlanChange = (change) => {
     if (!change) return;
@@ -8954,7 +9062,14 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
     const adaptSkipped = planAdaptations.skipped.includes(sl.id);
     return {...sl, time: times[i]||"--:--", data: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct, adaptSkipped};
   });
-  const mealList = (aiMealList || fallbackMealList).concat((planAdaptations.extraMeals||[]));
+  const preferredAiMealList = aiMealList?.map((meal) => {
+    if (meal.id !== "colazione" || !["dolce","salata"].includes(userData?.breakfastPref)) return meal;
+    const preferredBreakfast = dayMeals[bfKey] || meal.data;
+    return {...meal, data: preferredBreakfast};
+  });
+  const mealList = (preferredAiMealList || fallbackMealList)
+    .map((meal) => ({...meal, data: adaptMealForUserProfile(meal.data, meal.id, userData)}))
+    .concat((planAdaptations.extraMeals||[]));
 
   // ── MACRO SCALING — fattori indipendenti per ogni macro ──
   // Usa solo i pasti ATTIVI (non saltati da DUBI) per calcolare i fattori.
@@ -9116,19 +9231,21 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
             </p>
           </div>
         )}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          {wearableMetrics.map(metric => (
-            <WearableMetricCard
-              key={metric.type}
-              icon={<Ico n={metric.icon} size={18} c={metric.color}/>}
-              label={metric.label}
-              value={metric.value}
-              color={metric.color}
-              source={metric.available ? wearableSource : (latestWearable ? wearableUiCopy.unavailable : wearableUiCopy.none)}
-              available={metric.available}
-            />
-          ))}
-        </div>
+        {availableWearableMetrics.length > 0 && (
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {wearableMetrics.filter(metric => metric.available || latestWearable).map(metric => (
+              <WearableMetricCard
+                key={metric.type}
+                icon={<Ico n={metric.icon} size={18} c={metric.color}/>}
+                label={metric.label}
+                value={metric.value}
+                color={metric.color}
+                source={metric.available ? wearableSource : wearableUiCopy.unavailable}
+                available={metric.available}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Anomalia wearable — card contestuale ── */}
@@ -10605,6 +10722,10 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const [editingProgressId, setEditingProgressId] = useState(null);
   const [editingWeight, setEditingWeight] = useState("");
   const [wearableSnapshot, setWearableSnapshot] = useState(null);
+  const [manualDailySteps, setManualDailySteps] = useState(userData?.dailySteps || "unknown");
+  const [manualWorkoutDays, setManualWorkoutDays] = useState(userData?.workoutDays || "3-4");
+  const [manualWorkoutIntensity, setManualWorkoutIntensity] = useState(userData?.workoutIntensity || "moderata");
+  const [manualTdeeMessage, setManualTdeeMessage] = useState("");
   
   useEffect(() => {
   const loadProgressHistory = async () => {
@@ -10679,6 +10800,13 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   );
   const availableTrendMetrics = Object.values(wearableAvailability).filter(Boolean).length;
   const hasPartialTrendData = availableTrendMetrics > 0 && availableTrendMetrics < Object.keys(wearableAvailability).length;
+  const hasWearableTrendData = availableTrendMetrics > 0;
+  const latestProgressDate = progressHistory
+    .map(entry => new Date(entry.created_at))
+    .filter(date => !Number.isNaN(date.getTime()))
+    .sort((a,b) => b - a)[0];
+  const daysSinceWeightCheck = latestProgressDate ? Math.floor((Date.now() - latestProgressDate.getTime()) / 86400000) : null;
+  const needsWeightCheckIn = daysSinceWeightCheck === null || daysSinceWeightCheck >= 5;
 
   // Build chart data for active metric
   const metricRaw = activeMetric==="peso"
@@ -10698,10 +10826,10 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const improvements = [
     {icon:"dumbbell",color:"#C47B7B", labelKey:"prog.imp.lean.l", value:"+0.3 kg", noteKey:"prog.imp.lean.n"},
     {icon:"zap",color:"#C9A87C", labelKey:"prog.imp.tdee.l", value:`${plan?.tdee || 2100} kcal`, noteKey:"prog.imp.tdee.n"},
-    {icon:"moon",    color:"#9A8FBF", label:t("prog.imp.sleep.l"), value:wearableAvailability.sonno?`${latestWearable.sleep_quality}/100`:"--", note:wearableAvailability.sonno?t("prog.imp.sleep.n"):trendWearableCopy.unavailable},
-    {icon:"heart",   color:"#C47B7B", label:t("prog.imp.hrv.l"), value:wearableAvailability.hrv?`${latestWearable.hrv} ms`:"--", note:wearableAvailability.hrv?t("prog.imp.hrv.n"):trendWearableCopy.unavailable},
-    {icon:"flame",   color:"#C9A87C", label:t("prog.imp.cal.l"), value:wearableAvailability.calorie?`${Number(latestWearable.activity_kcal).toLocaleString("it-IT")} kcal`:"--", note:wearableAvailability.calorie?undefined:trendWearableCopy.unavailable},
-    {icon:"steps",   color:T.accentD, label:t("prog.metric.steps"), value:wearableAvailability.passi?Number(latestWearable.steps).toLocaleString("it-IT"):"--", note:wearableAvailability.passi?undefined:trendWearableCopy.unavailable},
+    ...(wearableAvailability.sonno ? [{icon:"moon", color:"#9A8FBF", label:t("prog.imp.sleep.l"), value:`${latestWearable.sleep_quality}/100`, note:t("prog.imp.sleep.n")}] : []),
+    ...(wearableAvailability.hrv ? [{icon:"heart", color:"#C47B7B", label:t("prog.imp.hrv.l"), value:`${latestWearable.hrv} ms`, note:t("prog.imp.hrv.n")}] : []),
+    ...(wearableAvailability.calorie ? [{icon:"flame", color:"#C9A87C", label:t("prog.imp.cal.l"), value:`${Number(latestWearable.activity_kcal).toLocaleString("it-IT")} kcal`}] : []),
+    ...(wearableAvailability.passi ? [{icon:"steps", color:T.accentD, label:t("prog.metric.steps"), value:Number(latestWearable.steps).toLocaleString("it-IT")}] : []),
     {icon:"drop",    color:"#7BA8C4", label:t("prog.imp.water.l"),          value:`2.1 ${t("prog.water.unit")}`,             note:t("prog.imp.water.n")},
     {icon:"trend",   color:T.accentD, label:t("prog.imp.adherence.l"),          value:"87%",                      note:t("prog.imp.adherence.n")},
   ];
@@ -10714,8 +10842,8 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   }[userData?.goal || plan?.goal] || userData?.goal || "DUBI";
   const trendCards = [
     {id:"weight", icon:"weight", label:t("trend.card.weight"), value:`${currentWeight} kg`, note:t("trend.explain.weight"), color:T.text, view:"weight", metric:"peso"},
-    {id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:wearableAvailability.hrv?`HRV ${latestWearable.hrv} ms`:"--", note:wearableAvailability.hrv?t("trend.explain.recovery"):trendWearableCopy.unavailable, color:"#C47B7B", view:wearableAvailability.hrv?"metrics":"summary", metric:"hrv"},
-    {id:"activity", icon:"steps", label:trendWearableCopy.activity, value:wearableAvailability.passi?Number(latestWearable.steps).toLocaleString("it-IT"):"--", note:wearableAvailability.passi?t("prog.metric.steps"):trendWearableCopy.unavailable, color:T.accentD, view:wearableAvailability.passi?"metrics":"summary", metric:"passi"},
+    ...(wearableAvailability.hrv ? [{id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:`HRV ${latestWearable.hrv} ms`, note:t("trend.explain.recovery"), color:"#C47B7B", view:"metrics", metric:"hrv"}] : []),
+    ...(wearableAvailability.passi ? [{id:"activity", icon:"steps", label:trendWearableCopy.activity, value:Number(latestWearable.steps).toLocaleString("it-IT"), note:t("prog.metric.steps"), color:T.accentD, view:"metrics", metric:"passi"}] : []),
     {id:"energy", icon:"zap", label:t("trend.card.energy"), value:`${plan?.tdee || 2100} kcal`, note:t("trend.explain.energy"), color:"#C9A87C", view:"report", metric:"calorie"},
   ];
 
@@ -10822,6 +10950,21 @@ const handleUpdateProgress = async (id) => {
   }
 };
 
+const handleManualTdeeUpdate = () => {
+  const updatedData = {
+    ...userData,
+    weight: Number(newWeight || currentWeight || userData?.weight),
+    dailySteps: manualDailySteps,
+    workoutDays: manualWorkoutDays,
+    workoutIntensity: manualWorkoutIntensity,
+  };
+  const updatedPlan = calcPlan(updatedData);
+  if (onAiPlanRefresh) onAiPlanRefresh(updatedPlan, updatedData.weight);
+  setManualTdeeMessage(lang === "it"
+    ? `Stima aggiornata: TDEE ${updatedPlan.tdee} kcal, piano ${updatedPlan.calories} kcal.`
+    : `Estimate updated: TDEE ${updatedPlan.tdee} kcal, plan ${updatedPlan.calories} kcal.`);
+};
+
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
@@ -10860,6 +11003,80 @@ const handleUpdateProgress = async (id) => {
       </div>
 
       {/* ── METRIC SELECTOR TABS ── */}
+      {(needsWeightCheckIn || !hasWearableTrendData) && (
+        <div style={{margin:"0 24px 18px",padding:16,background:T.card,border:`1.5px solid ${needsWeightCheckIn ? T.accent : T.border}`,borderRadius:18}}>
+          <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
+            <div style={{width:34,height:34,borderRadius:11,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <Ico n="weight" size={17} c={T.accentD}/>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:14,fontWeight:900,color:T.text,margin:"0 0 4px"}}>
+                {lang === "it" ? "Check-in manuale DUBI" : "DUBI manual check-in"}
+              </p>
+              <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>
+                {needsWeightCheckIn
+                  ? (lang === "it" ? "Sono passati almeno 5 giorni dall'ultimo peso: aggiornalo per mantenere il piano preciso." : "It has been at least 5 days since your last weight check: update it to keep the plan precise.")
+                  : (lang === "it" ? "Senza wearable, DUBI usa i tuoi check-in per stimare meglio il dispendio energetico." : "Without a wearable, DUBI uses your check-ins to estimate energy expenditure more accurately.")}
+              </p>
+            </div>
+          </div>
+          {needsWeightCheckIn && (
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <input type="number" value={newWeight} onChange={e=>setNewWeight(e.target.value)} placeholder={lang === "it" ? "Peso di oggi (kg)" : "Today's weight (kg)"}
+                style={{flex:1,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${T.border}`,background:T.bg,fontSize:15,color:T.text,outline:"none",fontFamily:"inherit"}} />
+              <button onClick={handleSaveProgress} disabled={savingProgress}
+                style={{padding:"11px 14px",borderRadius:12,background:T.text,color:T.bg,border:"none",fontSize:12,fontWeight:800,cursor:"pointer",opacity:savingProgress ? .7 : 1}}>
+                {savingProgress ? t("prog.saving") : (lang === "it" ? "Salva" : "Save")}
+              </button>
+            </div>
+          )}
+          {!hasWearableTrendData && (
+            <div>
+              <p style={{fontSize:11,fontWeight:900,color:T.muted,letterSpacing:.7,margin:"0 0 8px"}}>
+                {lang === "it" ? "STIMA TDEE SENZA WEARABLE" : "TDEE ESTIMATE WITHOUT WEARABLE"}
+              </p>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                <select value={manualDailySteps} onChange={e=>setManualDailySteps(e.target.value)}
+                  style={{padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12}}>
+                  <option value="unknown">{lang === "it" ? "Passi: non so" : "Steps: unsure"}</option>
+                  <option value="<3000">&lt; 3.000</option>
+                  <option value="3000-6000">3.000 - 6.000</option>
+                  <option value="6000-8000">6.000 - 8.000</option>
+                  <option value="8000-10000">8.000 - 10.000</option>
+                  <option value="10000+">10.000+</option>
+                </select>
+                <select value={manualWorkoutDays} onChange={e=>setManualWorkoutDays(e.target.value)}
+                  style={{padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12}}>
+                  <option value="0">0 allenamenti</option>
+                  <option value="1-2">1-2 allenamenti</option>
+                  <option value="3-4">3-4 allenamenti</option>
+                  <option value="5-6">5-6 allenamenti</option>
+                  <option value="7">7 allenamenti</option>
+                </select>
+              </div>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                {[
+                  ["leggera", lang === "it" ? "Leggera" : "Light"],
+                  ["moderata", lang === "it" ? "Moderata" : "Moderate"],
+                  ["alta", lang === "it" ? "Alta" : "High"],
+                ].map(([id,label])=>(
+                  <button key={id} onClick={()=>setManualWorkoutIntensity(id)}
+                    style={{flex:1,padding:"10px 8px",borderRadius:12,border:`1.5px solid ${manualWorkoutIntensity===id?T.accent:T.border}`,background:manualWorkoutIntensity===id?T.sel:T.bg,color:T.text,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={handleManualTdeeUpdate}
+                style={{width:"100%",padding:"12px 14px",borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer"}}>
+                {lang === "it" ? "Aggiorna stima e piano" : "Update estimate and plan"}
+              </button>
+              {manualTdeeMessage && <p style={{fontSize:11,color:T.accentD,margin:"10px 0 0",fontWeight:700}}>{manualTdeeMessage}</p>}
+            </div>
+          )}
+          {progressMessage && <p style={{fontSize:11,color:T.accentD,margin:"10px 0 0",fontWeight:700,lineHeight:1.45}}>{progressMessage}</p>}
+        </div>
+      )}
+
       <div style={{margin:"0 24px 14px",padding:"12px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
         <div style={{display:"flex",alignItems:"center",gap:9}}>
           <Ico n={availableTrendMetrics ? "check" : "info"} size={15} c={availableTrendMetrics ? T.accentD : T.muted}/>
@@ -10902,7 +11119,7 @@ const handleUpdateProgress = async (id) => {
       <div style={{padding:"0 24px",marginBottom:12}}>
         <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:10}}>{t("prog.metric.title")}</p>
         <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4}}>
-          {Object.entries(METRIC_CFG).map(([key,mc])=>(
+          {Object.entries(METRIC_CFG).filter(([key]) => key === "peso" || wearableAvailability[key]).map(([key,mc])=>(
             <button key={key} onClick={()=>{if(key==="peso" || wearableAvailability[key]) setActiveMetric(key);}}
               style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",padding:"10px 12px",borderRadius:14,
                 border:`1.5px solid ${activeMetric===key?mc.color:T.border}`,
@@ -11678,7 +11895,7 @@ const PROFILE_FIELDS = [
   {key:"workout_days", label:t("set.field.workoutDays"), section:t("set.edit.training"), type:"number", unit:"/7", impactsDiet:true, reason:t("set.reason.training")},
   {key:"workout_duration", label:t("set.field.workoutDuration"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["<30",t("act.dur.short")],["30-45",t("act.dur.mid1")],["45-60",t("act.dur.mid2")],["60-90",t("act.dur.long")],[">90",t("act.dur.xlong")]]},
   {key:"workout_intensity", label:t("set.field.workoutIntensity"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["leggera",t("act.int.light")],["moderata",t("act.int.moderate")],["alta",t("act.int.high")]]},
-  {key:"diet", label:t("set.field.diet"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["omnivore",t("pref.diet.omni")],["vegetarian",t("pref.diet.veg")],["vegan",t("pref.diet.vegan")]]},
+  {key:"diet", label:t("set.field.diet"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["omnivore",t("pref.diet.omni")],["pescatarian",(t("pref.diet.pesc")==="pref.diet.pesc"?"Pescetariano":t("pref.diet.pesc"))],["vegetarian",t("pref.diet.veg")],["vegan",t("pref.diet.vegan")]]},
   {key:"allergies", label:t("set.field.allergies"), section:t("set.edit.nutrition"), type:"text", impactsDiet:true, reason:t("set.reason.foods")},
   {key:"sport", label:t("set.field.sport"), section:t("set.edit.training"), type:"text", impactsDiet:true, reason:t("set.reason.training")},
   {key:"training_time", label:t("set.field.trainingTime"), section:t("set.edit.routine"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["morning",t("pref.training.morning")],["lunch",t("pref.training.lunch")],["afternoon",t("pref.training.afternoon")],["evening",t("pref.training.evening")],["varies",t("pref.training.varies")]]},
@@ -12204,7 +12421,7 @@ const handleSaveProfile = async () => {
                     setDeletingAccount(false);
                   }
                 }} disabled={deletingAccount}
-                  style={{flex:1,padding:"11px",borderRadius:12,border:"none",background:"#B91C1C",color:"#fff",fontWeight:800,cursor:deletingAccount?"default":"pointer",opacity:deletingAccount?.7:1}}>
+                  style={{flex:1,padding:"11px",borderRadius:12,border:"none",background:"#B91C1C",color:"#fff",fontWeight:800,cursor:deletingAccount?"default":"pointer",opacity:deletingAccount ? .7 : 1}}>
                   {deletingAccount ? "Deleting..." : "Delete permanently"}
                 </button>
               </div>
