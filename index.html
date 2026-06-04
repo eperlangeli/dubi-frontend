@@ -69,6 +69,33 @@
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+    button {
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+    }
+    button:not(:disabled):active { transform: scale(0.985); }
+    input, textarea, select {
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #6B8A64 !important;
+      box-shadow: 0 0 0 4px rgba(107, 138, 100, 0.14);
+    }
+    .dubi-card {
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    @media (hover:hover) {
+      button:not(:disabled):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(43, 43, 43, 0.08);
+      }
+      .dubi-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 30px rgba(43, 43, 43, 0.06);
+        border-color: #D8D1C8;
+      }
+    }
   </style>
 </head>
 <body>
@@ -768,6 +795,102 @@ const T = {
   bg:"#FAF9F7", card:"#F5F3EF", border:"#E7E2DA",
   text:"#2B2B2B", muted:"#9A9490", accent:"#A8B3A1",
   accentD:"#6B8A64", sel:"#EDF0EC", white:"#FFFFFF",
+};
+
+const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-04";
+const PRIVACY_COPY = {
+  it: {
+    title: "Privacy Policy",
+    subtitle: "Come DUBI protegge i tuoi dati nella beta gratuita.",
+    intro: "DUBI usa i dati che scegli di condividere solo per creare, adattare e migliorare il tuo piano nutrizionale personalizzato. Il servizio beta e gratuito e i tuoi dati non vengono venduti.",
+    sections: [
+      { title: "Quali dati usiamo", body: "Dati profilo, obiettivo, preferenze alimentari, progressi inseriti da te e, se li colleghi, dati wearable come passi, sonno, frequenza cardiaca, HRV, allenamenti e calorie attive. I dati wearable sono opzionali e vengono trattati solo se dai consenso separato." },
+      { title: "Perche li usiamo", body: "Li usiamo per calcolare fabbisogno, pasti, adattamenti, trend e suggerimenti pratici. Senza wearable DUBI lavora con questionario, peso, attivita dichiarata e aggiornamenti periodici." },
+      { title: "Cosa non facciamo", body: "Non vendiamo dati, non condividiamo dati individuali con assicurazioni o terze parti commerciali e non inventiamo biometrie mancanti. Se un dato non e disponibile, DUBI lo mostra come assente." },
+      { title: "Controllo dell'utente", body: "Puoi revocare i consensi, scollegare wearable e cancellare account e dati dalle Impostazioni. La cancellazione elimina i dati salvati collegati al tuo account." },
+      { title: "Nota salute", body: "DUBI offre supporto educativo e orientamento nutrizionale. Non sostituisce medico, dietista o nutrizionista, soprattutto in caso di patologie, gravidanza, disturbi alimentari, farmaci o condizioni cliniche." }
+    ],
+    version: "Versione beta: 4 giugno 2026",
+    close: "Chiudi",
+    required: "Acconsento al trattamento dei miei dati salute",
+    requiredBody: "DUBI tratta dati corporei, preferenze alimentari e dati wearable opzionali solo per generare e adattare il piano. Il consenso e necessario per trattare dati salute.",
+    link: "Leggi i dettagli privacy",
+    accept: "Accetto e crea il mio piano",
+    acceptDisabled: "Accetta il consenso richiesto",
+    decline: "Rifiuta ed esci",
+    consentTitle: "I tuoi dati, sotto il tuo controllo.",
+    consentLead: "Prima di generare il piano gratuito, DUBI ha bisogno del tuo consenso per usare i dati salute in modo sicuro e trasparente.",
+    consentFooter: "Puoi revocare il consenso e cancellare i dati in qualsiasi momento da Impostazioni > Privacy e dati."
+  },
+  en: {
+    title: "Privacy Policy",
+    subtitle: "How DUBI protects your data during the free beta.",
+    intro: "DUBI uses the data you choose to share only to create, adapt and improve your personalized nutrition plan. The beta service is free and your data is never sold.",
+    sections: [
+      { title: "Data we use", body: "Profile data, goals, dietary preferences, progress entered by you and, if connected, wearable data such as steps, sleep, heart rate, HRV, workouts and active calories. Wearable data is optional and processed only with separate consent." },
+      { title: "Why we use it", body: "We use it to calculate requirements, meals, adaptations, trends and practical suggestions. Without wearables, DUBI works with questionnaire data, weight, declared activity and periodic updates." },
+      { title: "What we do not do", body: "We do not sell data, share individual data with insurers or commercial third parties, or invent missing biometrics. If a signal is unavailable, DUBI shows it as unavailable." },
+      { title: "User control", body: "You can revoke consents, disconnect wearables and delete your account and data from Settings. Deletion removes saved data linked to your account." },
+      { title: "Health note", body: "DUBI provides educational support and nutrition guidance. It does not replace a doctor, dietitian or nutritionist, especially with medical conditions, pregnancy, eating disorders, medication or clinical needs." }
+    ],
+    version: "Beta version: June 4, 2026",
+    close: "Close",
+    required: "I consent to the processing of my health data",
+    requiredBody: "DUBI processes body metrics, dietary preferences and optional wearable data only to generate and adapt your plan. Consent is required to process health data.",
+    link: "Read privacy details",
+    accept: "Accept and create my plan",
+    acceptDisabled: "Accept the required consent",
+    decline: "Decline and exit",
+    consentTitle: "Your data, your control.",
+    consentLead: "Before generating your free plan, DUBI needs your consent to use health data safely and transparently.",
+    consentFooter: "You can withdraw consent and delete your data at any time from Settings > Privacy & Data."
+  }
+};
+const getPrivacyCopy = (lang) => PRIVACY_COPY[lang] || PRIVACY_COPY.en;
+
+const PrivacyPolicyContent = ({lang}) => {
+  const copy = getPrivacyCopy(lang);
+  return (
+    <div>
+      <p style={{fontSize:13,color:T.muted,lineHeight:1.6,margin:"0 0 14px"}}>{copy.intro}</p>
+      {copy.sections.map((section) => (
+        <div key={section.title} style={{padding:"12px 0",borderTop:`1px solid ${T.border}`}}>
+          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:900,color:T.text}}>{section.title}</p>
+          <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.55}}>{section.body}</p>
+        </div>
+      ))}
+      <p style={{margin:"10px 0 0",fontSize:11,color:T.muted,fontWeight:700}}>{copy.version}</p>
+    </div>
+  );
+};
+
+const PrivacyPolicyModal = ({lang, onClose}) => {
+  const copy = getPrivacyCopy(lang);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:4000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"18px 14px"}}>
+      <div className="dubi-card" style={{width:"100%",maxWidth:430,maxHeight:"86vh",overflowY:"auto",background:T.bg,borderRadius:24,border:`1px solid ${T.border}`,boxShadow:"0 24px 60px rgba(43,43,43,.18)"}}>
+        <div style={{position:"sticky",top:0,background:T.bg,padding:"18px 18px 10px",borderBottom:`1px solid ${T.border}`,zIndex:1}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+            <div>
+              <p style={{margin:0,fontSize:20,fontWeight:950,color:T.text,letterSpacing:-.4}}>{copy.title}</p>
+              <p style={{margin:"4px 0 0",fontSize:12,color:T.muted,lineHeight:1.45}}>{copy.subtitle}</p>
+            </div>
+            <button onClick={onClose} aria-label={copy.close}
+              style={{width:34,height:34,borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:18,fontWeight:900,cursor:"pointer"}}>
+              x
+            </button>
+          </div>
+        </div>
+        <div style={{padding:"14px 18px 18px"}}>
+          <PrivacyPolicyContent lang={lang} />
+          <button onClick={onClose}
+            style={{width:"100%",padding:"13px",marginTop:18,borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>
+            {copy.close}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -11268,6 +11391,7 @@ const [feedbackScore, setFeedbackScore] = useState(null);
 const [feedbackComment, setFeedbackComment] = useState("");
 const [feedbackMessage, setFeedbackMessage] = useState("");
 const [feedbackSending, setFeedbackSending] = useState(false);
+const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
 
 useEffect(() => {
   let cancelled = false;
@@ -11586,7 +11710,7 @@ const handleSaveProfile = async () => {
 
   // Card wrapper
   const Card = ({children, style={}}) => (
-    <div style={{background:T.card,borderRadius:16,border:`1px solid ${T.border}`,overflow:"hidden",...style}}>
+    <div className="dubi-card" style={{background:T.card,borderRadius:16,border:`1px solid ${T.border}`,overflow:"hidden",...style}}>
       {children}
     </div>
   );
@@ -11881,6 +12005,39 @@ const handleSaveProfile = async () => {
           <p style={{padding:"0 16px 16px",fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{getDubiBetaCopy(lang).settingsNote}</p>
         </Card>
 
+        <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>
+          {lang==="it" ? "PRIVACY E DATI" : "PRIVACY & DATA"}
+        </p>
+        <Card>
+          <button onClick={()=>setShowPrivacyPolicy(true)}
+            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"16px",border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:38,height:38,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={T.accentD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="M9 12l2 2 4-4"/>
+                </svg>
+              </div>
+              <div>
+                <p style={{margin:0,fontSize:14,fontWeight:900,color:T.text}}>{getPrivacyCopy(lang).title}</p>
+                <p style={{margin:"3px 0 0",fontSize:11,color:T.muted,lineHeight:1.45}}>
+                  {lang==="it"
+                    ? "Dati salute, wearable opzionali, consensi e cancellazione account."
+                    : "Health data, optional wearables, consents and account deletion."}
+                </p>
+              </div>
+            </div>
+            <span style={{fontSize:20,color:T.muted,lineHeight:1}}>&rsaquo;</span>
+          </button>
+          <div style={{padding:"0 16px 16px"}}>
+            <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
+              {lang==="it"
+                ? "DUBI usa i dati solo per generare e adattare il piano. Nessuna vendita dati, nessuna biometria inventata."
+                : "DUBI uses data only to generate and adapt the plan. No data selling, no invented biometrics."}
+            </p>
+          </div>
+        </Card>
+
         <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>AIUTACI A MIGLIORARE DUBI</p>
         <Card>
           <div style={{padding:16}}>
@@ -11991,6 +12148,7 @@ const handleSaveProfile = async () => {
         </div>
 
       </div>
+      {showPrivacyPolicy && <PrivacyPolicyModal lang={lang} onClose={()=>setShowPrivacyPolicy(false)} />}
     </div>
   );
 };
@@ -12013,6 +12171,9 @@ const BottomNav = ({active,onChange}) => { const { t } = useT(); return (
 const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [insuranceConsent, setInsuranceConsent] = React.useState(false);
   const [gdprConsent, setGdprConsent] = React.useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = React.useState(false);
+  const { lang } = useT();
+  const privacyCopy = getPrivacyCopy(lang);
 
   return (
     <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:40}}>
@@ -12022,8 +12183,8 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         </div>
-        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:800,color:T.text,letterSpacing:-0.8,margin:"0 0 8px"}}>Your data, your control.</h1>
-        <p style={{fontSize:14,color:T.muted,lineHeight:1.6,margin:"0 0 28px"}}>Before we create your plan, we need your consent to process your health data. This takes 30 seconds.</p>
+        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:800,color:T.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{privacyCopy.consentTitle}</h1>
+        <p style={{fontSize:14,color:T.muted,lineHeight:1.6,margin:"0 0 28px"}}>{privacyCopy.consentLead}</p>
       </div>
 
       <div style={{padding:"0 20px"}}>
@@ -12037,18 +12198,20 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
               {gdprConsent && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
             </div>
             <div style={{flex:1}}>
-              <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:T.text}}>I consent to the processing of my health data</p>
+              <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:T.text}}>{privacyCopy.required}</p>
               <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
-                DUBI processes your body metrics, dietary preferences and optional wearable data only to generate and adapt your personalised nutrition plan. Your data is never sold.
+                {privacyCopy.requiredBody}
               </p>
               <p style={{margin:"8px 0 0",fontSize:11,color:T.muted}}>
-                This consent is required by GDPR Art. 9 and UAE PDPL to process special category health data.
+                {lang==="it"
+                  ? "Questo consenso e richiesto per trattare dati salute e generare un piano personalizzato affidabile."
+                  : "This consent is required to process health data and generate a reliable personalized plan."}
               </p>
               <div
-                onClick={()=>window.open("/privacy.html","_blank")}
+                onClick={()=>setShowPrivacyPolicy(true)}
                 style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,cursor:"pointer"}}
               >
-                <span style={{fontSize:12,color:T.accentD,fontWeight:600}}>Read full Privacy Policy →</span>
+                <span style={{fontSize:12,color:T.accentD,fontWeight:600}}>{privacyCopy.link}</span>
               </div>
             </div>
           </div>
@@ -12076,27 +12239,33 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </div>
 
         <p style={{fontSize:11,color:T.muted,textAlign:"center",marginBottom:20,lineHeight:1.5}}>
-          You can withdraw your consent and delete your data at any time from Settings → Privacy & Data.
+          {privacyCopy.consentFooter}
         </p>
 
         <button
-          onClick={()=> gdprConsent ? onAccept({gdpr:true}) : null}
+          onClick={()=> gdprConsent ? onAccept({
+            gdpr:true,
+            medicalDisclaimer:true,
+            privacyPolicyVersion:PRIVACY_POLICY_VERSION,
+            privacyAcceptedAt:new Date().toISOString()
+          }) : null}
           style={{
             width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:gdprConsent?"pointer":"not-allowed",
             background:gdprConsent?"linear-gradient(135deg,#6B8A64,#4A6844)":"#ccc",
             color:"#fff",fontSize:15,fontWeight:700,marginBottom:12
           }}
         >
-          {gdprConsent ? "Accept & create my plan →" : "Please accept the required consent above"}
+          {gdprConsent ? privacyCopy.accept : privacyCopy.acceptDisabled}
         </button>
 
         <button
           onClick={onDecline}
           style={{width:"100%",padding:"14px",borderRadius:16,border:`1px solid ${T.border}`,background:"transparent",color:T.muted,fontSize:14,cursor:"pointer"}}
         >
-          Decline & exit
+          {privacyCopy.decline}
         </button>
       </div>
+      {showPrivacyPolicy && <PrivacyPolicyModal lang={lang} onClose={()=>setShowPrivacyPolicy(false)} />}
     </div>
   );
 };
