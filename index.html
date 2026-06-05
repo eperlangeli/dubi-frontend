@@ -12191,6 +12191,7 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [insuranceConsent, setInsuranceConsent] = React.useState(false);
   const [gdprConsent, setGdprConsent] = React.useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = React.useState(false);
+  const [acceptingConsent, setAcceptingConsent] = React.useState(false);
   const { lang } = useT();
   const privacyCopy = getPrivacyCopy(lang);
 
@@ -12273,24 +12274,34 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </p>
 
         <button
-          onClick={()=> gdprConsent ? onAccept({
-            gdpr:true,
-            medicalDisclaimer:true,
-            privacyPolicyVersion:PRIVACY_POLICY_VERSION,
-            privacyAcceptedAt:new Date().toISOString()
-          }) : null}
+          disabled={!gdprConsent || acceptingConsent}
+          onClick={async ()=> {
+            if (!gdprConsent || acceptingConsent) return;
+            setAcceptingConsent(true);
+            try {
+              await onAccept({
+                gdpr:true,
+                medicalDisclaimer:true,
+                privacyPolicyVersion:PRIVACY_POLICY_VERSION,
+                privacyAcceptedAt:new Date().toISOString()
+              });
+            } finally {
+              setAcceptingConsent(false);
+            }
+          }}
           style={{
-            width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:gdprConsent?"pointer":"not-allowed",
+            width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:gdprConsent&&!acceptingConsent?"pointer":"not-allowed",
             background:gdprConsent?"linear-gradient(135deg,#6B8A64,#4A6844)":"#ccc",
-            color:"#fff",fontSize:15,fontWeight:700,marginBottom:12
+            color:"#fff",fontSize:15,fontWeight:700,marginBottom:12,opacity:acceptingConsent ? .85 : 1
           }}
         >
-          {gdprConsent ? privacyCopy.accept : privacyCopy.acceptDisabled}
+          {acceptingConsent ? (lang==="it" ? "Genero il tuo piano..." : "Generating your plan...") : (gdprConsent ? privacyCopy.accept : privacyCopy.acceptDisabled)}
         </button>
 
         <button
           onClick={onDecline}
-          style={{width:"100%",padding:"14px",borderRadius:16,border:`1px solid ${T.border}`,background:"transparent",color:T.muted,fontSize:14,cursor:"pointer"}}
+          disabled={acceptingConsent}
+          style={{width:"100%",padding:"14px",borderRadius:16,border:`1px solid ${T.border}`,background:"transparent",color:T.muted,fontSize:14,cursor:acceptingConsent?"default":"pointer",opacity:acceptingConsent ? .55 : 1}}
         >
           {privacyCopy.decline}
         </button>
