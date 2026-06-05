@@ -237,7 +237,7 @@ const saveOnboardingToBackend = async (data) => {
 
   if (!token) {
     console.warn("No auth token found. Onboarding saved locally only.");
-    return null;
+    return { error: "missing_token" };
   }
 
   const payload = {
@@ -276,22 +276,27 @@ const saveOnboardingToBackend = async (data) => {
     wearable_consent: Boolean(data.wearableConsent)
   };
 
-  const response = await fetch(`${API_BASE_URL}/api/onboarding/save`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/onboarding/save`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    console.error("Failed to save onboarding:", err);
-    return null;
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("Failed to save onboarding:", err);
+      return { error: err.error || "onboarding_save_failed" };
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Onboarding save request failed:", error);
+    return { error: "network_error" };
   }
-
-  return await response.json();
 };
     const savePlanToBackend = async (plan, userData) => {
   const token = getAuthToken();
@@ -8022,6 +8027,7 @@ const normalizeInitialOnboardingData = (source) => {
 };
 
 const [data, setData] = useState(() => normalizeInitialOnboardingData(initialData));
+const [savingOnboarding, setSavingOnboarding] = useState(false);
   useEffect(() => {
   if (isEditing) {
     setData((prev) => ({
@@ -8079,9 +8085,14 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
       <div style={{flex:1,padding:"24px 24px 130px",overflowY:"auto"}}>{content[step]}</div>
       <div style={{padding:"16px 24px 40px",background:T.bg,borderTop:`1px solid ${T.border}`,position:"sticky",bottom:0}}>
         {betaAccessMessage && <p style={{fontSize:12,color:"#B91C1C",lineHeight:1.45,margin:"0 0 10px",fontWeight:700}}>{betaAccessMessage}</p>}
+        {step===4 && (
+          <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"0 0 10px"}}>
+            DUBI offre orientamento nutrizionale educativo e non sostituisce medico, dietista o nutrizionista. Prima della generazione del piano ti chiederemo consenso privacy e presa visione della nota salute.
+          </p>
+        )}
         <div style={{display:"flex",gap:10}}>
           {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:52,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:18,cursor:"pointer",flexShrink:0}}>←</button>}
-          <button disabled={!canContinueStep} onClick={async () => {
+          <button disabled={!canContinueStep || savingOnboarding} onClick={async () => {
   if (!canContinueStep) return;
   if (step < 4) {
     setStep(s => s + 1);
@@ -8090,12 +8101,19 @@ const [data, setData] = useState(() => normalizeInitialOnboardingData(initialDat
       setBetaAccessMessage("La beta iniziale di DUBI e disponibile solo per utenti maggiorenni. Il percorso per minori verra aperto quando il consenso genitoriale sara attivo.");
       return;
     }
-    await saveOnboardingToBackend(data);
+    setSavingOnboarding(true);
+    setBetaAccessMessage("");
+    const saved = await saveOnboardingToBackend(data);
+    setSavingOnboarding(false);
+    if (saved?.error) {
+      setBetaAccessMessage("Non riesco a salvare l'onboarding ora. Controlla la connessione o riprova tra poco: DUBI non genera il piano finche i dati iniziali non sono salvati.");
+      return;
+    }
     onComplete(data);
   }
 }}
-            style={{flex:1,background:canContinueStep?T.text:T.border,color:T.bg,border:"none",borderRadius:50,padding:18,fontSize:15,fontWeight:600,cursor:canContinueStep?"pointer":"default",opacity:canContinueStep?1:.75}}>
-            {step<4?t("onb.continue"):t("onb.generate")}
+            style={{flex:1,background:canContinueStep&&!savingOnboarding?T.text:T.border,color:T.bg,border:"none",borderRadius:50,padding:18,fontSize:15,fontWeight:600,cursor:canContinueStep&&!savingOnboarding?"pointer":"default",opacity:canContinueStep&&!savingOnboarding?1:.75}}>
+            {savingOnboarding ? "Salvataggio..." : (step<4?t("onb.continue"):t("onb.generate"))}
           </button>
         </div>
       </div>
@@ -12219,6 +12237,17 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </div>
 
         {/* Insurance Consent — opzionale */}
+        <div style={{background:"#FAEEDA",borderRadius:16,border:"1px solid rgba(133,79,11,.22)",padding:"14px 16px",marginBottom:14}}>
+          <p style={{margin:"0 0 5px",fontSize:12,fontWeight:900,color:"#854F0B"}}>
+            {lang==="it" ? "Nota salute obbligatoria" : "Required health note"}
+          </p>
+          <p style={{margin:0,fontSize:12,color:T.text,lineHeight:1.55}}>
+            {lang==="it"
+              ? "DUBI offre supporto educativo e orientamento nutrizionale. Non sostituisce medico, dietista o nutrizionista. In caso di patologie, gravidanza, disturbi alimentari, farmaci o condizioni cliniche, consulta un professionista prima di seguire il piano."
+              : "DUBI provides educational support and nutrition guidance. It does not replace a doctor, dietitian or nutritionist. With medical conditions, pregnancy, eating disorders, medication or clinical needs, consult a professional before following the plan."}
+          </p>
+        </div>
+
         <div style={{display:"none",background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:24}}>
           <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
             <div
@@ -12474,6 +12503,7 @@ const handleDeleteAccount = async () => {
   const [swaps, setSwaps] = useState({});
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
+  const [pendingPlanData, setPendingPlanData] = useState(null);
 
   const handleAiPlanRefreshFromProgress = (aiPlan, weightValue) => {
     const nextUserData = {...userData, weight: weightValue};
@@ -12482,6 +12512,26 @@ const handleDeleteAccount = async () => {
     setPlan(refreshedPlan);
     setSwaps({});
     saveDubiProfile(nextUserData);
+  };
+
+  const requestConsentBeforePlan = data => {
+    if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
+    saveDubiProfile(data);
+    setUserData(data);
+
+    const isEditingOnboarding = localStorage.getItem("dubi_edit_onboarding") === "true";
+    if (isEditingOnboarding) {
+      finalizeData(data);
+      return;
+    }
+
+    if (data.age && data.age < 18) {
+      setPhase("minor");
+      return;
+    }
+
+    setPendingPlanData(data);
+    setPhase("consent");
   };
 
   const handleComplete = data => {
@@ -12493,7 +12543,7 @@ const handleDeleteAccount = async () => {
       setPhase("safety");
       return;
     }
-    finalizeData(data);
+    requestConsentBeforePlan(data);
   };
 
   const finalizeData = async data => {
@@ -12517,11 +12567,7 @@ if (isEditingOnboarding) {
   return;
 }
 
-if (data.age && data.age < 18) {
-  setPhase("minor");
-} else {
-  setPhase("consent");
-}
+setPhase("free-beta");
   };
 
   // Quando l'utente entra nell'app (tab today) la prima volta, disattiva isFirstAccess dopo qualche secondo
@@ -12583,7 +12629,7 @@ if (data.age && data.age < 18) {
               // Se l'utente ha scelto esplicitamente un obiettivo (forced choice), usa quello
               if (chosenGoal) adjusted.goal = chosenGoal;
               setSafetyReview(null);
-              finalizeData(adjusted);
+              requestConsentBeforePlan(adjusted);
             }}
             onEdit={() => {
               setSafetyReview(null);
@@ -12594,7 +12640,12 @@ if (data.age && data.age < 18) {
         {phase==="consent" && (
           <ConsentScreen
             userData={userData}
-            onAccept={(c)=>{ setConsentData(c); setPhase("free-beta"); }}
+            onAccept={async (c)=>{
+              setConsentData(c);
+              const dataToGenerate = pendingPlanData || userData;
+              await finalizeData(dataToGenerate);
+              setPendingPlanData(null);
+            }}
             onDecline={()=>setPhase("welcome")}
           />
         )}
