@@ -3610,6 +3610,7 @@ function getAiMealListForDay(plan, dayIdx, slots, times) {
         why,
         whyEN: why,
         source,
+        practical: meal.practical || null,
         aiMeal: meal
       },
       workoutLabel: meal.mealType === "pre_workout" ? "PRE" : meal.mealType === "post_workout" ? "POST" : null,
@@ -9210,6 +9211,14 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                         <Ico n="info" size={11} c={T.accentD}/>
                         <span style={{fontSize:10,color:T.accentD,lineHeight:1.4}}>
                           {t("today.portions.info",{n:plan.calories})}
+                        </span>
+                      </div>
+                    )}
+                    {(meal.practical?.cookingGuidance || meal.practical?.portionNote) && (
+                      <div style={{marginTop:8,padding:"8px 10px",background:T.sel,borderRadius:10,border:`1px solid ${T.border}`,display:"flex",gap:8,alignItems:"flex-start"}}>
+                        <Ico n="info" size={12} c={T.accentD}/>
+                        <span style={{fontSize:11,color:T.text,lineHeight:1.45}}>
+                          {meal.practical?.cookingGuidance?.method || meal.practical?.portionNote}
                         </span>
                       </div>
                     )}
