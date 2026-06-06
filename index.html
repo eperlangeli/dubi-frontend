@@ -608,6 +608,65 @@ const importWearableDataFromBackend = async () => {
   }
 };
 
+const syncWearableProviderInBackend = async (provider) => {
+  const token = getAuthToken();
+  if (!token || !provider) return { error: "missing_token_or_provider" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/openwearables/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ provider, data_type: "all", historical: false })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: data.error || "wearable_sync_failed" };
+    return data;
+  } catch (error) {
+    console.error("Wearable sync failed:", error);
+    return { error: "network_error" };
+  }
+};
+
+const autoSyncWearableOnEntry = async ({ force = false } = {}) => {
+  const token = getAuthToken();
+  if (!token) return { skipped: true, reason: "missing_token" };
+
+  const throttleMs = 5 * 60 * 1000;
+  const storageKey = "dubi_wearable_auto_sync_at";
+  const now = Date.now();
+  const lastSync = Number(localStorage.getItem(storageKey) || 0);
+  if (!force && lastSync && now - lastSync < throttleMs) {
+    return { skipped: true, reason: "recent_sync" };
+  }
+
+  if (window.__dubiWearableAutoSyncPromise) return window.__dubiWearableAutoSyncPromise;
+
+  window.__dubiWearableAutoSyncPromise = (async () => {
+    const status = await fetchWearableStatusFromBackend();
+    const connection = status?.connection || null;
+    const provider = connection?.provider;
+    const connectionStatus = String(connection?.status || "").toLowerCase();
+
+    if (!provider || provider === "demo" || connectionStatus === "authorizing") {
+      return { skipped: true, reason: "no_connected_provider", connection };
+    }
+
+    localStorage.setItem(storageKey, String(now));
+    const sync = await syncWearableProviderInBackend(provider);
+    const imported = await importWearableDataFromBackend();
+    return { success: !sync.error && !imported.error, provider, sync, imported };
+  })();
+
+  try {
+    return await window.__dubiWearableAutoSyncPromise;
+  } finally {
+    window.__dubiWearableAutoSyncPromise = null;
+  }
+};
+
 const submitBetaFeedbackToBackend = async (score, comment) => {
   const token = getAuthToken();
   if (!token) return null;
@@ -8568,6 +8627,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   React.useEffect(() => {
     let cancelled = false;
     const loadWearableSnapshot = async () => {
+      await autoSyncWearableOnEntry();
       const snapshot = await fetchCurrentWearableDataFromBackend();
       if (!cancelled) setWearableSnapshot(snapshot);
     };
@@ -12483,6 +12543,7 @@ function DUBIApp() {
 
   setUserData(normalizedOnboarding);
 
+  await autoSyncWearableOnEntry();
   const currentAiPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding);
   const sessionPlan = currentAiPlan || (await generateAiPlanFromBackend(normalizedOnboarding)).plan || calcPlan(normalizedOnboarding);
   setPlan(sessionPlan);
@@ -12524,6 +12585,21 @@ const handleDeleteAccount = async () => {
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
   const [pendingPlanData, setPendingPlanData] = useState(null);
+
+  useEffect(() => {
+    if (phase !== "app") return undefined;
+    const syncOnVisibleEntry = () => {
+      if (document.visibilityState === "visible") {
+        autoSyncWearableOnEntry();
+      }
+    };
+    window.addEventListener("focus", syncOnVisibleEntry);
+    document.addEventListener("visibilitychange", syncOnVisibleEntry);
+    return () => {
+      window.removeEventListener("focus", syncOnVisibleEntry);
+      document.removeEventListener("visibilitychange", syncOnVisibleEntry);
+    };
+  }, [phase]);
 
   const handleAiPlanRefreshFromProgress = (aiPlan, weightValue) => {
     const nextUserData = {...userData, weight: weightValue};
@@ -12613,9 +12689,10 @@ setPhase("free-beta");
   </div>
 )}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
-        {phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding) => {
+{phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding) => {
   if (existingOnboarding) {
    setUserData(existingOnboarding);
+   await autoSyncWearableOnEntry();
    const currentAiPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding);
    const authPlan = currentAiPlan || (await generateAiPlanFromBackend(existingOnboarding)).plan || calcPlan(existingOnboarding);
    setPlan(authPlan);
