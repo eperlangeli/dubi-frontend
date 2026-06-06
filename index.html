@@ -233,7 +233,10 @@ const getPrimaryWearable = (data = {}) => {
 };
 
 const WEARABLE_OAUTH_PROVIDERS = new Set(["garmin", "polar", "suunto", "whoop", "strava", "oura", "fitbit", "ultrahuman"]);
+const VERIFIED_CONNECTABLE_WEARABLES = new Set([]);
 const WEARABLE_PROVIDER_LABELS = {
+  apple: "Apple Watch",
+  apple_health: "Apple Watch",
   garmin: "Garmin",
   polar: "Polar",
   suunto: "Suunto",
@@ -241,15 +244,30 @@ const WEARABLE_PROVIDER_LABELS = {
   strava: "Strava",
   oura: "Oura",
   fitbit: "Fitbit",
-  ultrahuman: "Ultrahuman"
+  ultrahuman: "Ultrahuman",
+  samsung: "Samsung Health",
+  google: "Google Health Connect"
 };
 
 const getOAuthWearableProvider = (data = {}) => {
   const selected = getSelectedWearables(data).filter(item => item !== "none");
-  return selected.find(item => WEARABLE_OAUTH_PROVIDERS.has(item)) || null;
+  return selected.find(item => VERIFIED_CONNECTABLE_WEARABLES.has(item)) || null;
 };
 
 const getWearableProviderLabel = (provider) => WEARABLE_PROVIDER_LABELS[provider] || String(provider || "").toUpperCase();
+
+const isAuthorizationUrlUsable = (url = "") => {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.get("client_id") === "") return false;
+    if (url.includes("localhost:8000")) return false;
+    if (/invalid_client|fallbacks\/error/i.test(url)) return false;
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
 
 const saveOnboardingToBackend = async (data) => {
   const token = getAuthToken();
@@ -7918,7 +7936,7 @@ const PreferencesStep = ({d,u}) => {
 const WearableStep = ({d,u}) => {
   const { t, lang } = useT();
   const selected = getSelectedWearables(d);
-  const selectedReal = selected.filter(id => id !== "none");
+  const selectedReal = selected.filter(id => id !== "none" && VERIFIED_CONNECTABLE_WEARABLES.has(id));
   const hasWearable = selectedReal.length > 0;
   const providers = [
     {id:"apple",   ic:"act",   l:"Apple Health",          ds:t("wear.apple.d2")},
@@ -7930,7 +7948,7 @@ const WearableStep = ({d,u}) => {
     {id:"suunto",  ic:"act",   l:"Suunto",                ds:t("wear.suunto.d")},
     {id:"samsung", ic:"act",   l:"Samsung Health",        ds:t("wear.samsung.d")},
     {id:"google",  ic:"act",   l:"Google Health Connect", ds:t("wear.google.d")}
-  ];
+  ].map(provider => ({ ...provider, connectable: VERIFIED_CONNECTABLE_WEARABLES.has(provider.id) }));
 
   const setWearables = (next) => {
     const clean = next.length ? next : ["none"];
@@ -7954,14 +7972,17 @@ const WearableStep = ({d,u}) => {
       {providers.map(w=>{
         const active = selectedReal.includes(w.id);
         return (
-      <button key={w.id} onClick={()=>toggleProvider(w.id)}
-        style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:13,minHeight:92,borderRadius:16,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,cursor:"pointer",textAlign:"left"}}>
+      <button key={w.id} onClick={()=>w.connectable && toggleProvider(w.id)} disabled={!w.connectable}
+        style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:13,minHeight:92,borderRadius:16,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,cursor:w.connectable?"pointer":"default",textAlign:"left",opacity:w.connectable?1:.62}}>
         <div style={{width:38,height:38,borderRadius:13,background:active?T.accentD+"22":T.bg,
           border:`1px solid ${active?T.accent:T.border}`,
           display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           <Ico n={w.ic} size={19} c={active?T.accentD:T.muted}/>
         </div>
-        <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:900,color:T.text}}>{w.l}</div><div style={{fontSize:10.5,color:T.muted,marginTop:3,lineHeight:1.25}}>{w.ds}</div></div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:900,color:T.text}}>{w.l}</div>
+          <div style={{fontSize:10.5,color:T.muted,marginTop:3,lineHeight:1.25}}>{w.connectable ? w.ds : (lang==="it" ? "Disponibile presto" : "Available soon")}</div>
+        </div>
         {active && <div style={{width:20,height:20,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={11} c={T.bg}/></div>}
       </button>
     )})}
@@ -11535,18 +11556,27 @@ useEffect(() => {
 const fallbackWearableProviders = [
   { id: "garmin", name: "Garmin" },
   { id: "polar", name: "Polar" },
-  { id: "oura", name: "Oura" },
+  { id: "suunto", name: "Suunto" },
   { id: "whoop", name: "WHOOP" },
+  { id: "strava", name: "Strava" },
+  { id: "oura", name: "Oura" },
   { id: "fitbit", name: "Fitbit" },
-  { id: "strava", name: "Strava" }
+  { id: "ultrahuman", name: "Ultrahuman" },
+  { id: "apple", name: "Apple Watch" },
+  { id: "samsung", name: "Samsung Health" },
+  { id: "google", name: "Google Health Connect" }
 ];
 
-const wearableProviderList = wearableProviders.length
+const normalizedWearableProviderList = wearableProviders.length
   ? wearableProviders.map((provider) => ({
       id: provider.provider || provider.id || provider.slug || provider.name,
       name: provider.display_name || provider.name || provider.id || provider.slug
     })).filter(provider => provider.id)
-  : (realWearablesReady ? fallbackWearableProviders : []);
+  : fallbackWearableProviders;
+const wearableProviderList = normalizedWearableProviderList.filter(provider => VERIFIED_CONNECTABLE_WEARABLES.has(String(provider.id).toLowerCase()));
+const upcomingWearableProviderList = normalizedWearableProviderList
+  .filter(provider => !VERIFIED_CONNECTABLE_WEARABLES.has(String(provider.id).toLowerCase()))
+  .filter((provider, index, list) => list.findIndex(item => String(item.id).toLowerCase() === String(provider.id).toLowerCase()) === index);
 
 const handleConnectWearable = async (providerId) => {
   setWearableBusy(true);
@@ -11565,12 +11595,12 @@ const handleConnectWearable = async (providerId) => {
       return;
     }
 
-    if (auth.authorization_url) {
+    if (isAuthorizationUrlUsable(auth.authorization_url)) {
       window.location.href = auth.authorization_url;
       return;
     }
 
-    setWearableMessage("OpenWearables non ha restituito un link OAuth valido.");
+    setWearableMessage("Questo wearable non e ancora configurato per il collegamento reale. Lo abbiamo messo in disponibile presto.");
   } finally {
     setWearableBusy(false);
   }
@@ -12019,10 +12049,27 @@ const handleSaveProfile = async () => {
       </div>
     ) : (
       <div style={{padding:12,borderRadius:16,background:T.bg,border:`1px solid ${T.border}`,marginBottom:12}}>
-        <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Collegamento reale in preparazione</p>
+        <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Collegamenti reali in configurazione</p>
         <p style={{margin:"4px 0 0",fontSize:11,color:T.muted,lineHeight:1.45}}>
-          Quando OpenWearables sara configurato, qui appariranno WHOOP, Polar, Garmin e gli altri provider autorizzabili.
+          Mostreremo come cliccabili solo i wearable con OAuth verificato e pronto in produzione.
         </p>
+      </div>
+    )}
+
+    {upcomingWearableProviderList.length > 0 && (
+      <div style={{marginTop:12,padding:12,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
+        <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Disponibili presto</p>
+        <p style={{margin:"4px 0 10px",fontSize:11,color:T.muted,lineHeight:1.45}}>
+          Questi provider sono preparati nel sistema, ma li abilitiamo solo quando il collegamento OAuth e verificato.
+        </p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {upcomingWearableProviderList.map(provider => (
+            <div key={provider.id}
+              style={{padding:"11px 10px",borderRadius:13,border:`1px solid ${T.border}`,background:T.card,color:T.muted,fontSize:11,fontWeight:900,opacity:.78}}>
+              {provider.name || getWearableProviderLabel(provider.id)}
+            </div>
+          ))}
+        </div>
       </div>
     )}
 
@@ -12401,10 +12448,10 @@ const WearableConnectScreen = ({userData, onSkip}) => {
       await createWearableUserInBackend();
       const auth = await authorizeWearableProviderInBackend(provider);
 
-      if (auth.error || !auth.authorization_url) {
+      if (auth.error || !isAuthorizationUrlUsable(auth.authorization_url)) {
         setMessage(lang === "it"
-          ? "Non riesco ad aprire il collegamento ora. Puoi continuare e collegarlo dalle Impostazioni."
-          : "I cannot open the connection right now. You can continue and connect it later from Settings.");
+          ? "Questo wearable non e ancora configurato per il collegamento reale. Puoi continuare e lo abiliteremo appena sara verificato."
+          : "This wearable is not configured for real connection yet. You can continue and we will enable it once verified.");
         setConnecting(false);
         return;
       }
