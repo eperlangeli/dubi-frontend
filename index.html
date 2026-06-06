@@ -233,7 +233,7 @@ const getPrimaryWearable = (data = {}) => {
 };
 
 const WEARABLE_OAUTH_PROVIDERS = new Set(["garmin", "polar", "suunto", "whoop", "strava", "oura", "fitbit", "ultrahuman"]);
-const VERIFIED_CONNECTABLE_WEARABLES = new Set([]);
+const VERIFIED_CONNECTABLE_WEARABLES = new Set();
 const WEARABLE_PROVIDER_LABELS = {
   apple: "Apple Watch",
   apple_health: "Apple Watch",
@@ -249,9 +249,21 @@ const WEARABLE_PROVIDER_LABELS = {
   google: "Google Health Connect"
 };
 
-const getOAuthWearableProvider = (data = {}) => {
+const syncVerifiedWearableProviders = (providers = []) => {
+  VERIFIED_CONNECTABLE_WEARABLES.clear();
+  providers
+    .map(provider => String(provider || "").trim().toLowerCase())
+    .filter(provider => WEARABLE_OAUTH_PROVIDERS.has(provider))
+    .forEach(provider => VERIFIED_CONNECTABLE_WEARABLES.add(provider));
+  return new Set(VERIFIED_CONNECTABLE_WEARABLES);
+};
+
+const isWearableConnectable = (provider, verifiedSet = VERIFIED_CONNECTABLE_WEARABLES) =>
+  verifiedSet.has(String(provider || "").trim().toLowerCase());
+
+const getOAuthWearableProvider = (data = {}, verifiedSet = VERIFIED_CONNECTABLE_WEARABLES) => {
   const selected = getSelectedWearables(data).filter(item => item !== "none");
-  return selected.find(item => VERIFIED_CONNECTABLE_WEARABLES.has(item)) || null;
+  return selected.find(item => isWearableConnectable(item, verifiedSet)) || null;
 };
 
 const getWearableProviderLabel = (provider) => WEARABLE_PROVIDER_LABELS[provider] || String(provider || "").toUpperCase();
@@ -736,7 +748,9 @@ const fetchWearableProvidersFromBackend = async () => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return { providers: [], error: data.error || "providers_unavailable" };
-    return { providers: data.providers || data || [], error: null };
+    const verifiedProviders = data.verified_providers || data.verifiedProviders || [];
+    syncVerifiedWearableProviders(verifiedProviders);
+    return { providers: data.providers || data || [], verifiedProviders, error: null };
   } catch (error) {
     console.error("Wearable providers request failed:", error);
     return { providers: [], error: "network_error" };
@@ -7933,10 +7947,10 @@ const PreferencesStep = ({d,u}) => {
   );
 };
 
-const WearableStep = ({d,u}) => {
+const WearableStep = ({d,u,connectableWearables = VERIFIED_CONNECTABLE_WEARABLES}) => {
   const { t, lang } = useT();
   const selected = getSelectedWearables(d);
-  const selectedReal = selected.filter(id => id !== "none" && VERIFIED_CONNECTABLE_WEARABLES.has(id));
+  const selectedReal = selected.filter(id => id !== "none" && isWearableConnectable(id, connectableWearables));
   const hasWearable = selectedReal.length > 0;
   const providers = [
     {id:"apple",   ic:"act",   l:"Apple Health",          ds:t("wear.apple.d2")},
@@ -7948,7 +7962,7 @@ const WearableStep = ({d,u}) => {
     {id:"suunto",  ic:"act",   l:"Suunto",                ds:t("wear.suunto.d")},
     {id:"samsung", ic:"act",   l:"Samsung Health",        ds:t("wear.samsung.d")},
     {id:"google",  ic:"act",   l:"Google Health Connect", ds:t("wear.google.d")}
-  ].map(provider => ({ ...provider, connectable: VERIFIED_CONNECTABLE_WEARABLES.has(provider.id) }));
+  ].map(provider => ({ ...provider, connectable: isWearableConnectable(provider.id, connectableWearables) }));
 
   const setWearables = (next) => {
     const clean = next.length ? next : ["none"];
@@ -8128,6 +8142,16 @@ const normalizeInitialOnboardingData = (source) => {
 
 const [data, setData] = useState(() => normalizeInitialOnboardingData(initialData));
 const [savingOnboarding, setSavingOnboarding] = useState(false);
+const [connectableWearables, setConnectableWearables] = useState(() => new Set(VERIFIED_CONNECTABLE_WEARABLES));
+  useEffect(() => {
+  let cancelled = false;
+  fetchWearableProvidersFromBackend().then((result) => {
+    if (cancelled || result.error) return;
+    const next = syncVerifiedWearableProviders(result.verifiedProviders || []);
+    setConnectableWearables(next);
+  });
+  return () => { cancelled = true; };
+}, []);
   useEffect(() => {
   if (isEditing) {
     setData((prev) => ({
@@ -8146,7 +8170,7 @@ const [savingOnboarding, setSavingOnboarding] = useState(false);
 />,
 <ActivityStep d={data} u={u}/>,
     <PreferencesStep d={data} u={u}/>,
-    <WearableStep d={data} u={u}/>,
+    <WearableStep d={data} u={u} connectableWearables={connectableWearables}/>,
   ];
   const selectedWearables = getSelectedWearables(data).filter(id => id !== "none");
   const wearableConsentRequired = step === 4 && selectedWearables.length > 0;
@@ -11573,9 +11597,9 @@ const normalizedWearableProviderList = wearableProviders.length
       name: provider.display_name || provider.name || provider.id || provider.slug
     })).filter(provider => provider.id)
   : fallbackWearableProviders;
-const wearableProviderList = normalizedWearableProviderList.filter(provider => VERIFIED_CONNECTABLE_WEARABLES.has(String(provider.id).toLowerCase()));
+const wearableProviderList = normalizedWearableProviderList.filter(provider => isWearableConnectable(provider.id));
 const upcomingWearableProviderList = normalizedWearableProviderList
-  .filter(provider => !VERIFIED_CONNECTABLE_WEARABLES.has(String(provider.id).toLowerCase()))
+  .filter(provider => !isWearableConnectable(provider.id))
   .filter((provider, index, list) => list.findIndex(item => String(item.id).toLowerCase() === String(provider.id).toLowerCase()) === index);
 
 const handleConnectWearable = async (providerId) => {
