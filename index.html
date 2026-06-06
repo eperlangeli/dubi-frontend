@@ -232,6 +232,25 @@ const getPrimaryWearable = (data = {}) => {
   return selected[0] || "none";
 };
 
+const WEARABLE_OAUTH_PROVIDERS = new Set(["garmin", "polar", "suunto", "whoop", "strava", "oura", "fitbit", "ultrahuman"]);
+const WEARABLE_PROVIDER_LABELS = {
+  garmin: "Garmin",
+  polar: "Polar",
+  suunto: "Suunto",
+  whoop: "WHOOP",
+  strava: "Strava",
+  oura: "Oura",
+  fitbit: "Fitbit",
+  ultrahuman: "Ultrahuman"
+};
+
+const getOAuthWearableProvider = (data = {}) => {
+  const selected = getSelectedWearables(data).filter(item => item !== "none");
+  return selected.find(item => WEARABLE_OAUTH_PROVIDERS.has(item)) || null;
+};
+
+const getWearableProviderLabel = (provider) => WEARABLE_PROVIDER_LABELS[provider] || String(provider || "").toUpperCase();
+
 const saveOnboardingToBackend = async (data) => {
   const token = getAuthToken();
 
@@ -11495,8 +11514,8 @@ useEffect(() => {
       setRealWearablesReady(false);
       setWearableMessage(
         providersResult.error === "OPENWEARABLES_API_KEY is not configured"
-          ? "Collegamento reale non ancora attivo: manca la configurazione OpenWearables su Render. Puoi usare il test demo."
-          : "Provider wearable reali non disponibili ora. Puoi usare il test demo."
+          ? "Collegamento reale non ancora attivo: manca la configurazione OpenWearables su Render."
+          : "Provider wearable reali non disponibili ora. Riprova tra poco."
       );
       setWearableProviders([]);
       return;
@@ -12007,29 +12026,8 @@ const handleSaveProfile = async () => {
       </div>
     )}
 
-    <div style={{marginTop:12,padding:12,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
-      <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>Test senza wearable</p>
-      <p style={{margin:"4px 0 10px",fontSize:11,color:T.muted,lineHeight:1.45}}>
-        Carica dati biometrici demo per provare subito recupero, sonno, HRV e adattamento del piano.
-      </p>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-        <button onClick={()=>handleSeedDemoWearable("balanced")} disabled={wearableBusy}
-          style={{padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
-          Demo normale
-        </button>
-        <button onClick={()=>handleSeedDemoWearable("low_recovery")} disabled={wearableBusy}
-          style={{padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
-          Demo recupero basso
-        </button>
-        <button onClick={()=>handleSeedDemoWearable("activity_only")} disabled={wearableBusy}
-          style={{gridColumn:"1 / -1",padding:"11px 9px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
-          Demo solo attivita (tipo Strava)
-        </button>
-      </div>
-    </div>
-
     {wearableMessage && (
-      <p style={{margin:"12px 0 0",fontSize:11,fontWeight:700,color:wearableMessage.includes("Demo caricata") ? T.accentD : wearableMessage.includes("OPENWEARABLES") || wearableMessage.includes("Serve") ? "#B7791F" : "#B91C1C",lineHeight:1.45}}>
+      <p style={{margin:"12px 0 0",fontSize:11,fontWeight:700,color:wearableMessage.includes("OPENWEARABLES") || wearableMessage.includes("Serve") ? "#B7791F" : "#B91C1C",lineHeight:1.45}}>
         {wearableMessage}
       </p>
     )}
@@ -12263,6 +12261,7 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [acceptingConsent, setAcceptingConsent] = React.useState(false);
   const { lang } = useT();
   const privacyCopy = getPrivacyCopy(lang);
+  const hasOAuthWearable = Boolean(getOAuthWearableProvider(userData) && userData?.wearableConsent);
 
   return (
     <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:40}}>
@@ -12364,7 +12363,9 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
             color:"#fff",fontSize:15,fontWeight:700,marginBottom:12,opacity:acceptingConsent ? .85 : 1
           }}
         >
-          {acceptingConsent ? (lang==="it" ? "Genero il tuo piano..." : "Generating your plan...") : (gdprConsent ? privacyCopy.accept : privacyCopy.acceptDisabled)}
+          {acceptingConsent
+            ? (hasOAuthWearable ? (lang==="it" ? "Continuo..." : "Continuing...") : (lang==="it" ? "Genero il tuo piano..." : "Generating your plan..."))
+            : (gdprConsent ? (hasOAuthWearable ? (lang==="it" ? "Continua al collegamento wearable" : "Continue to wearable connection") : privacyCopy.accept) : privacyCopy.acceptDisabled)}
         </button>
 
         <button
@@ -12384,6 +12385,93 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
 // MINOR SCREEN — consenso genitoriale per under-18 (GDPR + UAE PDPL)
 // Aggiunta da: DUBI_App_Consent.html
 // ═══════════════════════════════════════════════════════════════
+const WearableConnectScreen = ({userData, onSkip}) => {
+  const { lang } = useT();
+  const provider = getOAuthWearableProvider(userData);
+  const providerLabel = getWearableProviderLabel(provider);
+  const [connecting, setConnecting] = React.useState(false);
+  const [message, setMessage] = React.useState("");
+
+  const connect = async () => {
+    if (!provider || connecting) return;
+    setConnecting(true);
+    setMessage("");
+
+    try {
+      await createWearableUserInBackend();
+      const auth = await authorizeWearableProviderInBackend(provider);
+
+      if (auth.error || !auth.authorization_url) {
+        setMessage(lang === "it"
+          ? "Non riesco ad aprire il collegamento ora. Puoi continuare e collegarlo dalle Impostazioni."
+          : "I cannot open the connection right now. You can continue and connect it later from Settings.");
+        setConnecting(false);
+        return;
+      }
+
+      window.location.href = auth.authorization_url;
+    } catch (error) {
+      console.error("Onboarding wearable connect failed:", error);
+      setMessage(lang === "it"
+        ? "Errore di collegamento. Puoi continuare e collegarlo piu tardi."
+        : "Connection error. You can continue and connect it later.");
+      setConnecting(false);
+    }
+  };
+
+  return (
+    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:40}}>
+      <div style={{padding:"56px 20px 0"}}>
+        <div style={{width:56,height:56,borderRadius:16,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+          <Ico n="heart" size={28} c="#fff"/>
+        </div>
+        <p style={{fontSize:10,fontWeight:900,color:T.accentD,letterSpacing:1.5,margin:"0 0 8px"}}>
+          {lang === "it" ? "COLLEGAMENTO WEARABLE" : "WEARABLE CONNECTION"}
+        </p>
+        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:27,fontWeight:900,color:T.text,letterSpacing:-0.8,margin:"0 0 8px"}}>
+          {lang === "it" ? `Collega ${providerLabel}` : `Connect ${providerLabel}`}
+        </h1>
+        <p style={{fontSize:14,color:T.muted,lineHeight:1.6,margin:"0 0 24px"}}>
+          {lang === "it"
+            ? "DUBI usera sonno, HRV, recovery, passi e calorie attive quando il provider li rende disponibili. Il piano sara piu preciso fin dal primo accesso."
+            : "DUBI will use sleep, HRV, recovery, steps and active calories when your provider makes them available. Your plan will be more precise from the first access."}
+        </p>
+      </div>
+
+      <div style={{padding:"0 20px"}}>
+        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:20,padding:18,marginBottom:14}}>
+          <p style={{fontSize:13,fontWeight:900,color:T.text,margin:"0 0 6px"}}>
+            {lang === "it" ? "Come funziona" : "How it works"}
+          </p>
+          <p style={{fontSize:12,color:T.muted,lineHeight:1.55,margin:0}}>
+            {lang === "it"
+              ? `Ti mandiamo alla pagina ufficiale ${providerLabel}. Inserisci le credenziali li, confermi i permessi e torni automaticamente in DUBI. DUBI non vede mai la tua password.`
+              : `We send you to the official ${providerLabel} page. You enter your credentials there, confirm permissions and return automatically to DUBI. DUBI never sees your password.`}
+          </p>
+        </div>
+
+        <button onClick={connect} disabled={!provider || connecting}
+          style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:T.accentD,color:"#fff",fontSize:15,fontWeight:900,cursor:connecting?"default":"pointer",opacity:connecting ? .75 : 1,marginBottom:10}}>
+          {connecting
+            ? (lang === "it" ? "Apro il collegamento..." : "Opening connection...")
+            : (lang === "it" ? `Collega ${providerLabel} ora` : `Connect ${providerLabel} now`)}
+        </button>
+
+        <button onClick={onSkip} disabled={connecting}
+          style={{width:"100%",padding:"14px",borderRadius:16,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:14,fontWeight:800,cursor:connecting?"default":"pointer",opacity:connecting ? .55 : 1}}>
+          {lang === "it" ? "Lo faccio piu tardi" : "I'll do it later"}
+        </button>
+
+        {message && (
+          <p style={{fontSize:12,color:"#B7791F",fontWeight:700,lineHeight:1.45,margin:"12px 0 0"}}>
+            {message}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const MinorScreen = ({userData, onComplete, onBack}) => {
   const [parentEmail, setParentEmail] = React.useState("");
   const [parentName, setParentName] = React.useState("");
@@ -12740,10 +12828,24 @@ setPhase("free-beta");
             onAccept={async (c)=>{
               setConsentData(c);
               const dataToGenerate = pendingPlanData || userData;
+              if (getOAuthWearableProvider(dataToGenerate) && dataToGenerate?.wearableConsent) {
+                setPhase("wearable-connect");
+                return;
+              }
               await finalizeData(dataToGenerate);
               setPendingPlanData(null);
             }}
             onDecline={()=>setPhase("welcome")}
+          />
+        )}
+        {phase==="wearable-connect" && (
+          <WearableConnectScreen
+            userData={pendingPlanData || userData}
+            onSkip={async ()=>{
+              const dataToGenerate = pendingPlanData || userData;
+              await finalizeData(dataToGenerate);
+              setPendingPlanData(null);
+            }}
           />
         )}
         {phase==="minor" && (
