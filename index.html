@@ -912,20 +912,21 @@ const T = {
   accentD:"#6B8A64", sel:"#EDF0EC", white:"#FFFFFF",
 };
 
-const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-04";
+const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-06";
 const PRIVACY_COPY = {
   it: {
     title: "Privacy Policy",
     subtitle: "Come DUBI protegge i tuoi dati nella beta gratuita.",
     intro: "DUBI usa i dati che scegli di condividere solo per creare, adattare e migliorare il tuo piano nutrizionale personalizzato. Il servizio beta e gratuito e i tuoi dati non vengono venduti.",
     sections: [
-      { title: "Quali dati usiamo", body: "Dati profilo, obiettivo, preferenze alimentari, progressi inseriti da te e, se li colleghi, dati wearable come passi, sonno, frequenza cardiaca, HRV, allenamenti e calorie attive. I dati wearable sono opzionali e vengono trattati solo se dai consenso separato." },
-      { title: "Perche li usiamo", body: "Li usiamo per calcolare fabbisogno, pasti, adattamenti, trend e suggerimenti pratici. Senza wearable DUBI lavora con questionario, peso, attivita dichiarata e aggiornamenti periodici." },
+      { title: "Quali dati usiamo", body: "Dati profilo, obiettivo, preferenze alimentari, allergie/intolleranze, progressi inseriti da te e, se li colleghi, dati wearable come passi, sonno, frequenza cardiaca, HRV, recovery, allenamenti, calorie attive e misurazioni corporee disponibili dal provider." },
+      { title: "Perche li usiamo", body: "Li usiamo per stimare fabbisogno energetico, macronutrienti, timing dei pasti, adattamenti del piano, trend e suggerimenti pratici. Senza wearable DUBI lavora con questionario, peso, attivita dichiarata e aggiornamenti periodici." },
+      { title: "Dati wearable", body: "Il collegamento wearable e opzionale. Se autorizzi un provider, inserisci le credenziali solo sulla pagina ufficiale del provider: DUBI non vede mai la tua password. DUBI riceve solo i dati permessi tramite token OAuth e li usa per personalizzare il piano." },
       { title: "Cosa non facciamo", body: "Non vendiamo dati, non condividiamo dati individuali con assicurazioni o terze parti commerciali e non inventiamo biometrie mancanti. Se un dato non e disponibile, DUBI lo mostra come assente." },
       { title: "Controllo dell'utente", body: "Puoi revocare i consensi, scollegare wearable e cancellare account e dati dalle Impostazioni. La cancellazione elimina i dati salvati collegati al tuo account." },
       { title: "Nota salute", body: "DUBI offre supporto educativo e orientamento nutrizionale. Non sostituisce medico, dietista o nutrizionista, soprattutto in caso di patologie, gravidanza, disturbi alimentari, farmaci o condizioni cliniche." }
     ],
-    version: "Versione beta: 4 giugno 2026",
+    version: "Versione beta: 6 giugno 2026",
     close: "Chiudi",
     required: "Acconsento al trattamento dei miei dati salute",
     requiredBody: "DUBI tratta dati corporei, preferenze alimentari e dati wearable opzionali solo per generare e adattare il piano. Il consenso e necessario per trattare dati salute.",
@@ -942,13 +943,14 @@ const PRIVACY_COPY = {
     subtitle: "How DUBI protects your data during the free beta.",
     intro: "DUBI uses the data you choose to share only to create, adapt and improve your personalized nutrition plan. The beta service is free and your data is never sold.",
     sections: [
-      { title: "Data we use", body: "Profile data, goals, dietary preferences, progress entered by you and, if connected, wearable data such as steps, sleep, heart rate, HRV, workouts and active calories. Wearable data is optional and processed only with separate consent." },
-      { title: "Why we use it", body: "We use it to calculate requirements, meals, adaptations, trends and practical suggestions. Without wearables, DUBI works with questionnaire data, weight, declared activity and periodic updates." },
+      { title: "Data we use", body: "Profile data, goals, dietary preferences, allergies/intolerances, progress entered by you and, if connected, wearable data such as steps, sleep, heart rate, HRV, recovery, workouts, active calories and body measurements made available by the provider." },
+      { title: "Why we use it", body: "We use it to estimate energy needs, macronutrients, meal timing, plan adaptations, trends and practical suggestions. Without wearables, DUBI works with questionnaire data, weight, declared activity and periodic updates." },
+      { title: "Wearable data", body: "Wearable connection is optional. If you authorize a provider, you enter credentials only on the provider's official page: DUBI never sees your password. DUBI receives only the data permitted through OAuth tokens and uses it to personalize your plan." },
       { title: "What we do not do", body: "We do not sell data, share individual data with insurers or commercial third parties, or invent missing biometrics. If a signal is unavailable, DUBI shows it as unavailable." },
       { title: "User control", body: "You can revoke consents, disconnect wearables and delete your account and data from Settings. Deletion removes saved data linked to your account." },
       { title: "Health note", body: "DUBI provides educational support and nutrition guidance. It does not replace a doctor, dietitian or nutritionist, especially with medical conditions, pregnancy, eating disorders, medication or clinical needs." }
     ],
-    version: "Beta version: June 4, 2026",
+    version: "Beta version: June 6, 2026",
     close: "Close",
     required: "I consent to the processing of my health data",
     requiredBody: "DUBI processes body metrics, dietary preferences and optional wearable data only to generate and adapt your plan. Consent is required to process health data.",
@@ -1002,6 +1004,36 @@ const PrivacyPolicyModal = ({lang, onClose}) => {
             style={{width:"100%",padding:"13px",marginTop:18,borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>
             {copy.close}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PrivacyPolicyPage = () => {
+  const { lang } = useT();
+  const copy = getPrivacyCopy(lang);
+  return (
+    <div style={{background:T.bg,minHeight:"100vh",padding:"42px 20px 48px",fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+      <div style={{maxWidth:720,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22}}>
+          <DUBILogo size={42} color={T.accentD}/>
+          <div>
+            <p style={{margin:0,fontSize:22,fontWeight:950,color:T.text,letterSpacing:-.4}}>DUBI</p>
+            <p style={{margin:"2px 0 0",fontSize:12,color:T.muted,fontWeight:800,letterSpacing:1,textTransform:"uppercase"}}>Privacy & Data</p>
+          </div>
+        </div>
+        <div className="dubi-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:24,padding:"22px 20px",boxShadow:"0 16px 40px rgba(43,43,43,.08)"}}>
+          <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:30,fontWeight:950,color:T.text,letterSpacing:-.8,margin:"0 0 8px"}}>{copy.title}</h1>
+          <p style={{margin:"0 0 20px",fontSize:14,color:T.muted,lineHeight:1.55}}>{copy.subtitle}</p>
+          <PrivacyPolicyContent lang={lang}/>
+          <div style={{marginTop:22,padding:"14px 16px",borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
+            <p style={{margin:0,fontSize:12,color:T.text,lineHeight:1.55}}>
+              {lang === "it"
+                ? "Questa pagina pubblica serve per utenti e provider wearable che richiedono una privacy policy prima dell'autorizzazione OAuth."
+                : "This public page is available for users and wearable providers that require a privacy policy before OAuth authorization."}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -12964,8 +12996,17 @@ setPhase("free-beta");
   );
 }
 
+function DUBIRoot() {
+  const params = new URLSearchParams(window.location.search);
+  const legal = params.get("legal") || params.get("page");
+  if (legal === "privacy" || window.location.pathname === "/privacy") {
+    return <PrivacyPolicyPage />;
+  }
+  return <DUBIApp />;
+}
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<LangProvider><DUBIApp /></LangProvider>);
+    root.render(<LangProvider><DUBIRoot /></LangProvider>);
 
     // Nascondi schermata di boot non appena React ha montato il componente
     window._dubiReady = true;
