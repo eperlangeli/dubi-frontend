@@ -8901,7 +8901,15 @@ const ANOMALY_CAUSE_OPTIONS = [
 const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const { t, lang } = useT();
 
-  const [status,setStatus] = useState({});
+  const todayMealStatusStorageKey = React.useMemo(() => {
+    const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
+    const dateKey = new Date().toISOString().slice(0,10);
+    const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.calories || "plan";
+    return `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
+  }, [userData?.dubiCode, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.calories]);
+  const [status,setStatus] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(todayMealStatusStorageKey) || "{}"); } catch(e) { return {}; }
+  });
   const [expanded,setExpanded] = useState(null);
   const [showWhy,setShowWhy] = useState({});
   const [skipText,setSkipText] = useState({});
@@ -8911,6 +8919,14 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const [askOpen,setAskOpen] = useState(false);
   const [planAdaptations,setPlanAdaptations] = useState({skipped:[],banner:null,note:null,extraMeals:[]});
   const [wearableSnapshot,setWearableSnapshot] = useState(null);
+
+  React.useEffect(() => {
+    try { setStatus(JSON.parse(localStorage.getItem(todayMealStatusStorageKey) || "{}")); } catch(e) { setStatus({}); }
+  }, [todayMealStatusStorageKey]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem(todayMealStatusStorageKey, JSON.stringify(status)); } catch(e) {}
+  }, [todayMealStatusStorageKey, status]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -9688,8 +9704,13 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     const carbPct = getCarbTargetPct(userData?.trainingTime, sl.id, userData?.sport);
     return {...sl, time: times[i]||"--:--", meal: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct};
   });
-  const mealEntries = aiWeeklyMeals
-    ? aiWeeklyMeals.map(m => ({...m, meal: m.data}))
+  const preferredAiWeeklyMeals = aiWeeklyMeals?.map((meal) => {
+    if (meal.id !== "colazione") return meal;
+    const preferredBreakfast = dayMeals[bfKey] || meal.data;
+    return {...meal, data: preferredBreakfast};
+  });
+  const mealEntries = preferredAiWeeklyMeals
+    ? preferredAiWeeklyMeals.map(m => ({...m, meal: m.data}))
     : fallbackMealEntries;
   const adjustedMealEntries = mealEntries.map(entry => ({
     ...entry,
@@ -11961,6 +11982,8 @@ const PROFILE_FIELDS = [
   {key:"height", label:t("set.field.height"), section:t("set.edit.body"), type:"number", unit:"cm", impactsDiet:true, reason:t("set.reason.energy")},
   {key:"weight", label:t("set.field.weight"), section:t("set.edit.body"), type:"number", unit:"kg", impactsDiet:true, reason:t("set.reason.energy")},
   {key:"goal", label:t("set.field.goal"), section:t("set.edit.body"), type:"select", impactsDiet:true, reason:t("set.reason.energy"), options:[["fatLoss",t("goal.fatLoss.t")],["definition",t("goal.definition.t")],["gain",t("goal.gain.t")],["maintain",t("goal.maintain.t")]]},
+  {key:"target_weight", label:t("set.field.targetWeight"), section:t("set.edit.body"), type:"number", unit:"kg", impactsDiet:true, reason:t("set.reason.energy")},
+  {key:"target_body_fat", label:t("set.field.targetBf"), section:t("set.edit.body"), type:"number", unit:"%", impactsDiet:true, reason:t("set.reason.energy")},
   {key:"workout_days", label:t("set.field.workoutDays"), section:t("set.edit.training"), type:"number", unit:"/7", impactsDiet:true, reason:t("set.reason.training")},
   {key:"workout_duration", label:t("set.field.workoutDuration"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["<30",t("act.dur.short")],["30-45",t("act.dur.mid1")],["45-60",t("act.dur.mid2")],["60-90",t("act.dur.long")],[">90",t("act.dur.xlong")]]},
   {key:"workout_intensity", label:t("set.field.workoutIntensity"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["leggera",t("act.int.light")],["moderata",t("act.int.moderate")],["alta",t("act.int.high")]]},
@@ -12007,6 +12030,18 @@ const handleSaveProfile = async () => {
   const changed = changedProfileFields();
   if (!changed.length) {
     setProfileMessage(t("set.edit.selectField"));
+    return;
+  }
+  const goalChanged = changed.some(f => f.key === "goal");
+  const nextGoal = String(profileForm.goal || userData?.goal || "").toLowerCase();
+  const goalNeedsTarget = goalChanged && !["maintain", "mantenimento"].includes(nextGoal);
+  if (goalNeedsTarget && !Number(profileForm.target_weight)) {
+    setSelectedProfileField("target_weight");
+    setConfirmProfileSave(false);
+    setProfileMessage(lang === "it"
+      ? "Prima di aggiornare il piano, inserisci il peso target: cosi DUBI capisce la direzione reale dell'obiettivo."
+      : "Before updating the plan, add your target weight so DUBI understands the real direction of the goal."
+    );
     return;
   }
   if (!confirmProfileSave) {
