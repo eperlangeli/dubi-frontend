@@ -7280,6 +7280,17 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
   const [q, setQ] = useState("");
   const scrollRef = React.useRef(null);
 
+  React.useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
+
   // auto-scroll in fondo ogni volta che arrivano nuovi messaggi
   React.useEffect(()=>{
     if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -7317,9 +7328,17 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
   const hasMessages = messages.length > 0;
 
   return (
-    <div style={{position:"fixed",inset:0,zIndex:260,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
+    <div
+      style={{position:"fixed",inset:0,zIndex:5000,display:"flex",justifyContent:"center",alignItems:"stretch",background:"rgba(0,0,0,0.45)",overscrollBehavior:"contain"}}
+      onClick={onClose}
+      onWheel={e=>e.stopPropagation()}
+      onTouchMove={e=>e.stopPropagation()}
+    >
       <div style={{background:"rgba(0,0,0,0.45)",position:"absolute",inset:0}} />
-      <div style={{position:"relative",background:T.bg,borderRadius:"24px 24px 0 0",maxHeight:"92vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+      <div
+        style={{position:"relative",width:"100%",maxWidth:430,height:"100dvh",maxHeight:"100dvh",background:T.bg,borderRadius:0,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 0 50px rgba(0,0,0,0.18)",overscrollBehavior:"contain"}}
+        onClick={e=>e.stopPropagation()}
+      >
         <div style={{width:40,height:4,borderRadius:2,background:T.border,margin:"16px auto 0",flexShrink:0}} />
 
         {/* Header */}
@@ -7339,7 +7358,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
         </div>
 
         {/* Chat area */}
-        <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"16px 20px",minHeight:0}}>
+        <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"16px 20px 22px",minHeight:0,overscrollBehavior:"contain",WebkitOverflowScrolling:"touch"}}>
 
           {/* Stato iniziale: suggestions */}
           {!hasMessages && (
@@ -7455,7 +7474,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
         </div>
 
         {/* Input fisso in fondo */}
-        <div style={{padding:"12px 16px 32px",borderTop:`1px solid ${T.border}`,flexShrink:0,background:T.bg}}>
+        <div style={{padding:"12px 16px max(24px, env(safe-area-inset-bottom))",borderTop:`1px solid ${T.border}`,flexShrink:0,background:T.bg}}>
           <div style={{display:"flex",gap:8}}>
             <textarea
               value={q}
