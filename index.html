@@ -27,7 +27,16 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #FAF9F7; font-family: 'Inter', -apple-system, sans-serif; color-scheme: light; forced-color-adjust: none; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: #FAF9F7;
+      font-family: 'Inter', -apple-system, sans-serif;
+      color-scheme: light;
+      forced-color-adjust: none;
+      overscroll-behavior-y: none;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
+    }
     #root { min-height: 100vh; }
 
     /* ── Schermata di caricamento — visibile finché React non renderizza ── */
@@ -71,9 +80,14 @@
     input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     button {
       -webkit-tap-highlight-color: transparent;
-      transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+      touch-action: manipulation;
+      transition: transform 0.18s cubic-bezier(.2,.8,.2,1), box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
     }
-    button:not(:disabled):active { transform: scale(0.985); }
+    button:not(:disabled):active { transform: scale(0.975); }
+    button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(107, 138, 100, 0.18), 0 12px 28px rgba(43,43,43,0.08);
+    }
     input, textarea, select {
       transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
     }
@@ -83,7 +97,54 @@
       box-shadow: 0 0 0 4px rgba(107, 138, 100, 0.14);
     }
     .dubi-card {
-      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      transition: transform 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .dubi-screen-motion {
+      animation: dubi-fade-up 0.34s cubic-bezier(.2,.8,.2,1) both;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+    .dubi-pressable {
+      position: relative;
+      overflow: hidden;
+      transform: translateZ(0);
+    }
+    .dubi-pressable::after {
+      content: "";
+      position: absolute;
+      inset: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(107, 138, 100, 0.13);
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.36s ease, opacity 0.36s ease;
+    }
+    .dubi-pressable:active::after {
+      transform: translate(-50%, -50%) scale(24);
+      opacity: 1;
+      transition-duration: 0.12s;
+    }
+    .dubi-chat-bubble {
+      animation: dubi-bubble-in 0.24s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .dubi-success-pop {
+      animation: dubi-success-pop 0.32s cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes dubi-fade-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dubi-bubble-in {
+      from { opacity: 0; transform: translateY(8px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes dubi-success-pop {
+      0% { transform: scale(.92); opacity: .4; }
+      60% { transform: scale(1.04); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
     }
     @media (hover:hover) {
       button:not(:disabled):hover {
@@ -94,6 +155,14 @@
         transform: translateY(-1px);
         box-shadow: 0 14px 30px rgba(43, 43, 43, 0.06);
         border-color: #D8D1C8;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
       }
     }
   </style>
@@ -148,6 +217,20 @@ const DUBI_BETA_COPY = {
   }
 };
 const getDubiBetaCopy = (lang) => DUBI_BETA_COPY[lang] || DUBI_BETA_COPY.en;
+
+const dubiHaptic = (type = "tap") => {
+  try {
+    if (!navigator?.vibrate) return;
+    const patterns = {
+      tap: 6,
+      soft: 10,
+      success: [12, 24, 18],
+      warning: [18, 35, 18],
+      heavy: 28
+    };
+    navigator.vibrate(patterns[type] || patterns.tap);
+  } catch (error) {}
+};
 
     const normalizeOnboarding = (data) => {
   if (!data) return null;
@@ -6442,20 +6525,138 @@ function getPlanDecisionCopy(lang) {
 function classifyPlanDecision(planChange, lang) {
   if (!planChange) return null;
   const c = getPlanDecisionCopy(lang);
-  const regenerationActions = ["regenerate_plan", "profile_change", "allergy_change", "goal_change"];
+  const regenerationActions = ["regenerate_plan", "profile_change", "allergy_change", "goal_change", "open_settings"];
   if (regenerationActions.includes(planChange.action)) return {label:c.regenerate, sub:c.regenerateSub, badge:c.ask, tone:"regen"};
   return {label:c.today, sub:c.todaySub, badge:c.temporary, tone:"today"};
 }
 
-function detectPlanChange(t, plan) {
+function detectMealSlotFromText(t, plan) {
+  const slots = getMealSlots(plan?.mealCount || 4).map(slot => slot.id);
+  if (/(colazione|breakfast)/i.test(t)) return "colazione";
+  if (/(pranzo|lunch)/i.test(t)) return "pranzo";
+  if (/(cena|dinner)/i.test(t)) return "cena";
+  if (/(spuntino.*matt|snack.*morning|morning.*snack)/i.test(t) && slots.includes("snack_m")) return "snack_m";
+  if (/(spuntino.*pomer|merenda|snack.*afternoon|afternoon.*snack)/i.test(t) && slots.includes("snack")) return "snack";
+  if (/(pre.?nanna|serale|pre.?bed|night.*snack)/i.test(t) && slots.includes("snack_n")) return "snack_n";
+  if (/(spuntino|snack)/i.test(t)) return slots.find(id => id.startsWith("snack")) || "snack";
+  if (/(pasto|meal|piatto)/i.test(t)) return "pranzo";
+  return null;
+}
+
+function getTodayMealForAskDubi(plan, mealId) {
+  const dayIdx = (new Date().getDay()+6)%7;
+  const slots = getMealSlots(plan?.mealCount || 4);
+  const times = plan?.mealTimes || ["08:00","13:00","16:30","20:00"];
+  return getAiMealListForDay(plan, dayIdx, slots, times)?.find(meal => meal.id === mealId) || null;
+}
+
+function buildAskDubiReplacementMeal(mealId, userData, plan, lang = "it") {
+  const dayIdx = (new Date().getDay()+6)%7;
+  const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
+  const slots = getMealSlots(plan?.mealCount || 4);
+  const current = getTodayMealForAskDubi(plan, mealId);
+  const currentName = current?.data?.name || "";
+  const breakfastKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
+  const mealKey = mealId === "colazione" ? breakfastKey : mealId;
+  const candidates = [];
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const day = dietMeals[(dayIdx + offset) % 7] || {};
+    const candidate = day[mealKey] || day[mealId] || day.snack;
+    if (candidate && candidate.name !== currentName) candidates.push(candidate);
+  }
+
+  const base = candidates[0] || (dietMeals[dayIdx]?.[mealKey]) || current?.data;
+  if (!base) return null;
+  const adapted = adaptMealForUserProfile(base, mealId, userData);
+  const targetMacros = current?.data?.macros || adapted.macros || {cal:0,p:0,c:0,f:0};
+  return {
+    ...adapted,
+    name: adapted.name,
+    macros: targetMacros,
+    why: lang === "it"
+      ? `Alternativa generata da DUBI per sostituire il pasto mantenendo lo stesso blocco nutrizionale: circa ${targetMacros.cal || 0} kcal, ${targetMacros.p || 0}g proteine, ${targetMacros.c || 0}g carboidrati e ${targetMacros.f || 0}g grassi.`
+      : `DUBI replacement meal with the same nutritional block: about ${targetMacros.cal || 0} kcal, ${targetMacros.p || 0}g protein, ${targetMacros.c || 0}g carbs and ${targetMacros.f || 0}g fats.`
+  };
+}
+
+function getDubiServiceAnswer(t, userData, plan, lang = "it") {
+  const isEN = lang === "en" || lang === "en-US";
+  const kcal = plan?.calories || plan?.caloriesTarget || "—";
+  const meals = plan?.mealCount || plan?.meals?.length || "—";
+  const goal = userData?.goal || "obiettivo";
+  if (/(come funziona|strutturat|sezion|cosa fa|a cosa serve|come.*app|how.*work|app.*work|sections|structure)/i.test(t)) {
+    return isEN ? {
+      title:"How DUBI is structured",
+      body:["DUBI has five core areas: Today for the daily plan, Plan for the week and swaps, Shop for the shopping list, Trend for progress and biometrics, Settings for profile/privacy/wearables.","The engine combines onboarding data, declared activity, allergies, preferences, progress and optional wearable signals.","Ask DUBI is the action layer: it explains the system and can adapt today without breaking your nutrition targets."],
+      source:"DUBI product logic"
+    } : {
+      title:"Come e strutturata DUBI",
+      body:["DUBI ha cinque aree: Oggi per il piano giornaliero, Piano per settimana e sostituzioni, Spesa per la lista acquisti, Trend per progressi/biometrie, Impostazioni per profilo/privacy/wearable.","Il motore usa onboarding, attivita dichiarata, allergie, preferenze, progressi e dati wearable opzionali.","Chiedi a DUBI e il livello operativo: spiega il sistema e puo adattare la giornata senza rompere i target nutrizionali."],
+      source:"DUBI · Logica prodotto"
+    };
+  }
+  if (/(come.*gener|pasti.*gener|logica.*pasti|macro|calcol|fonti|why.*meal|how.*meal|meal.*generated|sources)/i.test(t)) {
+    return isEN ? {
+      title:"How your meals are generated",
+      body:[`For your current profile DUBI is targeting about ${kcal} kcal across ${meals} meals.`,"Meals are filtered by diet, allergies/intolerances, breakfast preference, meal timing, training context and recipe quality.","Then DUBI scores calories, protein, carbs, fats, satiety, nutrient density, glycemic response, recovery support and source-backed nutrition status."],
+      source:"Mifflin-St Jeor · WHO/EFSA/ISSN · DUBI nutrition audit"
+    } : {
+      title:"Come DUBI genera i pasti",
+      body:[`Per il tuo profilo attuale DUBI lavora su circa ${kcal} kcal distribuite in ${meals} pasti.`,"Prima filtra ricette per dieta, allergie/intolleranze, preferenza colazione, timing pasti, allenamento e qualita della ricetta.","Poi valuta calorie, proteine, carboidrati, grassi, sazieta, densita nutrizionale, risposta glicemica, recupero e stato audit delle fonti nutrizionali."],
+      source:"Mifflin-St Jeor · WHO/EFSA/ISSN · DUBI nutrition audit"
+    };
+  }
+  if (/(gratis|gratuito|free|costo|pagare|abbonamento|subscription|price|cost)/i.test(t)) {
+    return isEN ? {
+      title:"Why DUBI is free in beta",
+      body:["The beta service is free: plan, adaptations, shopping list, progress and supported wearable flow are included.","This choice was made to make nutrition education and practical guidance accessible while the product is refined with early users.","No card is required in the beta."],
+      source:"DUBI beta policy"
+    } : {
+      title:"Perche DUBI e gratuito",
+      body:["La beta e gratuita: piano, adattamenti, lista spesa, progressi e flusso wearable supportato sono inclusi.","La scelta nasce per rendere educazione alimentare e guida pratica accessibili mentre il prodotto viene rifinito con i primi utenti.","Nella beta non serve carta e non c'e abbonamento."],
+      source:"DUBI · Beta gratuita"
+    };
+  }
+  if (/(privacy|dati|consenso|wearable|whoop|oura|garmin|strava|token|biometri|data|consent)/i.test(t)) {
+    return isEN ? {
+      title:"Data, privacy and wearables",
+      body:["Wearable connection is optional. You authenticate on the provider page, not inside DUBI, so DUBI never sees your wearable password.","DUBI receives only authorized data through OAuth tokens and uses it to personalize nutrition, timing, recovery and trends.","If a signal is missing, DUBI shows it as missing and never invents biometric values."],
+      source:"DUBI privacy policy"
+    } : {
+      title:"Dati, privacy e wearable",
+      body:["Il collegamento wearable e opzionale. L'accesso avviene sulla pagina ufficiale del provider, quindi DUBI non vede mai la password del wearable.","DUBI riceve solo i dati autorizzati tramite token OAuth e li usa per personalizzare nutrizione, timing, recupero e trend.","Se un segnale manca, DUBI lo mostra come assente e non inventa valori biometrici."],
+      source:"Privacy Policy DUBI"
+    };
+  }
+  return null;
+}
+
+function detectPlanChange(t, plan, userData, lang = "it") {
   const slots = plan?.mealCount || 4;
   if (/(nuov[ao].*(allerg|intoller)|sono allerg|sono intoller|ho scoperto.*allerg|glutine|lattosio|celiach|cambio.*obiettivo|voglio.*massa|voglio.*definizione|devo.*dimagrire|peso.*cambiato|sono ingrassat|sono dimagrit|regenera.*piano|rifai.*piano|nuova dieta|new allergy|intoleran|change.*goal|regenerate.*plan|new diet)/i.test(t)) {
     return {
       action: "regenerate_plan",
       banner: "Rigenerazione piano richiesta",
       planNote: "Questa modifica non va applicata solo a oggi: puo cambiare calorie, macro, ingredienti sicuri e lista della spesa. Vai in Impostazioni > Modifica intelligente, aggiorna il campo corretto e conferma: DUBI rigenera il piano spiegando il motivo.",
-      confirmLabel: "Ho capito",
+      confirmLabel: "Apri Impostazioni",
     };
+  }
+
+  const hasReplacementIntent = /(non mi piace|non voglio|odio|stufo|stufa|cambia|cambiami|sostituisci|sostituire|swap|alternativa|replace|change.*meal|don't like|do not like)/i.test(t);
+  const mealToReplace = hasReplacementIntent ? detectMealSlotFromText(t, plan) : null;
+  if (mealToReplace) {
+    const replacementMeal = buildAskDubiReplacementMeal(mealToReplace, userData, plan, lang);
+    if (replacementMeal) {
+      return {
+        action: "replace_meal",
+        mealId: mealToReplace,
+        replacement: { data: replacementMeal },
+        banner: "Pasto sostituito · macro mantenuti",
+        planNote: `Ho preparato un'alternativa per ${mealToReplace.replace("_"," ")} mantenendo lo stesso blocco di calorie e macronutrienti del pasto originale.`,
+        confirmLabel: "Sì, cambia questo pasto"
+      };
+    }
   }
 
   // Sveglio tardi → salta colazione, aggiunge spuntino extra metà mattina
@@ -6727,7 +6928,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
   }
 
   // ── PRIORITY 1: rilevamento plan change ──
-  const pc = detectPlanChange(t, plan);
+  const pc = detectPlanChange(t, plan, userData, lang);
   if (pc) {
     const msgs = {
       skip_meal: {
@@ -6774,6 +6975,30 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
           ],
         },
       },
+      replace_meal: {
+        title: "Perfetto, ti preparo un'alternativa sensata",
+        body: [
+          "Ho scelto un pasto alternativo coerente con dieta, preferenze e vincoli del tuo profilo.",
+          "Mantengo lo stesso blocco di calorie e macronutrienti del pasto originale, così non si rompe la giornata.",
+          "Se vuoi cambiare una regola permanente, tipo allergie o obiettivo, DUBI ti porta invece in Impostazioni per rigenerare il piano in modo corretto.",
+        ],
+      },
+      shift_times: {
+        title: "Orari aggiornati intorno all'allenamento",
+        body: [
+          "Ho riorganizzato il timing dei pasti per supportare energia prima del training e recupero dopo.",
+          "Il totale calorico e i macro non cambiano: cambia solo il momento in cui li distribuiamo.",
+          "Così il piano rimane stabile, ma più adatto alla giornata reale.",
+        ],
+      },
+      regenerate_plan: {
+        title: "Qui serve rigenerare il piano",
+        body: [
+          "Questa modifica cambia le fondamenta del piano: fabbisogno, obiettivo, allergie, preferenze o struttura dei pasti.",
+          "Per sicurezza DUBI non la applica in silenzio solo a oggi.",
+          "Ti porto in Impostazioni, aggiorni il dato e DUBI rigenera il piano con la nuova logica.",
+        ],
+      },
       light_day: {
         title: "Giornata difficile: il corpo parla",
         body: [
@@ -6788,6 +7013,12 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
       ? msgs.skip_meal[pc.mealId] || msgs.skip_meal.colazione
       : pc.action === "restaurant_note"
       ? msgs.restaurant_note[pc.mealId] || msgs.restaurant_note.pranzo
+      : pc.action === "replace_meal"
+      ? msgs.replace_meal
+      : pc.action === "shift_times"
+      ? msgs.shift_times
+      : pc.action === "regenerate_plan"
+      ? msgs.regenerate_plan
       : msgs.light_day;
 
     return {
@@ -6799,6 +7030,9 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
   }
 
   // ── INFORMATIVA: sostituzioni ingredienti ──
+  const serviceAnswer = getDubiServiceAnswer(t, userData, plan, lang);
+  if (serviceAnswer) return serviceAnswer;
+
   if (/(sostitu|swap|cambi|alternativ|substitut|replac|swap|alternative)/.test(t)) {
     const swapMap = {
       pollo: "Tacchino, merluzzo, sgombro, tofu, uova (2) — stesso range proteico, profilo calorico simile.",
@@ -7040,7 +7274,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
 }
 
 // ── ASK DUBI MODAL — conversazione multi-turno ──
-const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
+const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) => {
   const { t, lang } = useT();
   const [messages, setMessages] = useState([]); // [{id,role:"user"|"dubi",text?,ans?,applied}]
   const [q, setQ] = useState("");
@@ -7069,10 +7303,15 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
   };
 
   const applyChange = (msgId, planChange) => {
-    if (planChange && onPlanChange) {
-      onPlanChange(planChange);
-      setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
+    if (!planChange) return;
+    dubiHaptic(planChange.action === "regenerate_plan" ? "warning" : "success");
+    const settingsActions = ["regenerate_plan", "profile_change", "allergy_change", "goal_change", "open_settings"];
+    setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
+    if (settingsActions.includes(planChange.action)) {
+      if (onOpenSettings) setTimeout(() => { onClose?.(); onOpenSettings(); }, 250);
+      return;
     }
+    if (onPlanChange) onPlanChange(planChange);
   };
 
   const hasMessages = messages.length > 0;
@@ -7109,7 +7348,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
                 {ASK_DUBI_SUGGESTION_KEYS.map((sk,i)=>{
                   const s=t(sk); return (
-                  <button key={i} onClick={()=>sendMessage(s)}
+                  <button key={i} className="dubi-pressable" onClick={()=>sendMessage(s)}
                     style={{padding:"9px 13px",fontSize:12,color:T.text,background:T.card,
                       border:`1px solid ${T.border}`,borderRadius:20,cursor:"pointer",textAlign:"left"}}>
                     {s}
@@ -7129,7 +7368,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
           {messages.map(msg => {
             if (msg.role === "user") {
               return (
-                <div key={msg.id} style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+                <div key={msg.id} className="dubi-chat-bubble" style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
                   <div style={{maxWidth:"80%",padding:"11px 15px",background:T.accentD,borderRadius:"18px 18px 4px 18px"}}>
                     <p style={{fontSize:14,color:"#fff",margin:0,lineHeight:1.5}}>{msg.text}</p>
                   </div>
@@ -7141,7 +7380,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
             if (!a) return null;
             const decision = classifyPlanDecision(a.planChange, lang);
             return (
-              <div key={msg.id} style={{marginBottom:16}}>
+              <div key={msg.id} className="dubi-chat-bubble" style={{marginBottom:16}}>
                 {/* Card risposta */}
                 <div style={{padding:"14px 16px",background:T.card,border:`1.5px solid ${T.accent}`,borderRadius:18,marginBottom:a.planChange||a.offerAdd ? 8 : 0}}>
                   <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
@@ -7165,7 +7404,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
                     <p style={{fontSize:13,color:T.text,lineHeight:1.5,margin:"0 0 10px"}}>
                       {t("askdubi.offer.q",{item:a.addableItem.label})}
                     </p>
-                    <button onClick={()=>sendMessage(t("askdubi.offer.q",{item:a.addableItem.label}))}
+                    <button className="dubi-pressable" onClick={()=>sendMessage(t("askdubi.offer.q",{item:a.addableItem.label}))}
                       style={{width:"100%",padding:"11px",background:T.accentD,color:"#fff",border:"none",
                         borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
                       {t("askdubi.apply")}
@@ -7190,7 +7429,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
                       </div>
                     )}
                     <p style={{fontSize:13,color:T.text,lineHeight:1.5,margin:"0 0 12px"}}>{a.planChange.planNote}</p>
-                    <button onClick={()=>applyChange(msg.id, a.planChange)}
+                    <button className="dubi-pressable" data-no-haptic="true" onClick={()=>applyChange(msg.id, a.planChange)}
                       style={{width:"100%",padding:"12px",background:T.accentD,color:"#fff",border:"none",
                         borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
                       {a.planChange.confirmLabel}
@@ -7200,7 +7439,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange}) => {
 
                 {/* Successo dopo apply */}
                 {a.planChange && msg.applied && (
-                  <div style={{padding:"12px 16px",background:T.sel,border:`1.5px solid ${T.accent}`,borderRadius:14,display:"flex",gap:10,alignItems:"center"}}>
+                  <div className="dubi-success-pop" style={{padding:"12px 16px",background:T.sel,border:`1.5px solid ${T.accent}`,borderRadius:14,display:"flex",gap:10,alignItems:"center"}}>
                     <div style={{width:32,height:32,borderRadius:10,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <Ico n="check" size={16} c="#fff"/>
                     </div>
@@ -7226,7 +7465,7 @@ placeholder={hasMessages ? t("askdubi.input.ph.followup") : t("askdubi.input.ph"
               rows={2}
               style={{flex:1,padding:"12px 14px",fontSize:14,color:T.text,background:T.card,
                 border:`1.5px solid ${T.border}`,borderRadius:14,outline:"none",resize:"none",lineHeight:1.5,fontFamily:"inherit"}} />
-            <button onClick={()=>sendMessage(q)}
+            <button className="dubi-pressable" onClick={()=>sendMessage(q)}
               style={{padding:"0 18px",background:T.accentD,color:"#fff",border:"none",borderRadius:14,
                 fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"stretch",minWidth:64}}>
               {t("askdubi.send")}
@@ -8898,7 +9137,7 @@ const ANOMALY_CAUSE_OPTIONS = [
   { id: "none_reported", label: "Nulla di evidente", detail: "DUBI monitora 48-72 ore" },
 ];
 
-const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
+const TodayScreen = ({userData,plan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
 
   const todayMealStatusStorageKey = React.useMemo(() => {
@@ -8917,7 +9156,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
   const [wearableModal,setWearableModal] = useState(null);
   const [ingModal,setIngModal] = useState(null);
   const [askOpen,setAskOpen] = useState(false);
-  const [planAdaptations,setPlanAdaptations] = useState({skipped:[],banner:null,note:null,extraMeals:[]});
+  const [planAdaptations,setPlanAdaptations] = useState({skipped:[],banner:null,note:null,extraMeals:[],replacements:{}});
   const [wearableSnapshot,setWearableSnapshot] = useState(null);
 
   React.useEffect(() => {
@@ -9041,6 +9280,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
 
   const handlePlanChange = (change) => {
     if (!change) return;
+    dubiHaptic(change.action === "regenerate_plan" ? "warning" : "success");
     if (change.action === "skip_meal") {
       setPlanAdaptations(a => ({
         ...a,
@@ -9072,6 +9312,16 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
         extraMeals: change.extraMeal
           ? [...(a.extraMeals||[]).filter(m=>m.id!==change.extraMeal.id), change.extraMeal]
           : (a.extraMeals||[]),
+      }));
+    } else if (change.action === "replace_meal") {
+      setPlanAdaptations(a => ({
+        ...a,
+        banner: change.banner || a.banner,
+        note: change.planNote || a.note,
+        replacements: {
+          ...(a.replacements || {}),
+          [change.mealId]: change.replacement,
+        },
       }));
     } else if (change.action === "light_day") {
       setPlanAdaptations(a => ({
@@ -9135,7 +9385,11 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
     return {...meal, data: preferredBreakfast};
   });
   const mealList = (preferredAiMealList || fallbackMealList)
-    .map((meal) => ({...meal, data: adaptMealForUserProfile(meal.data, meal.id, userData)}))
+    .map((meal) => {
+      const replacement = planAdaptations.replacements?.[meal.id];
+      const data = replacement?.data || replacement || adaptMealForUserProfile(meal.data, meal.id, userData);
+      return {...meal, data, isReplaced:Boolean(replacement)};
+    })
     .concat((planAdaptations.extraMeals||[]));
 
   // ── MACRO SCALING — fattori indipendenti per ogni macro ──
@@ -9485,7 +9739,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
               planAdaptations.skipped.forEach(id=>{ if(newStatus[id]==="skip") delete newStatus[id]; });
               (planAdaptations.extraMeals||[]).forEach(m=>{ delete newStatus[m.id]; });
               setStatus(newStatus);
-              setPlanAdaptations({skipped:[],banner:null,note:null,extraMeals:[]});
+              setPlanAdaptations({skipped:[],banner:null,note:null,extraMeals:[],replacements:{}});
             }}
               style={{marginTop:8,padding:"5px 12px",borderRadius:8,background:"transparent",border:`1px solid ${T.accentD}`,color:T.accentD,fontSize:11,cursor:"pointer",fontWeight:600}}>
               {t("today.adapt.reset")}
@@ -9601,7 +9855,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                     </div>
                   )}
                   <div style={{display:"flex",gap:8}}>
-                    <button onClick={()=>{setStatus(s=>({...s,[mt.id]:"done"}));setExpanded(null);}}
+                    <button data-no-haptic="true" onClick={()=>{dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));setExpanded(null);}}
                       style={{flex:1,padding:11,borderRadius:12,background:T.accentD,color:T.white,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                       <Ico n="check" size={16} c={T.bg}/> {t("today.done").replace(/^✓\s*/,"")}
                     </button>
@@ -9616,7 +9870,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
                       <textarea value={skipText[mt.id]||""} onChange={e=>setSkipText(s=>({...s,[mt.id]:e.target.value}))}
                         placeholder={t("today.skip.ph")}
                         style={{width:"100%",padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,fontSize:13,fontFamily:"inherit",resize:"none",minHeight:44,outline:"none",color:T.text}} />
-                      <button onClick={()=>{setStatus(s=>({...s,[mt.id]:"skip"}));setExpanded(null);setShowSkipInput(null);}}
+                      <button data-no-haptic="true" onClick={()=>{dubiHaptic("soft");setStatus(s=>({...s,[mt.id]:"skip"}));setExpanded(null);setShowSkipInput(null);}}
                         style={{width:"100%",marginTop:6,padding:10,borderRadius:10,background:T.card,border:`1px solid ${T.border}`,fontSize:13,color:T.text,cursor:"pointer"}}>
                         {t("today.skip.confirm")}
                       </button>
@@ -9639,7 +9893,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps}) => {
 
       {wearableModal && <WearableModal type={wearableModal} onClose={()=>setWearableModal(null)}/>}
       {ingModal && <IngredientModal ingredient={ingModal} onClose={()=>setIngModal(null)}/>}
-      {askOpen && <AskDubiModal onClose={()=>setAskOpen(false)} userData={userData} plan={plan} onPlanChange={handlePlanChange}/>}
+      {askOpen && <AskDubiModal onClose={()=>setAskOpen(false)} userData={userData} plan={plan} onPlanChange={handlePlanChange} onOpenSettings={onOpenSettings}/>}
     </div>
   );
 };
@@ -10237,7 +10491,11 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
   const [filter, setFilter] = useState("all");
   const [partnerMode, setPartnerMode] = useState(false);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
-  const toggle = key => setChecked(c => ({...c, [key]: !c[key]}));
+  const toggle = key => setChecked(c => {
+    const nextValue = !c[key];
+    dubiHaptic(nextValue ? "success" : "soft");
+    return {...c, [key]: nextValue};
+  });
   const resetAll = () => setChecked({});
 
   React.useEffect(() => {
@@ -10451,7 +10709,7 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
                   const isDone = !!checked[key];
                   const display = splitShoppingDisplay(entry.item);
                   return (
-                    <button key={key} onClick={()=>toggle(key)}
+                    <button key={key} data-no-haptic="true" onClick={()=>toggle(key)}
                       style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"14px 16px",
                         background:isDone?"rgba(107,138,100,0.06)":"transparent",
                         border:"none",borderBottom:i<filtered.length-1?`1px solid ${T.border}`:"none",
@@ -12937,6 +13195,15 @@ function DUBIApp() {
   }
 }, [phase]);
   useEffect(() => {
+    const handlePointerDown = (event) => {
+      const el = event.target?.closest?.("button,[role='button'],[data-haptic]");
+      if (!el || el.disabled || el.dataset.noHaptic === "true") return;
+      dubiHaptic(el.dataset.haptic || "tap");
+    };
+    document.addEventListener("pointerdown", handlePointerDown, {passive:true});
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+  useEffect(() => {
   const checkUserSession = async () => {
     const token = localStorage.getItem("dubi_token");
 
@@ -13192,8 +13459,8 @@ setPhase("free-beta");
 }} />}
         {phase==="app" && (
           <>
-            <div style={{height:"100vh",overflowY:"auto",position:"relative"}}>
-              {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} isFirstAccess={isFirstAccess} swaps={swaps} />}
+            <div className="dubi-screen-motion" style={{height:"100vh",overflowY:"auto",position:"relative"}}>
+              {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} />}
