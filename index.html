@@ -489,7 +489,7 @@ const mapAiPlanToFrontend = (aiPlan, userData) => {
   };
 };
 
-const generateAiPlanFromBackend = async (userData) => {
+const generateAiPlanFromBackend = async (userData, options = {}) => {
   const token = getAuthToken();
   const fallbackPlan = calcPlan(userData);
 
@@ -503,7 +503,11 @@ const generateAiPlanFromBackend = async (userData) => {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
-      }
+      },
+      body: JSON.stringify({
+        force: Boolean(options.force),
+        reason: options.reason || (options.force ? "explicit_frontend_regeneration" : null)
+      })
     });
 
     if (!response.ok) {
@@ -3548,6 +3552,54 @@ Object.keys(I18N_DEEP_COMPLETION).forEach(code => {
   TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...I18N_DEEP_COMPLETION[code]};
 });
 
+const ASK_DUBI_HISTORY_TRANSLATIONS = {
+  it: {
+    "askdubi.history.title":"Storico chat",
+    "askdubi.history.empty":"Nessuna chat ancora",
+    "askdubi.history.new":"Nuova chat",
+    "askdubi.history.recent":"Recenti",
+    "askdubi.offer.applied":"Aggiunto al piano"
+  },
+  en: {
+    "askdubi.history.title":"Chat history",
+    "askdubi.history.empty":"No chats yet",
+    "askdubi.history.new":"New chat",
+    "askdubi.history.recent":"Recent",
+    "askdubi.offer.applied":"Added to plan"
+  },
+  fr: {
+    "askdubi.history.title":"Historique",
+    "askdubi.history.empty":"Aucune conversation",
+    "askdubi.history.new":"Nouvelle chat",
+    "askdubi.history.recent":"Recentes",
+    "askdubi.offer.applied":"Ajoute au plan"
+  },
+  es: {
+    "askdubi.history.title":"Historial",
+    "askdubi.history.empty":"Sin chats aun",
+    "askdubi.history.new":"Nuevo chat",
+    "askdubi.history.recent":"Recientes",
+    "askdubi.offer.applied":"Anadido al plan"
+  },
+  de: {
+    "askdubi.history.title":"Chatverlauf",
+    "askdubi.history.empty":"Noch keine Chats",
+    "askdubi.history.new":"Neuer Chat",
+    "askdubi.history.recent":"Aktuell",
+    "askdubi.offer.applied":"Zum Plan hinzugefugt"
+  },
+  pt: {
+    "askdubi.history.title":"Historico",
+    "askdubi.history.empty":"Ainda sem chats",
+    "askdubi.history.new":"Nova chat",
+    "askdubi.history.recent":"Recentes",
+    "askdubi.offer.applied":"Adicionado ao plano"
+  }
+};
+Object.keys(ASK_DUBI_HISTORY_TRANSLATIONS).forEach(code => {
+  TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...ASK_DUBI_HISTORY_TRANSLATIONS[code]};
+});
+
 function applyDir(lang){
   const meta = LANGUAGES.find(l=>l.code===lang) || LANGUAGES[0];
   const root = document.getElementById("dubi-html") || document.documentElement;
@@ -5586,6 +5638,16 @@ function rememberOwnedShoppingIngredient(userData, item) {
   } catch(e) {}
 }
 
+function hasOwnedShoppingIngredient(userData, item) {
+  try {
+    const existing = JSON.parse(localStorage.getItem(ownedShoppingKey(userData)) || "[]");
+    const base = shoppingItemBase(item);
+    return Boolean(base && existing.includes(base));
+  } catch(e) {
+    return false;
+  }
+}
+
 function flattenShoppingItems(userData, plan, swaps) {
   const shop = getPersonalizedShopping(userData, plan, swaps);
   return Object.values(shop).flat();
@@ -7296,13 +7358,77 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
 }
 
 // ── ASK DUBI MODAL — conversazione multi-turno ──
+const ASK_DUBI_HISTORY_LIMIT = 16;
+const getAskDubiHistoryKey = (userData) =>
+  `dubi_ask_threads_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
+
+const loadAskDubiThreads = (userData) => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(getAskDubiHistoryKey(userData)) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(t => Array.isArray(t.messages)).slice(0, ASK_DUBI_HISTORY_LIMIT) : [];
+  } catch(e) {
+    return [];
+  }
+};
+
+const saveAskDubiThreads = (userData, threads) => {
+  try {
+    localStorage.setItem(getAskDubiHistoryKey(userData), JSON.stringify((threads || []).slice(0, ASK_DUBI_HISTORY_LIMIT)));
+  } catch(e) {}
+};
+
+const makeAskThreadTitle = (messages) => {
+  const firstUserMessage = (messages || []).find(m => m.role === "user" && m.text)?.text || "Chat DUBI";
+  return firstUserMessage.length > 34 ? `${firstUserMessage.slice(0, 34).trim()}...` : firstUserMessage;
+};
+
+const makeAddablePlanChange = (addableItem, t) => {
+  if (!addableItem?.extraMeal) return null;
+  return {
+    action: "add_extra",
+    banner: `+ ${addableItem.label} aggiunto al piano`,
+    planNote: addableItem.description,
+    confirmLabel: t("askdubi.apply"),
+    extraMeal: addableItem.extraMeal,
+  };
+};
+
 const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) => {
   const { t, lang } = useT();
+  const [threads, setThreads] = useState(() => loadAskDubiThreads(userData));
+  const [activeThreadId, setActiveThreadId] = useState(null);
   const [messages, setMessages] = useState([]); // [{id,role:"user"|"dubi",text?,ans?,applied}]
   const [q, setQ] = useState("");
   const scrollRef = React.useRef(null);
+  const isWideAsk = typeof window !== "undefined" && window.innerWidth >= 760;
 
   useModalScrollLock();
+
+  React.useEffect(() => {
+    const loaded = loadAskDubiThreads(userData);
+    setThreads(loaded);
+    setActiveThreadId(null);
+    setMessages([]);
+  }, [userData?.dubiCode]);
+
+  React.useEffect(() => {
+    if (!messages.length) return;
+    const now = Date.now();
+    const threadId = activeThreadId || `ask_${now}`;
+    if (!activeThreadId) setActiveThreadId(threadId);
+    const updatedThread = {
+      id: threadId,
+      title: makeAskThreadTitle(messages),
+      updatedAt: now,
+      messages
+    };
+    setThreads(prev => {
+      const next = [updatedThread, ...prev.filter(thread => thread.id !== threadId)]
+        .slice(0, ASK_DUBI_HISTORY_LIMIT);
+      saveAskDubiThreads(userData, next);
+      return next;
+    });
+  }, [messages, activeThreadId, userData?.dubiCode]);
 
   // auto-scroll in fondo ogni volta che arrivano nuovi messaggi
   React.useEffect(()=>{
@@ -7310,6 +7436,18 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
   },[messages]);
 
   const lastDubiAns = [...messages].reverse().find(m=>m.role==="dubi")?.ans || null;
+
+  const startNewThread = () => {
+    setActiveThreadId(null);
+    setMessages([]);
+    setQ("");
+  };
+
+  const openThread = (thread) => {
+    setActiveThreadId(thread.id);
+    setMessages(thread.messages || []);
+    setQ("");
+  };
 
   const sendMessage = (text) => {
     if (!text.trim()) return;
@@ -7340,22 +7478,48 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
 
   const hasMessages = messages.length > 0;
 
+  const HistoryRail = ({compact=false}) => (
+    <div style={compact
+      ? {padding:"10px 20px 0",borderBottom:`1px solid ${T.border}`,background:T.bg,flexShrink:0}
+      : {position:"absolute",left:14,top:62,bottom:88,width:144,borderRight:`1px solid ${T.border}`,padding:"6px 12px 8px 0",overflowY:"auto",zIndex:2}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:8}}>
+        <span style={{fontSize:10,fontWeight:800,color:T.muted,letterSpacing:.8,textTransform:"uppercase"}}>{t("askdubi.history.title")}</span>
+        <button className="dubi-pressable" onClick={startNewThread}
+          style={{border:`1px solid ${T.border}`,background:T.card,borderRadius:999,padding:compact?"5px 9px":"5px 7px",fontSize:10,fontWeight:800,color:T.text,cursor:"pointer"}}>
+          {compact ? t("askdubi.history.new") : "+"}
+        </button>
+      </div>
+      {!threads.length && <p style={{fontSize:11,color:T.muted,lineHeight:1.35,margin:"8px 0 0"}}>{t("askdubi.history.empty")}</p>}
+      <div style={{display:compact?"flex":"block",gap:8,overflowX:compact?"auto":"visible",paddingBottom:compact?10:0}}>
+        {threads.map(thread => (
+          <button key={thread.id} onClick={()=>openThread(thread)}
+            style={{display:"block",width:compact?150:"100%",minWidth:compact?150:"auto",textAlign:"left",padding:"8px 9px",marginBottom:compact?0:6,borderRadius:12,
+              border:`1px solid ${activeThreadId===thread.id?T.accent:T.border}`,background:activeThreadId===thread.id?T.sel:T.card,cursor:"pointer"}}>
+            <span style={{display:"block",fontSize:11,fontWeight:800,color:T.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{thread.title || "Chat DUBI"}</span>
+            <span style={{display:"block",fontSize:9,color:T.muted,marginTop:2}}>{new Date(thread.updatedAt || Date.now()).toLocaleDateString()}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return ReactDOM.createPortal((
     <div
-      style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",justifyContent:"center",alignItems:"stretch",background:"rgba(0,0,0,0.48)",overscrollBehavior:"contain"}}
+      style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",justifyContent:"center",alignItems:isWideAsk?"center":"stretch",background:"rgba(0,0,0,0.48)",overscrollBehavior:"contain",padding:isWideAsk?16:0}}
       onClick={onClose}
       onWheel={e=>e.stopPropagation()}
       onTouchMove={e=>e.stopPropagation()}
     >
       <div style={{background:"rgba(0,0,0,0.45)",position:"absolute",inset:0}} />
       <div
-        style={{position:"relative",width:"100%",maxWidth:430,height:"100dvh",maxHeight:"100dvh",background:T.bg,borderRadius:0,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 0 50px rgba(0,0,0,0.18)",overscrollBehavior:"contain"}}
+        style={{position:"relative",width:"100%",maxWidth:isWideAsk?840:430,height:isWideAsk?"min(720px, calc(100dvh - 32px))":"100dvh",maxHeight:"100dvh",background:T.bg,borderRadius:isWideAsk?28:0,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 0 50px rgba(0,0,0,0.18)",overscrollBehavior:"contain"}}
         onClick={e=>e.stopPropagation()}
       >
         <div style={{width:40,height:4,borderRadius:2,background:T.border,margin:"16px auto 0",flexShrink:0}} />
+        {isWideAsk ? <HistoryRail /> : <HistoryRail compact />}
 
         {/* Header */}
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 20px 12px",flexShrink:0,borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:isWideAsk?"14px 20px 12px 180px":"14px 20px 12px",flexShrink:0,borderBottom:`1px solid ${T.border}`}}>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
             <div style={{width:38,height:38,borderRadius:12,background:T.accentD+"18",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <Ico n="leaf2" size={18} c={T.accentD}/>
@@ -7371,7 +7535,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
         </div>
 
         {/* Chat area */}
-        <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"16px 20px 22px",minHeight:0,overscrollBehavior:"contain",WebkitOverflowScrolling:"touch"}}>
+        <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:isWideAsk?"16px 20px 22px 180px":"16px 20px 22px",minHeight:0,overscrollBehavior:"contain",WebkitOverflowScrolling:"touch"}}>
 
           {/* Stato iniziale: suggestions */}
           {!hasMessages && (
@@ -7436,7 +7600,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
                     <p style={{fontSize:13,color:T.text,lineHeight:1.5,margin:"0 0 10px"}}>
                       {t("askdubi.offer.q",{item:a.addableItem.label})}
                     </p>
-                    <button className="dubi-pressable" onClick={()=>sendMessage(t("askdubi.offer.q",{item:a.addableItem.label}))}
+                    <button className="dubi-pressable" data-no-haptic="true" onClick={()=>applyChange(msg.id, makeAddablePlanChange(a.addableItem, t))}
                       style={{width:"100%",padding:"11px",background:T.accentD,color:"#fff",border:"none",
                         borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
                       {t("askdubi.apply")}
@@ -7470,7 +7634,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
                 )}
 
                 {/* Successo dopo apply */}
-                {a.planChange && msg.applied && (
+                {(a.planChange || a.offerAdd) && msg.applied && (
                   <div className="dubi-success-pop" style={{padding:"12px 16px",background:T.sel,border:`1.5px solid ${T.accent}`,borderRadius:14,display:"flex",gap:10,alignItems:"center"}}>
                     <div style={{width:32,height:32,borderRadius:10,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <Ico n="check" size={16} c="#fff"/>
@@ -7487,7 +7651,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
         </div>
 
         {/* Input fisso in fondo */}
-        <div style={{padding:"12px 16px max(24px, env(safe-area-inset-bottom))",borderTop:`1px solid ${T.border}`,flexShrink:0,background:T.bg}}>
+        <div style={{padding:isWideAsk?"12px 16px 18px 180px":"12px 16px max(24px, env(safe-area-inset-bottom))",borderTop:`1px solid ${T.border}`,flexShrink:0,background:T.bg}}>
           <div style={{display:"flex",gap:8}}>
             <textarea
               value={q}
@@ -10053,11 +10217,10 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
     const replacement = formatFoodText(newItem);
     const original = formatFoodText(oldItem);
-    const nextSwaps = {...swaps, [swapKey]: replacement};
     const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement);
-    const coverageAfter = findShoppingCoverage(userData, plan, nextSwaps, replacement);
+    const alreadyAvailable = coverageBefore.exists || coverageBefore.checked || hasOwnedShoppingIngredient(userData, replacement);
 
-    if (!coverageBefore.checked && !coverageAfter.checked) {
+    if (!alreadyAvailable) {
       setShoppingPrompt({swapKey, mealKey, itemIdx, oldItem: original, replacement});
       return;
     }
@@ -10256,7 +10419,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
               const isSwapOpen = swapOpen===`${mKey}-${i}`;
               return (
                 <div key={i}>
-                  <div onClick={()=>setIngModal(displayItem)}
+                  <div onClick={()=>hasAlts ? setSwapOpen(isSwapOpen?null:`${mKey}-${i}`) : setIngModal(displayItem)}
                     style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,padding:"5px 4px",borderRadius:9,cursor:"pointer"}}
                     onMouseEnter={e=>{e.currentTarget.style.background=T.sel;}}
                     onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
@@ -10268,6 +10431,10 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
                         <Ico n="swap" size={14} c={T.muted} />
                       </button>
                     )}
+                    <button onClick={(e)=>{e.stopPropagation();setIngModal(displayItem);}}
+                      style={{background:"none",border:"none",cursor:"pointer",padding:4,opacity:0.45}}>
+                      <Ico n="info" size={13} c={T.muted} />
+                    </button>
                   </div>
                   {isSwapOpen && hasAlts && (
                     <div style={{marginLeft:16,marginBottom:8,padding:10,background:T.sel,borderRadius:10,border:`1px solid ${T.border}`}}>
@@ -12178,7 +12345,7 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
 
     const status = await fetchWearableStatusFromBackend();
     setWearableStatus(status?.connection || { provider: "demo", status: "demo_seeded" });
-    const aiResult = await generateAiPlanFromBackend(userData);
+    const aiResult = await generateAiPlanFromBackend(userData, { force: true, reason: "wearable_demo_refresh" });
     if (aiResult?.plan) setPlan(aiResult.plan);
     const demoDays = result.importedCount || 14;
     setWearableMessage(
@@ -12385,7 +12552,10 @@ const handleSaveProfile = async () => {
     setUserData(updatedData);
     saveDubiProfile(updatedData);
     if (selectedProfileImpactsDiet) {
-      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData);
+      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+        force: true,
+        reason: `profile_update_${changed.map(f => f.key).join("_") || "settings"}`
+      });
       setPlan(updatedPlan);
       if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
     }
@@ -13367,7 +13537,7 @@ const handleDeleteAccount = async () => {
     saveDubiProfile(data);
     setUserData(data);
 
-  const { plan: generatedPlan, savedByAi } = await generateAiPlanFromBackend(data);
+  const { plan: generatedPlan, savedByAi } = await generateAiPlanFromBackend(data, { force: true, reason: "onboarding_completed" });
 setPlan(generatedPlan);
 if (!savedByAi) await savePlanToBackend(generatedPlan, data);
 
