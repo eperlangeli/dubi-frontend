@@ -6404,6 +6404,20 @@ function getIngredientInfo(str) {
   return INGREDIENT_DB.find(item=>item.rx.test(str)) || null;
 }
 
+const DUBI_MODAL_Z = 10000;
+const useModalScrollLock = () => {
+  React.useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
+};
+
 const IngredientModal = ({ingredient, onClose}) => {
   const { t, lang } = useT();
   const isEN = lang === "en";
@@ -6418,10 +6432,18 @@ const IngredientModal = ({ingredient, onClose}) => {
   } : _info) : null;
   const viewInfo = localizeIngredientInfo(info, lang);
   const ingredientDisplay = splitIngredientDisplay(ingredient);
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:250,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={onClose}>
-      <div style={{background:"rgba(0,0,0,0.45)",position:"absolute",inset:0}} />
-      <div style={{position:"relative",background:T.bg,borderRadius:"24px 24px 0 0",maxHeight:"78vh",overflowY:"auto",padding:"24px 24px 48px"}} onClick={e=>e.stopPropagation()}>
+  useModalScrollLock();
+  return ReactDOM.createPortal((
+    <div
+      style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",justifyContent:"center",alignItems:"flex-end",background:"rgba(0,0,0,0.48)",overscrollBehavior:"contain"}}
+      onClick={onClose}
+      onWheel={e=>e.stopPropagation()}
+      onTouchMove={e=>e.stopPropagation()}
+    >
+      <div
+        style={{position:"relative",width:"100%",maxWidth:430,maxHeight:"calc(100dvh - 16px)",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",background:T.bg,borderRadius:"24px 24px 0 0",padding:"24px 24px max(96px, calc(56px + env(safe-area-inset-bottom)))",boxShadow:"0 -24px 70px rgba(0,0,0,0.22)"}}
+        onClick={e=>e.stopPropagation()}
+      >
         {/* Handle bar */}
         <div style={{width:40,height:4,borderRadius:2,background:T.border,margin:"0 auto 20px"}} />
         {/* Header */}
@@ -6492,7 +6514,7 @@ const IngredientModal = ({ingredient, onClose}) => {
         )}
       </div>
     </div>
-  );
+  ), document.body);
 };
 
 // ═══════════════════════════════════════════════
@@ -7280,16 +7302,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
   const [q, setQ] = useState("");
   const scrollRef = React.useRef(null);
 
-  React.useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
-  }, []);
+  useModalScrollLock();
 
   // auto-scroll in fondo ogni volta che arrivano nuovi messaggi
   React.useEffect(()=>{
@@ -7327,9 +7340,9 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
 
   const hasMessages = messages.length > 0;
 
-  return (
+  return ReactDOM.createPortal((
     <div
-      style={{position:"fixed",inset:0,zIndex:5000,display:"flex",justifyContent:"center",alignItems:"stretch",background:"rgba(0,0,0,0.45)",overscrollBehavior:"contain"}}
+      style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",justifyContent:"center",alignItems:"stretch",background:"rgba(0,0,0,0.48)",overscrollBehavior:"contain"}}
       onClick={onClose}
       onWheel={e=>e.stopPropagation()}
       onTouchMove={e=>e.stopPropagation()}
@@ -7493,7 +7506,7 @@ placeholder={hasMessages ? t("askdubi.input.ph.followup") : t("askdubi.input.ph"
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 };
 
 // ═══════════════════════════════════════════════
