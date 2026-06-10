@@ -1071,6 +1071,7 @@ const T = {
   accentD:"#6B8A64", sel:"#EDF0EC", white:"#FFFFFF",
 };
 
+const DUBI_SUPPORT_EMAIL = "support@dubi.app";
 const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-10";
 const PRIVACY_COPY = {
   it: {
@@ -1084,7 +1085,7 @@ const PRIVACY_COPY = {
       { title: "Sicurezza e conservazione", body: "I token wearable vengono gestiti lato backend e non vengono esposti nel frontend. Conserviamo i dati finche l'account resta attivo o finche sono necessari alla beta; puoi cancellarli scollegando il wearable o eliminando l'account." },
       { title: "Cosa non facciamo", body: "Non vendiamo dati, non condividiamo dati individuali con assicurazioni o terze parti commerciali e non inventiamo biometrie mancanti. Se un dato non e disponibile, DUBI lo mostra come assente." },
       { title: "Controllo dell'utente", body: "Puoi revocare i consensi, scollegare wearable e cancellare account e dati dalle Impostazioni. La cancellazione elimina i dati salvati collegati al tuo account. Puoi anche revocare l'accesso direttamente dall'account del provider wearable." },
-      { title: "Contatto", body: "Per richieste privacy, cancellazione dati o chiarimenti sull'uso dei dati wearable puoi contattare il team DUBI tramite il canale di supporto indicato nell'app o nella pagina ufficiale del servizio." },
+      { title: "Contatto", body: `Per richieste privacy, cancellazione dati o chiarimenti sull'uso dei dati wearable puoi contattare il team DUBI a ${DUBI_SUPPORT_EMAIL}.` },
       { title: "Nota salute", body: "DUBI offre supporto educativo e orientamento nutrizionale. Non sostituisce medico, dietista o nutrizionista, soprattutto in caso di patologie, gravidanza, disturbi alimentari, farmaci o condizioni cliniche." }
     ],
     version: "Versione beta: 10 giugno 2026",
@@ -1110,7 +1111,7 @@ const PRIVACY_COPY = {
       { title: "Security and retention", body: "Wearable tokens are handled server-side and are never exposed in the frontend. We retain data while the account is active or while needed for the beta; you can delete it by disconnecting the wearable or deleting your account." },
       { title: "What we do not do", body: "We do not sell data, share individual data with insurers or commercial third parties, or invent missing biometrics. If a signal is unavailable, DUBI shows it as unavailable." },
       { title: "User control", body: "You can revoke consents, disconnect wearables and delete your account and data from Settings. Deletion removes saved data linked to your account. You can also revoke access directly from the wearable provider account." },
-      { title: "Contact", body: "For privacy requests, data deletion or questions about wearable data use, you can contact the DUBI team through the support channel shown in the app or on the official service page." },
+      { title: "Contact", body: `For privacy requests, data deletion or questions about wearable data use, you can contact the DUBI team at ${DUBI_SUPPORT_EMAIL}.` },
       { title: "Health note", body: "DUBI provides educational support and nutrition guidance. It does not replace a doctor, dietitian or nutritionist, especially with medical conditions, pregnancy, eating disorders, medication or clinical needs." }
     ],
     version: "Beta version: June 10, 2026",
@@ -1320,6 +1321,45 @@ const PRIVACY_COPY = {
 };
 const getPrivacyCopy = (lang) => PRIVACY_COPY[lang] || PRIVACY_COPY.en;
 
+const TERMS_VERSION = "dubi-beta-terms-2026-06-10";
+const TERMS_COPY = {
+  it: {
+    title: "Termini e nota salute",
+    subtitle: "Condizioni d'uso della beta gratuita DUBI.",
+    intro: "Usando DUBI accetti che il servizio fornisca orientamento educativo su nutrizione, abitudini, recupero e stile di vita. DUBI e una beta gratuita e non sostituisce consulenza medica o nutrizionale professionale.",
+    sections: [
+      { title: "Servizio beta gratuito", body: "Durante la beta, DUBI offre piano nutrizionale, adattamenti, lista della spesa, progressi e funzioni wearable supportate senza abbonamento e senza carta richiesta. Le funzionalita possono cambiare mentre il prodotto viene testato e migliorato." },
+      { title: "Finalita educativa", body: "DUBI aiuta a organizzare pasti, macro, timing attorno all'allenamento e abitudini alimentari usando dati inseriti dall'utente e, se autorizzati, dati wearable. Le indicazioni sono supporto informativo e non sono diagnosi, terapia o prescrizione." },
+      { title: "Nota salute obbligatoria", body: "In caso di patologie, gravidanza, allattamento, disturbi alimentari, diabete, condizioni renali, cardiovascolari, gastrointestinali, farmaci o bisogni clinici, consulta un medico, dietista o nutrizionista prima di seguire il piano." },
+      { title: "Responsabilita dell'utente", body: "L'utente deve inserire dati corretti e aggiornati su eta, peso, obiettivo, allergie, intolleranze, preferenze, attivita fisica e condizioni rilevanti. Se qualcosa cambia, il profilo va aggiornato prima di seguire nuovi consigli." },
+      { title: "Wearable e provider terzi", body: "Il collegamento wearable e opzionale e avviene tramite pagine ufficiali dei provider. DUBI usa solo i dati autorizzati e disponibili. Alcuni provider possono limitare metriche, ritardare sincronizzazioni o richiedere approvazioni aggiuntive." },
+      { title: "Limitazioni", body: "DUBI non garantisce risultati specifici di peso, performance o salute. Le stime caloriche e nutrizionali sono basate su formule, database e dati disponibili, ma possono variare per fisiologia individuale, qualita degli alimenti e metodi di preparazione." },
+      { title: "Uso corretto", body: "Non usare DUBI per emergenze mediche o per sostituire un piano clinico. Se avverti sintomi, peggioramenti, perdita di peso eccessiva, fame intensa persistente o comportamenti alimentari problematici, interrompi il piano e contatta un professionista." },
+      { title: "Contatto", body: `Per domande sui termini, sicurezza, privacy o uso dei dati puoi scrivere a ${DUBI_SUPPORT_EMAIL}.` }
+    ],
+    version: "Versione beta: 10 giugno 2026",
+    close: "Chiudi"
+  },
+  en: {
+    title: "Terms & Health Disclaimer",
+    subtitle: "Terms of use for the free DUBI beta.",
+    intro: "By using DUBI, you accept that the service provides educational guidance on nutrition, habits, recovery and lifestyle. DUBI is a free beta and does not replace professional medical or nutrition care.",
+    sections: [
+      { title: "Free beta service", body: "During the beta, DUBI provides the nutrition plan, adaptations, shopping list, progress and supported wearable features with no subscription and no card required. Features may change while the product is tested and improved." },
+      { title: "Educational purpose", body: "DUBI helps organize meals, macros, training-adjacent timing and eating habits using user-entered data and, when authorized, wearable data. Guidance is informational support and is not diagnosis, treatment or prescription." },
+      { title: "Required health note", body: "If you have medical conditions, pregnancy, breastfeeding, eating disorders, diabetes, renal, cardiovascular or gastrointestinal conditions, medications or clinical needs, consult a doctor, dietitian or nutritionist before following the plan." },
+      { title: "User responsibility", body: "The user must enter accurate and updated data about age, weight, goal, allergies, intolerances, preferences, physical activity and relevant conditions. If something changes, the profile should be updated before following new advice." },
+      { title: "Wearables and third-party providers", body: "Wearable connection is optional and happens through official provider pages. DUBI uses only authorized and available data. Some providers may limit metrics, delay syncs or require additional approvals." },
+      { title: "Limitations", body: "DUBI does not guarantee specific weight, performance or health outcomes. Calorie and nutrition estimates are based on formulas, databases and available data, but may vary with individual physiology, food quality and preparation methods." },
+      { title: "Proper use", body: "Do not use DUBI for medical emergencies or to replace a clinical plan. If you experience symptoms, worsening health, excessive weight loss, persistent intense hunger or problematic eating behaviors, stop following the plan and contact a professional." },
+      { title: "Contact", body: `For questions about terms, safety, privacy or data use, contact ${DUBI_SUPPORT_EMAIL}.` }
+    ],
+    version: "Beta version: June 10, 2026",
+    close: "Close"
+  }
+};
+const getTermsCopy = (lang) => TERMS_COPY[lang] || TERMS_COPY.en;
+
 const PrivacyPolicyContent = ({lang}) => {
   const copy = getPrivacyCopy(lang);
   return (
@@ -1409,6 +1449,90 @@ const PrivacyPolicyPage = () => {
    Source language: Italian (it)
    Supported: it, en, fr, es, de, ar (RTL), pt, zh, ja, ru
    ═══════════════════════════════════════════════════════════════ */
+
+const TermsContent = ({lang}) => {
+  const copy = getTermsCopy(lang);
+  return (
+    <div>
+      <p style={{fontSize:13,color:T.muted,lineHeight:1.6,margin:"0 0 14px"}}>{copy.intro}</p>
+      {copy.sections.map((section) => (
+        <div key={section.title} style={{padding:"12px 0",borderTop:`1px solid ${T.border}`}}>
+          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:900,color:T.text}}>{section.title}</p>
+          <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.55}}>{section.body}</p>
+        </div>
+      ))}
+      <p style={{margin:"10px 0 0",fontSize:11,color:T.muted,fontWeight:700}}>{copy.version}</p>
+    </div>
+  );
+};
+
+const TermsModal = ({lang, onClose}) => {
+  const copy = getTermsCopy(lang);
+  return ReactDOM.createPortal((
+    <div
+      style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:DUBI_MODAL_Z + 10,display:"flex",alignItems:"center",justifyContent:"center",padding:"max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom))",overscrollBehavior:"contain"}}
+      onClick={onClose}
+      onWheel={e=>e.stopPropagation()}
+      onTouchMove={e=>e.stopPropagation()}
+    >
+      <div
+        className="dubi-card"
+        onClick={e=>e.stopPropagation()}
+        style={{width:"min(430px, calc(100vw - 28px))",maxHeight:"min(86dvh, 720px)",overflowY:"auto",background:T.bg,borderRadius:24,border:`1px solid ${T.border}`,boxShadow:"0 24px 60px rgba(43,43,43,.18)",overscrollBehavior:"contain"}}
+      >
+        <div style={{position:"sticky",top:0,background:T.bg,padding:"18px 18px 10px",borderBottom:`1px solid ${T.border}`,zIndex:1}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+            <div>
+              <p style={{margin:0,fontSize:20,fontWeight:950,color:T.text,letterSpacing:-.4}}>{copy.title}</p>
+              <p style={{margin:"4px 0 0",fontSize:12,color:T.muted,lineHeight:1.45}}>{copy.subtitle}</p>
+            </div>
+            <button onClick={onClose} aria-label={copy.close}
+              style={{width:34,height:34,borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:18,fontWeight:900,cursor:"pointer"}}>
+              x
+            </button>
+          </div>
+        </div>
+        <div style={{padding:"14px 18px 18px"}}>
+          <TermsContent lang={lang} />
+          <button onClick={onClose}
+            style={{width:"100%",padding:"13px",marginTop:18,borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>
+            {copy.close}
+          </button>
+        </div>
+      </div>
+    </div>
+  ), document.body);
+};
+
+const TermsPage = () => {
+  const { lang } = useT();
+  const copy = getTermsCopy(lang);
+  return (
+    <div style={{background:T.bg,minHeight:"100vh",padding:"42px 20px 48px",fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+      <div style={{maxWidth:720,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22}}>
+          <DUBILogo size={42} color={T.accentD}/>
+          <div>
+            <p style={{margin:0,fontSize:22,fontWeight:950,color:T.text,letterSpacing:-.4}}>DUBI</p>
+            <p style={{margin:"2px 0 0",fontSize:12,color:T.muted,fontWeight:800,letterSpacing:1,textTransform:"uppercase"}}>Terms & Health</p>
+          </div>
+        </div>
+        <div className="dubi-card" style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:24,padding:"22px 20px",boxShadow:"0 16px 40px rgba(43,43,43,.08)"}}>
+          <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:30,fontWeight:950,color:T.text,letterSpacing:-.8,margin:"0 0 8px"}}>{copy.title}</h1>
+          <p style={{margin:"0 0 20px",fontSize:14,color:T.muted,lineHeight:1.55}}>{copy.subtitle}</p>
+          <TermsContent lang={lang}/>
+          <div style={{marginTop:22,padding:"14px 16px",borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
+            <p style={{margin:0,fontSize:12,color:T.text,lineHeight:1.55}}>
+              {lang === "it"
+                ? "Questa pagina pubblica serve per utenti e provider wearable che richiedono termini, disclaimer salute e limiti d'uso prima dell'autorizzazione OAuth."
+                : "This public page is available for users and wearable providers that require terms, health disclaimers and service limitations before OAuth authorization."}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const LANGUAGES = [
   { code:"it", name:"Italiano",   flag:"🇮🇹", dir:"ltr", locale:"it-IT" },
@@ -12646,6 +12770,7 @@ const [feedbackComment, setFeedbackComment] = useState("");
 const [feedbackMessage, setFeedbackMessage] = useState("");
 const [feedbackSending, setFeedbackSending] = useState(false);
 const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+const [showTerms, setShowTerms] = useState(false);
 
 useEffect(() => {
   let cancelled = false;
@@ -13290,24 +13415,6 @@ const handleSaveProfile = async () => {
     )}
   </Card>
 
-        {/* Free beta access */}
-        <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>{getDubiBetaCopy(lang).settingsTitle}</p>
-        <Card>
-          <div style={{padding:"16px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:38,height:38,borderRadius:10,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <Ico n="check" size={18} c={T.accentD}/>
-              </div>
-              <div>
-                <p style={{margin:0,fontSize:15,fontWeight:800,color:T.text}}>{getDubiBetaCopy(lang).settingsTitle}</p>
-                <p style={{margin:"2px 0 0",fontSize:11,color:T.muted}}>{getDubiBetaCopy(lang).settingsPlan}</p>
-              </div>
-            </div>
-            <Ico n="check" size={18} c={T.accentD}/>
-          </div>
-          <p style={{padding:"0 16px 16px",fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{getDubiBetaCopy(lang).settingsNote}</p>
-        </Card>
-
         <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>
           {lang==="it" ? "PRIVACY E DATI" : "PRIVACY & DATA"}
         </p>
@@ -13337,6 +13444,33 @@ const handleSaveProfile = async () => {
               {lang==="it"
                 ? "DUBI usa i dati solo per generare e adattare il piano. Nessuna vendita dati, nessuna biometria inventata."
                 : "DUBI uses data only to generate and adapt the plan. No data selling, no invented biometrics."}
+            </p>
+          </div>
+        </Card>
+
+        <Card style={{marginTop:10}}>
+          <button onClick={()=>setShowTerms(true)}
+            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"16px",border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:38,height:38,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ico n="info" size={18} c={T.accentD}/>
+              </div>
+              <div>
+                <p style={{margin:0,fontSize:14,fontWeight:900,color:T.text}}>{getTermsCopy(lang).title}</p>
+                <p style={{margin:"3px 0 0",fontSize:11,color:T.muted,lineHeight:1.45}}>
+                  {lang==="it"
+                    ? "Beta gratuita, limiti del servizio, nota salute e uso corretto."
+                    : "Free beta, service limits, health disclaimer and proper use."}
+                </p>
+              </div>
+            </div>
+            <span style={{fontSize:20,color:T.muted,lineHeight:1}}>&rsaquo;</span>
+          </button>
+          <div style={{padding:"0 16px 16px"}}>
+            <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
+              {lang==="it"
+                ? "DUBI offre orientamento educativo e non sostituisce medico, dietista o nutrizionista."
+                : "DUBI provides educational guidance and does not replace a doctor, dietitian or nutritionist."}
             </p>
           </div>
         </Card>
@@ -13452,6 +13586,7 @@ const handleSaveProfile = async () => {
 
       </div>
       {showPrivacyPolicy && <PrivacyPolicyModal lang={lang} onClose={()=>setShowPrivacyPolicy(false)} />}
+      {showTerms && <TermsModal lang={lang} onClose={()=>setShowTerms(false)} />}
     </div>
   );
 };
@@ -14124,6 +14259,9 @@ function DUBIRoot() {
   const legal = params.get("legal") || params.get("page");
   if (legal === "privacy" || window.location.pathname === "/privacy") {
     return <PrivacyPolicyPage />;
+  }
+  if (legal === "terms" || legal === "health" || window.location.pathname === "/terms") {
+    return <TermsPage />;
   }
   return <DUBIApp />;
 }
