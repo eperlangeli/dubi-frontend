@@ -232,6 +232,59 @@ const dubiHaptic = (type = "tap") => {
   } catch (error) {}
 };
 
+const TRAINING_TIME_ALIASES = {
+  mattina: "morning",
+  morning: "morning",
+  pranzo: "lunch",
+  lunch: "lunch",
+  "pausa pranzo": "lunch",
+  pomeriggio: "afternoon",
+  afternoon: "afternoon",
+  sera: "evening",
+  evening: "evening",
+  varia: "varies",
+  varie: "varies",
+  varies: "varies",
+  variable: "varies",
+  neutral: "varies"
+};
+const TRAINING_TIME_LABELS = {
+  morning: "Mattina",
+  lunch: "Pausa pranzo",
+  afternoon: "Pomeriggio",
+  evening: "Sera",
+  varies: "Variabile"
+};
+const normalizeTrainingTime = (value) => {
+  const key = String(value || "").trim().toLowerCase();
+  return TRAINING_TIME_ALIASES[key] || "varies";
+};
+const getTrainingTimeLabel = (value) => TRAINING_TIME_LABELS[normalizeTrainingTime(value)] || TRAINING_TIME_LABELS.varies;
+const getPlanProfileSignature = (userData = {}) => {
+  const parseHourForSignature = (value, fallback) => {
+    if (value === undefined || value === null || value === "") return fallback;
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    const hour = parseInt(String(value).split(":")[0], 10);
+    return Number.isFinite(hour) ? hour : fallback;
+  };
+  return JSON.stringify({
+    goal: String(userData.goal || ""),
+    target_weight: String(userData.target_weight ?? userData.targetWeight ?? ""),
+    target_body_fat: String(userData.target_body_fat ?? userData.targetBf ?? ""),
+    weight: Number(userData.weight || 0),
+    diet: String(userData.diet || ""),
+    allergies: String(userData.allergies || "").trim().toLowerCase(),
+    sport: String(userData.sport || "").trim().toLowerCase(),
+    training_time: normalizeTrainingTime(userData.training_time ?? userData.trainingTime),
+    workout_days: String(userData.workout_days ?? userData.workoutDays ?? ""),
+    workout_duration: String(userData.workout_duration ?? userData.workoutDuration ?? ""),
+    workout_intensity: String(userData.workout_intensity ?? userData.workoutIntensity ?? ""),
+    breakfast_pref: String(userData.breakfast_pref ?? userData.breakfastPref ?? ""),
+    day_start: parseHourForSignature(userData.day_start ?? userData.dayStart, 7),
+    day_end: parseHourForSignature(userData.day_end ?? userData.dayEnd, 22)
+  });
+};
+
     const normalizeOnboarding = (data) => {
   if (!data) return null;
 
@@ -260,7 +313,7 @@ const dubiHaptic = (type = "tap") => {
     sedentaryDays: data.sedentary_days ?? data.sedentaryDays ?? 0,
     dietIntensity: data.diet_intensity ?? data.dietIntensity ?? "balanced",
 
-    trainingTime: data.training_time ?? data.trainingTime ?? "varies",
+    trainingTime: normalizeTrainingTime(data.training_time ?? data.trainingTime ?? "varies"),
     breakfastPref: data.breakfast_pref ?? data.breakfastPref ?? "both",
 
     dayStart: parseHour(data.day_start ?? data.dayStart, 7),
@@ -397,7 +450,7 @@ const saveOnboardingToBackend = async (data) => {
     diet_intensity: data.dietIntensity || "balanced",
     allergies: data.allergies || "",
     sport: data.sport || "",
-    training_time: data.trainingTime,
+    training_time: normalizeTrainingTime(data.trainingTime),
     breakfast_pref: data.breakfastPref,
 
     day_start: `${String(data.dayStart).padStart(2, "0")}:00`,
@@ -485,6 +538,7 @@ const mapAiPlanToFrontend = (aiPlan, userData) => {
     mealCount: slots.length || fallbackPlan.mealCount,
     aiGenerated: true,
     aiEnginePlan: aiPlan,
+    profileSignature: aiPlan?.profileSignature || getPlanProfileSignature(userData),
     scienceTrace: aiPlan?.mealStructure?.scientificBasis || []
   };
 };
@@ -539,6 +593,8 @@ const fetchCurrentAiPlanFromBackend = async (userData) => {
     const data = await response.json();
     const rawPlan = data?.plan?.plan_json;
     const aiPlan = typeof rawPlan === "string" ? JSON.parse(rawPlan) : rawPlan;
+    const expectedSignature = getPlanProfileSignature(userData);
+    if (aiPlan?.profileSignature !== expectedSignature) return null;
     const planText = JSON.stringify(aiPlan || {});
     if (planText.includes("Fonte proteica principale")) return null;
     const hasIngredientSwaps = aiPlan?.mealStructure?.days?.some(day =>
@@ -1262,9 +1318,18 @@ const PrivacyPolicyContent = ({lang}) => {
 
 const PrivacyPolicyModal = ({lang, onClose}) => {
   const copy = getPrivacyCopy(lang);
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:4000,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:"18px 14px"}}>
-      <div className="dubi-card" style={{width:"100%",maxWidth:430,maxHeight:"86vh",overflowY:"auto",background:T.bg,borderRadius:24,border:`1px solid ${T.border}`,boxShadow:"0 24px 60px rgba(43,43,43,.18)"}}>
+  return ReactDOM.createPortal((
+    <div
+      style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:DUBI_MODAL_Z + 10,display:"flex",alignItems:"center",justifyContent:"center",padding:"max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom))",overscrollBehavior:"contain"}}
+      onClick={onClose}
+      onWheel={e=>e.stopPropagation()}
+      onTouchMove={e=>e.stopPropagation()}
+    >
+      <div
+        className="dubi-card"
+        onClick={e=>e.stopPropagation()}
+        style={{width:"min(430px, calc(100vw - 28px))",maxHeight:"min(86dvh, 720px)",overflowY:"auto",background:T.bg,borderRadius:24,border:`1px solid ${T.border}`,boxShadow:"0 24px 60px rgba(43,43,43,.18)",overscrollBehavior:"contain"}}
+      >
         <div style={{position:"sticky",top:0,background:T.bg,padding:"18px 18px 10px",borderBottom:`1px solid ${T.border}`,zIndex:1}}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
             <div>
@@ -1286,7 +1351,7 @@ const PrivacyPolicyModal = ({lang, onClose}) => {
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 };
 
 const PrivacyPolicyPage = () => {
@@ -4107,31 +4172,49 @@ function carbNote(sport, goal) {
 // WORKOUT MEAL TIMING HELPERS
 // ═══════════════════════════════════════════════
 function getWorkoutLabel(trainingTime, mealId) {
+  const normalizedTime = normalizeTrainingTime(trainingTime);
+  const normalizedMeal = {
+    breakfast: "colazione",
+    snack_morning: "snack_m",
+    lunch: "pranzo",
+    snack_afternoon: "snack",
+    dinner: "cena",
+    snack_evening: "snack_n"
+  }[mealId] || mealId;
   const map = {
-    mattina:{pre:"colazione",post:"snack_m"},
-    pranzo:{pre:"snack_m",post:"pranzo"},
-    pomeriggio:{pre:"pranzo",post:"snack"},
-    sera:{pre:"snack",post:"cena"},
+    morning:{pre:"colazione",post:"snack_m"},
+    lunch:{pre:"snack_m",post:"pranzo"},
+    afternoon:{pre:"pranzo",post:"snack"},
+    evening:{pre:"snack",post:"cena"},
   };
-  const wp = map[trainingTime];
+  const wp = map[normalizedTime];
   if (!wp) return null;
-  if (wp.pre===mealId) return "PRE";
-  if (wp.post===mealId) return "POST";
+  if (wp.pre===normalizedMeal) return "PRE";
+  if (wp.post===normalizedMeal) return "POST";
   return null;
 }
 
 function getCarbTargetPct(trainingTime, mealId, sport) {
   const isEndurance = /corsa|ciclismo|nuoto|triathlon|maratona|running|bici/i.test(sport||"");
+  const normalizedTime = normalizeTrainingTime(trainingTime);
+  const normalizedMeal = {
+    breakfast: "colazione",
+    snack_morning: "snack_m",
+    lunch: "pranzo",
+    snack_afternoon: "snack",
+    dinner: "cena",
+    snack_evening: "snack_n"
+  }[mealId] || mealId;
   const map = {
-    mattina:{pre:"colazione",post:"snack_m"},
-    pranzo:{pre:"snack_m",post:"pranzo"},
-    pomeriggio:{pre:"pranzo",post:"snack"},
-    sera:{pre:"snack",post:"cena"},
+    morning:{pre:"colazione",post:"snack_m"},
+    lunch:{pre:"snack_m",post:"pranzo"},
+    afternoon:{pre:"pranzo",post:"snack"},
+    evening:{pre:"snack",post:"cena"},
   };
-  const wp = map[trainingTime];
+  const wp = map[normalizedTime];
   if (!wp) return null;
-  if (wp.pre===mealId) return isEndurance?"40% carb":"35% carb";
-  if (wp.post===mealId) return isEndurance?"35% carb":"30% carb";
+  if (wp.pre===normalizedMeal) return isEndurance?"40% carb":"35% carb";
+  if (wp.post===normalizedMeal) return isEndurance?"35% carb":"30% carb";
   return null;
 }
 
@@ -7667,7 +7750,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
   const applyChange = (msgId, planChange) => {
     if (!planChange) return;
     dubiHaptic(planChange.action === "regenerate_plan" ? "warning" : "success");
-    const settingsActions = ["regenerate_plan", "profile_change", "allergy_change", "goal_change", "open_settings"];
+    const settingsActions = ["profile_change", "allergy_change", "goal_change", "open_settings"];
     setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
     if (settingsActions.includes(planChange.action)) {
       if (onOpenSettings) setTimeout(() => { onClose?.(); onOpenSettings(); }, 250);
@@ -7705,14 +7788,14 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
 
   return ReactDOM.createPortal((
     <div
-      style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",justifyContent:"center",alignItems:isWideAsk?"center":"stretch",background:"rgba(0,0,0,0.48)",overscrollBehavior:"contain",padding:isWideAsk?16:0}}
+      style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",justifyContent:"center",alignItems:"center",background:"rgba(0,0,0,0.48)",overscrollBehavior:"contain",padding:isWideAsk?16:"max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))"}}
       onClick={onClose}
       onWheel={e=>e.stopPropagation()}
       onTouchMove={e=>e.stopPropagation()}
     >
       <div style={{background:"rgba(0,0,0,0.45)",position:"absolute",inset:0}} />
       <div
-        style={{position:"relative",width:"100%",maxWidth:isWideAsk?840:430,height:isWideAsk?"min(720px, calc(100dvh - 32px))":"100dvh",maxHeight:"100dvh",background:T.bg,borderRadius:isWideAsk?28:0,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 0 50px rgba(0,0,0,0.18)",overscrollBehavior:"contain"}}
+        style={{position:"relative",width:"100%",maxWidth:isWideAsk?840:430,height:isWideAsk?"min(720px, calc(100dvh - 32px))":"min(92dvh, 760px)",maxHeight:"calc(100dvh - 24px)",background:T.bg,borderRadius:isWideAsk?28:26,display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 0 50px rgba(0,0,0,0.18)",overscrollBehavior:"contain"}}
         onClick={e=>e.stopPropagation()}
       >
         <div style={{width:40,height:4,borderRadius:2,background:T.border,margin:"16px auto 0",flexShrink:0}} />
@@ -8741,11 +8824,11 @@ const PreferencesStep = ({d,u}) => {
       {/* Orario allenamento */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.training")}</p>
       <OptBtn value={d.trainingTime} onChange={v=>u("trainingTime",v)} small options={[
-        {id:"mattina",label:t("pref.training.morning"),note:t("pref.training.morning.r")},
-        {id:"pranzo",label:t("pref.training.lunch"),note:t("pref.training.lunch.r")},
-        {id:"pomeriggio",label:t("pref.training.afternoon"),note:t("pref.training.afternoon.r")},
-        {id:"sera",label:t("pref.training.evening"),note:t("pref.training.evening.r")},
-        {id:"varia",label:t("pref.training.varies")},
+        {id:"morning",label:t("pref.training.morning"),note:t("pref.training.morning.r")},
+        {id:"lunch",label:t("pref.training.lunch"),note:t("pref.training.lunch.r")},
+        {id:"afternoon",label:t("pref.training.afternoon"),note:t("pref.training.afternoon.r")},
+        {id:"evening",label:t("pref.training.evening"),note:t("pref.training.evening.r")},
+        {id:"varies",label:t("pref.training.varies")},
       ]} />
 
       {/* Colazione pref */}
@@ -8922,7 +9005,7 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   dietIntensity:"balanced",
   allergies:"",
   sport:"",
-  trainingTime:"sera",
+  trainingTime:"evening",
   breakfastPref:"entrambi",
   dayStart:"07:00",
   dayEnd:"22:00",
@@ -8989,7 +9072,7 @@ const normalizeInitialOnboardingData = (source) => {
     dietIntensity: source.diet_intensity || source.dietIntensity || defaultOnboardingData.dietIntensity,
     allergies: source.allergies || "",
     sport: source.sport || "",
-    trainingTime: source.training_time || source.trainingTime || defaultOnboardingData.trainingTime,
+    trainingTime: normalizeTrainingTime(source.training_time || source.trainingTime || defaultOnboardingData.trainingTime),
     breakfastPref: source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref,
     dayStart: safeTime(source.day_start || source.dayStart, "07:00"),
     dayEnd: safeTime(source.day_end || source.dayEnd, "22:00"),
@@ -9533,7 +9616,7 @@ const ANOMALY_CAUSE_OPTIONS = [
   { id: "none_reported", label: "Nulla di evidente", detail: "DUBI monitora 48-72 ore" },
 ];
 
-const TodayScreen = ({userData,plan,isFirstAccess,swaps,onOpenSettings}) => {
+const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
 
   const todayMealStatusStorageKey = React.useMemo(() => {
@@ -9554,6 +9637,8 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps,onOpenSettings}) => {
   const [askOpen,setAskOpen] = useState(false);
   const [planAdaptations,setPlanAdaptations] = useState({skipped:[],banner:null,note:null,extraMeals:[],replacements:{}});
   const [wearableSnapshot,setWearableSnapshot] = useState(null);
+  const [trainingSaving,setTrainingSaving] = useState(false);
+  const [trainingMessage,setTrainingMessage] = useState("");
 
   React.useEffect(() => {
     try { setStatus(JSON.parse(localStorage.getItem(todayMealStatusStorageKey) || "{}")); } catch(e) { setStatus({}); }
@@ -9674,7 +9759,7 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps,onOpenSettings}) => {
     } catch(e) {}
   }, [notifDismissed, wearableSnapshot, lang, userData?.trainingTime]);
 
-  const handlePlanChange = (change) => {
+  const handlePlanChange = async (change) => {
     if (!change) return;
     dubiHaptic(change.action === "regenerate_plan" ? "warning" : "success");
     if (change.action === "skip_meal") {
@@ -9747,6 +9832,61 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps,onOpenSettings}) => {
         banner: change.banner,
         note: change.planNote,
       }));
+      try {
+        const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(userData, {
+          force: true,
+          reason: "ask_dubi_regenerate_plan"
+        });
+        setPlan?.(updatedPlan);
+        if (!savedByAi) await savePlanToBackend(updatedPlan, userData);
+        setTrainingMessage(lang === "it"
+          ? "Piano rigenerato da Chiedi a DUBI."
+          : "Plan regenerated from Ask DUBI."
+        );
+      } catch (error) {
+        console.error("Ask DUBI regeneration failed:", error);
+      }
+    }
+  };
+
+  const handleTrainingTimeUpdate = async (value) => {
+    const nextTrainingTime = normalizeTrainingTime(value);
+    if (trainingSaving) return;
+    if (nextTrainingTime === normalizeTrainingTime(userData?.trainingTime)) {
+      setTrainingMessage(lang === "it" ? "Orario gia confermato per oggi." : "Training time already confirmed for today.");
+      return;
+    }
+
+    const updatedData = {...userData, trainingTime: nextTrainingTime, training_time: nextTrainingTime};
+    setTrainingSaving(true);
+    setTrainingMessage("");
+    dubiHaptic("tap");
+
+    try {
+      const saved = await saveOnboardingToBackend(updatedData);
+      if (saved?.error) throw new Error(saved.error);
+      setUserData?.(updatedData);
+      saveDubiProfile(updatedData);
+      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+        force: true,
+        reason: `home_training_time_${nextTrainingTime}`
+      });
+      setPlan?.(updatedPlan);
+      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+      setTrainingMessage(lang === "it"
+        ? "Orario aggiornato: DUBI ha rigenerato i pasti vicini all'allenamento."
+        : "Training time updated: DUBI regenerated workout-adjacent meals."
+      );
+      dubiHaptic("success");
+    } catch (error) {
+      console.error("Training time update failed:", error);
+      setTrainingMessage(lang === "it"
+        ? "Non sono riuscito ad aggiornare ora. Riprova tra poco."
+        : "I could not update it now. Please try again shortly."
+      );
+      dubiHaptic("warning");
+    } finally {
+      setTrainingSaving(false);
     }
   };
 
@@ -9893,6 +10033,46 @@ const TodayScreen = ({userData,plan,isFirstAccess,swaps,onOpenSettings}) => {
       </div>
 
       {/* ── Weight target announcement banner (first access only) ── */}
+      <div style={{margin:"0 24px 18px",padding:"14px 14px 13px",borderRadius:18,background:T.card,border:`1.5px solid ${T.border}`,boxShadow:"0 2px 12px rgba(43,43,43,.04)"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
+          <div style={{width:38,height:38,borderRadius:13,background:T.accentD+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <Ico n="zap" size={18} c={T.accentD}/>
+          </div>
+          <div style={{flex:1}}>
+            <p style={{fontSize:13,fontWeight:850,color:T.text,margin:0}}>
+              {lang === "it" ? "Allenamento di oggi" : "Today's training"}
+            </p>
+            <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"3px 0 0"}}>
+              {lang === "it"
+                ? `Conferma l'orario: ora DUBI sta usando ${getTrainingTimeLabel(userData?.trainingTime).toLowerCase()} per distribuire carboidrati e pasti.`
+                : `Confirm timing: DUBI is using ${getTrainingTimeLabel(userData?.trainingTime).toLowerCase()} to place carbs and meals.`}
+            </p>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5, minmax(0, 1fr))",gap:7}}>
+          {[
+            ["morning", lang === "it" ? "Mattina" : "Morning"],
+            ["lunch", lang === "it" ? "Pranzo" : "Lunch"],
+            ["afternoon", lang === "it" ? "Pomer." : "Aft."],
+            ["evening", lang === "it" ? "Sera" : "Evening"],
+            ["varies", lang === "it" ? "Varia" : "Varies"]
+          ].map(([id,label]) => {
+            const active = normalizeTrainingTime(userData?.trainingTime) === id;
+            return (
+              <button key={id} disabled={trainingSaving} onClick={()=>handleTrainingTimeUpdate(id)}
+                style={{padding:"9px 4px",borderRadius:12,border:`1.5px solid ${active ? T.accent : T.border}`,background:active ? T.sel : T.bg,color:active ? T.accentD : T.text,fontSize:10,fontWeight:850,cursor:trainingSaving?"wait":"pointer",opacity:trainingSaving ? .8 : 1}}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {(trainingSaving || trainingMessage) && (
+          <p style={{fontSize:11,color:trainingMessage.includes("Non") || trainingMessage.includes("could not") ? "#B64C3B" : T.accentD,margin:"10px 2px 0",lineHeight:1.4,fontWeight:700}}>
+            {trainingSaving ? (lang === "it" ? "Aggiorno il piano attorno al workout..." : "Updating the plan around training...") : trainingMessage}
+          </p>
+        )}
+      </div>
+
       {isFirstAccess && userData?.targetWeight && userData?.weight && (
         (() => {
           const targetW = parseFloat(userData.targetWeight);
@@ -12627,7 +12807,7 @@ const [profileForm, setProfileForm] = useState({
   diet: userData?.diet || "",
   allergies: userData?.allergies || "",
   sport: userData?.sport || "",
-  training_time: userData?.training_time || userData?.trainingTime || "",
+  training_time: normalizeTrainingTime(userData?.training_time || userData?.trainingTime || ""),
   breakfast_pref: userData?.breakfast_pref || userData?.breakfastPref || "",
   day_start: userData?.day_start || userData?.dayStart || "",
   day_end: userData?.day_end || userData?.dayEnd || "",
@@ -12674,7 +12854,8 @@ const currentProfileValue = (key) => ({
   day_end: userData?.day_end ?? userData?.dayEnd,
   wearable_provider: userData?.wearable_provider ?? userData?.wearable
 }[key] ?? userData?.[key] ?? "");
-const changedProfileFields = () => PROFILE_FIELDS.filter(f => String(profileForm[f.key] ?? "") !== String(currentProfileValue(f.key) || ""));
+const comparableProfileValue = (key, value) => key === "training_time" ? normalizeTrainingTime(value) : String(value ?? "");
+const changedProfileFields = () => PROFILE_FIELDS.filter(f => comparableProfileValue(f.key, profileForm[f.key]) !== comparableProfileValue(f.key, currentProfileValue(f.key)));
 const selectedProfileImpactsDiet = changedProfileFields().some(f => f.impactsDiet);
 const parseProfileHour = (value, fallback) => {
   if (value === undefined || value === null || value === "") return fallback;
@@ -12731,7 +12912,7 @@ const handleSaveProfile = async () => {
     diet: pick("diet", userData?.diet || "omnivore"),
     allergies: pick("allergies", userData?.allergies || ""),
     sport: pick("sport", userData?.sport || ""),
-    trainingTime: pick("training_time", userData?.trainingTime || "varies"),
+    trainingTime: normalizeTrainingTime(pick("training_time", userData?.trainingTime || "varies")),
     breakfastPref: pick("breakfast_pref", userData?.breakfastPref || "entrambi"),
     dayStart: parseProfileHour(pick("day_start", userData?.dayStart || userData?.day_start || 7), 7),
     dayEnd: parseProfileHour(pick("day_end", userData?.dayEnd || userData?.day_end || 22), 22),
@@ -13862,7 +14043,7 @@ setPhase("free-beta");
         {phase==="app" && (
           <>
             <div className="dubi-screen-motion" style={{height:"100vh",overflowY:"auto",position:"relative"}}>
-              {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
+              {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} />}
