@@ -939,6 +939,22 @@ const authorizeWearableProviderInBackend = async (provider) => {
   }
 };
 
+const disconnectWearableInBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return { error: "missing_token" };
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/wearables/openwearables/disconnect`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? data : { error: data.error || "wearable_disconnect_failed" };
+  } catch (error) {
+    console.error("Wearable disconnect failed:", error);
+    return { error: "network_error" };
+  }
+};
+
 const seedDemoWearableDataInBackend = async (scenario = "balanced") => {
   const token = getAuthToken();
   if (!token) return { error: "missing_token" };
@@ -1055,7 +1071,7 @@ const T = {
   accentD:"#6B8A64", sel:"#EDF0EC", white:"#FFFFFF",
 };
 
-const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-06";
+const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-10";
 const PRIVACY_COPY = {
   it: {
     title: "Privacy Policy",
@@ -1065,11 +1081,13 @@ const PRIVACY_COPY = {
       { title: "Quali dati usiamo", body: "Dati profilo, obiettivo, preferenze alimentari, allergie/intolleranze, progressi inseriti da te e, se li colleghi, dati wearable come passi, sonno, frequenza cardiaca, HRV, recovery, allenamenti, calorie attive e misurazioni corporee disponibili dal provider." },
       { title: "Perche li usiamo", body: "Li usiamo per stimare fabbisogno energetico, macronutrienti, timing dei pasti, adattamenti del piano, trend e suggerimenti pratici. Senza wearable DUBI lavora con questionario, peso, attivita dichiarata e aggiornamenti periodici." },
       { title: "Dati wearable", body: "Il collegamento wearable e opzionale. Se autorizzi un provider, inserisci le credenziali solo sulla pagina ufficiale del provider: DUBI non vede mai la tua password. DUBI riceve solo i dati permessi tramite token OAuth e li usa per personalizzare il piano." },
+      { title: "Sicurezza e conservazione", body: "I token wearable vengono gestiti lato backend e non vengono esposti nel frontend. Conserviamo i dati finche l'account resta attivo o finche sono necessari alla beta; puoi cancellarli scollegando il wearable o eliminando l'account." },
       { title: "Cosa non facciamo", body: "Non vendiamo dati, non condividiamo dati individuali con assicurazioni o terze parti commerciali e non inventiamo biometrie mancanti. Se un dato non e disponibile, DUBI lo mostra come assente." },
-      { title: "Controllo dell'utente", body: "Puoi revocare i consensi, scollegare wearable e cancellare account e dati dalle Impostazioni. La cancellazione elimina i dati salvati collegati al tuo account." },
+      { title: "Controllo dell'utente", body: "Puoi revocare i consensi, scollegare wearable e cancellare account e dati dalle Impostazioni. La cancellazione elimina i dati salvati collegati al tuo account. Puoi anche revocare l'accesso direttamente dall'account del provider wearable." },
+      { title: "Contatto", body: "Per richieste privacy, cancellazione dati o chiarimenti sull'uso dei dati wearable puoi contattare il team DUBI tramite il canale di supporto indicato nell'app o nella pagina ufficiale del servizio." },
       { title: "Nota salute", body: "DUBI offre supporto educativo e orientamento nutrizionale. Non sostituisce medico, dietista o nutrizionista, soprattutto in caso di patologie, gravidanza, disturbi alimentari, farmaci o condizioni cliniche." }
     ],
-    version: "Versione beta: 6 giugno 2026",
+    version: "Versione beta: 10 giugno 2026",
     close: "Chiudi",
     required: "Acconsento al trattamento dei miei dati salute",
     requiredBody: "DUBI tratta dati corporei, preferenze alimentari e dati wearable opzionali solo per generare e adattare il piano. Il consenso e necessario per trattare dati salute.",
@@ -1089,11 +1107,13 @@ const PRIVACY_COPY = {
       { title: "Data we use", body: "Profile data, goals, dietary preferences, allergies/intolerances, progress entered by you and, if connected, wearable data such as steps, sleep, heart rate, HRV, recovery, workouts, active calories and body measurements made available by the provider." },
       { title: "Why we use it", body: "We use it to estimate energy needs, macronutrients, meal timing, plan adaptations, trends and practical suggestions. Without wearables, DUBI works with questionnaire data, weight, declared activity and periodic updates." },
       { title: "Wearable data", body: "Wearable connection is optional. If you authorize a provider, you enter credentials only on the provider's official page: DUBI never sees your password. DUBI receives only the data permitted through OAuth tokens and uses it to personalize your plan." },
+      { title: "Security and retention", body: "Wearable tokens are handled server-side and are never exposed in the frontend. We retain data while the account is active or while needed for the beta; you can delete it by disconnecting the wearable or deleting your account." },
       { title: "What we do not do", body: "We do not sell data, share individual data with insurers or commercial third parties, or invent missing biometrics. If a signal is unavailable, DUBI shows it as unavailable." },
-      { title: "User control", body: "You can revoke consents, disconnect wearables and delete your account and data from Settings. Deletion removes saved data linked to your account." },
+      { title: "User control", body: "You can revoke consents, disconnect wearables and delete your account and data from Settings. Deletion removes saved data linked to your account. You can also revoke access directly from the wearable provider account." },
+      { title: "Contact", body: "For privacy requests, data deletion or questions about wearable data use, you can contact the DUBI team through the support channel shown in the app or on the official service page." },
       { title: "Health note", body: "DUBI provides educational support and nutrition guidance. It does not replace a doctor, dietitian or nutritionist, especially with medical conditions, pregnancy, eating disorders, medication or clinical needs." }
     ],
-    version: "Beta version: June 6, 2026",
+    version: "Beta version: June 10, 2026",
     close: "Close",
     required: "I consent to the processing of my health data",
     requiredBody: "DUBI processes body metrics, dietary preferences and optional wearable data only to generate and adapt your plan. Consent is required to process health data.",
@@ -12765,6 +12785,28 @@ const handleImportWearableData = async () => {
   }
 };
 
+const handleDisconnectWearable = async () => {
+  if (!window.confirm("Scollegare il wearable e cancellare i dati biometrici salvati in DUBI?")) return;
+  setWearableBusy(true);
+  setWearableMessage("");
+  try {
+    const result = await disconnectWearableInBackend();
+    if (result.error) {
+      setWearableMessage("Non riesco a scollegare il wearable ora. Riprova tra poco.");
+      return;
+    }
+    setWearableStatus(null);
+    const updatedData = {...userData, wearable:"none", wearable_provider:"none", wearableConsent:false};
+    setUserData(updatedData);
+    saveDubiProfile(updatedData);
+    const aiResult = await generateAiPlanFromBackend(updatedData, { force: true, reason: "wearable_disconnected" });
+    if (aiResult?.plan) setPlan(aiResult.plan);
+    setWearableMessage("Wearable scollegato. I dati biometrici salvati in DUBI sono stati eliminati e il piano e stato aggiornato senza wearable.");
+  } finally {
+    setWearableBusy(false);
+  }
+};
+
 const handleSubmitBetaFeedback = async () => {
   if (!feedbackScore || feedbackSending) return;
   setFeedbackSending(true);
@@ -13159,6 +13201,10 @@ const handleSaveProfile = async () => {
             {wearableBusy ? "Sincronizzazione..." : "Sincronizza dati disponibili"}
           </button>
         )}
+        <button onClick={handleDisconnectWearable} disabled={wearableBusy}
+          style={{width:"100%",padding:"10px",marginTop:8,borderRadius:12,border:`1px solid #E8C4C4`,background:"#FDF5F5",color:"#B91C1C",fontSize:11,fontWeight:900,cursor:wearableBusy?"default":"pointer",opacity:wearableBusy ? .7 : 1}}>
+          Scollega wearable e cancella dati
+        </button>
       </div>
     )}
 
