@@ -7439,27 +7439,208 @@ function detectMealSlotFromText(t, plan) {
   const slots = getMealSlots(plan?.mealCount || 4).map(slot => slot.id);
   if (/(colazione|breakfast)/i.test(t)) return "colazione";
   if (/(pranzo|lunch)/i.test(t)) return "pranzo";
-  if (/(cena|dinner)/i.test(t)) return "cena";
+  if (/(cena|dinner|stasera|sera|tonight|evening)/i.test(t)) return "cena";
   if (/(spuntino.*matt|snack.*morning|morning.*snack)/i.test(t) && slots.includes("snack_m")) return "snack_m";
-  if (/(spuntino.*pomer|merenda|snack.*afternoon|afternoon.*snack)/i.test(t) && slots.includes("snack")) return "snack";
+  if (/(spuntino.*(pomer|poem|merenda)|merenda|snack.*afternoon|afternoon.*snack)/i.test(t) && slots.includes("snack")) return "snack";
   if (/(pre.?nanna|serale|pre.?bed|night.*snack)/i.test(t) && slots.includes("snack_n")) return "snack_n";
   if (/(spuntino|snack)/i.test(t)) return slots.find(id => id.startsWith("snack")) || "snack";
   if (/(pasto|meal|piatto)/i.test(t)) return "pranzo";
   return null;
 }
 
-function getTodayMealForAskDubi(plan, mealId) {
+function getAskDubiTodayMeals(plan, userData = {}) {
   const dayIdx = (new Date().getDay()+6)%7;
   const slots = getMealSlots(plan?.mealCount || 4);
   const times = plan?.mealTimes || ["08:00","13:00","16:30","20:00"];
-  return getAiMealListForDay(plan, dayIdx, slots, times)?.find(meal => meal.id === mealId) || null;
+  const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
+  const dayMeals = dietMeals[dayIdx] || dietMeals[0] || {};
+  const breakfastKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
+  const aiMealList = getAiMealListForDay(plan, dayIdx, slots, times);
+  const fallbackMealList = slots.map((sl, i) => {
+    let meal;
+    if (sl.id === "colazione") meal = dayMeals[breakfastKey] || dayMeals.colazione_dolce;
+    else if (sl.id === "pranzo") meal = dayMeals.pranzo;
+    else if (sl.id === "cena") meal = dayMeals.cena;
+    else if (sl.id === "snack") meal = dayMeals.snack;
+    else if (sl.id === "snack_m") meal = dayMeals.snack_m || dayMeals.snack;
+    else if (sl.id === "snack_n") meal = dayMeals.snack_n || dayMeals.snack;
+    return {...sl, time: times[i] || "--:--", data: meal || dayMeals.snack || null};
+  });
+  const preferredAiMealList = aiMealList?.map((meal) => {
+    if (meal.id !== "colazione" || !["dolce","salata"].includes(userData?.breakfastPref)) return meal;
+    const preferredBreakfast = dayMeals[breakfastKey] || meal.data;
+    return {...meal, data: preferredBreakfast};
+  });
+  const mealList = (preferredAiMealList || fallbackMealList)
+    .filter(meal => meal?.data)
+    .map(meal => ({...meal, data: adaptMealForUserProfile(meal.data, meal.id, userData)}));
+  const totals = mealList.reduce((acc, meal) => {
+    const mx = meal.data?.macros || {};
+    return {
+      cal: acc.cal + Number(mx.cal || 0),
+      p: acc.p + Number(mx.p || 0),
+      c: acc.c + Number(mx.c || 0),
+      f: acc.f + Number(mx.f || 0),
+    };
+  }, {cal:0,p:0,c:0,f:0});
+  const scales = {
+    cal: totals.cal > 0 && plan?.calories ? Number(plan.calories) / totals.cal : 1,
+    p: totals.p > 0 && plan?.protein ? Number(plan.protein) / totals.p : null,
+    c: totals.c > 0 && plan?.carbs ? Number(plan.carbs) / totals.c : null,
+    f: totals.f > 0 && plan?.fat ? Number(plan.fat) / totals.f : null,
+  };
+  scales.p = scales.p || scales.cal;
+  scales.c = scales.c || scales.cal;
+  scales.f = scales.f || scales.cal;
+  return mealList.map((meal) => {
+    const mx = meal.data?.macros || {};
+    const scaledMacros = {
+      cal: Math.round(Number(mx.cal || 0) * scales.cal),
+      p: Math.round(Number(mx.p || 0) * scales.p),
+      c: Math.round(Number(mx.c || 0) * scales.c),
+      f: Math.round(Number(mx.f || 0) * scales.f),
+    };
+    return {...meal, scaledMacros};
+  });
+}
+
+function getTodayMealForAskDubi(plan, mealId, userData = {}) {
+  return getAskDubiTodayMeals(plan, userData).find(meal => meal.id === mealId) || null;
+}
+
+function getAskDubiMealLabel(id, lang = "it") {
+  const isEN = lang === "en" || lang === "en-US";
+  const labels = isEN
+    ? {colazione:"breakfast", snack_m:"morning snack", pranzo:"lunch", snack:"afternoon snack", cena:"dinner", snack_n:"evening snack"}
+    : {colazione:"colazione", snack_m:"spuntino mattutino", pranzo:"pranzo", snack:"spuntino pomeridiano", cena:"cena", snack_n:"spuntino serale"};
+  return labels[id] || String(id || "pasto").replace("_", " ");
+}
+
+function formatAskDubiMacros(mx) {
+  if (!mx) return "";
+  return `${mx.cal || 0} kcal, ${mx.p || 0}g P, ${mx.c || 0}g C, ${mx.f || 0}g G`;
+}
+
+function getAskDubiMealItems(meal, limit = 5) {
+  const items = meal?.data?.items || [];
+  return items.map(formatFoodText).filter(Boolean).slice(0, limit).join(", ");
+}
+
+function detectAskDubiMealRefs(text, plan) {
+  const slots = getMealSlots(plan?.mealCount || 4).map(slot => slot.id);
+  const refs = [];
+  const add = (id) => {
+    if (id && slots.includes(id) && !refs.includes(id)) refs.push(id);
+  };
+  if (/(colazione|breakfast)/i.test(text)) add("colazione");
+  if (/(spuntino.*matt|snack.*morning|morning.*snack)/i.test(text)) add("snack_m");
+  if (/(spuntino.*(pomer|poem|merenda)|merenda|snack.*afternoon|afternoon.*snack)/i.test(text)) add("snack");
+  if (/(pranzo|lunch)/i.test(text)) add("pranzo");
+  if (/(cena|dinner|stasera|sera|tonight|evening)/i.test(text)) add("cena");
+  if (/(pre.?nanna|snack.*sera|snack.*night|night.*snack)/i.test(text)) add("snack_n");
+  if (!refs.length && /(spuntino|snack)/i.test(text)) add(slots.find(id => id.startsWith("snack")) || "snack");
+  return refs;
+}
+
+function mealContainsFish(meal) {
+  const txt = `${meal?.data?.name || ""} ${(meal?.data?.items || []).join(" ")}`.toLowerCase();
+  return /(pesce|salmone|tonno|merluzzo|sgombro|orata|branzino|spigola|gamber|fish|salmon|tuna|cod|mackerel|shrimp)/i.test(txt);
+}
+
+function buildAskDubiPlanAuditAnswer(q, userData, plan, lang = "it") {
+  const text = String(q || "");
+  const lower = text.toLowerCase();
+  const isEN = lang === "en" || lang === "en-US";
+  const asksWhy = /(perch[eèé]|come mai|motivo|logica|senso|why|reason)/i.test(lower);
+  const asksCompare = /(pi[uù]|piu|more|meno|less|ricc|abbondant|calori|macro|carbo|prote|grassi|fat|protein|carb)/i.test(lower);
+  const hasMealWord = /(colazione|spuntino|merenda|pranzo|cena|pasto|breakfast|snack|lunch|dinner|stasera|sera)/i.test(lower);
+  const hasFoodFocus = /(pesce|salmone|tonno|merluzzo|sgombro|gamber|pollo|manzo|uova|riso|quinoa|pane|pasta|fish|salmon|chicken|beef|rice|bread)/i.test(lower);
+  if (!hasMealWord && !hasFoodFocus) return null;
+  if (!asksWhy && !asksCompare && !/(ingredient|macro|calori|pasto|meal)/i.test(lower)) return null;
+
+  const meals = getAskDubiTodayMeals(plan, userData);
+  if (!meals.length) return null;
+  const mealById = (id) => meals.find(meal => meal.id === id);
+  const refs = detectAskDubiMealRefs(lower, plan);
+  const dinner = mealById("cena");
+  const snack = mealById("snack") || mealById("snack_m");
+  const body = [];
+
+  if (hasFoodFocus && /(pesce|salmone|tonno|merluzzo|sgombro|gamber|fish|salmon|tuna|cod|mackerel|shrimp)/i.test(lower)) {
+    const dinnerIntent = /(cena|dinner|stasera|sera|tonight|evening)/i.test(lower);
+    const meal = (dinnerIntent && dinner) || refs.map(mealById).find(mealContainsFish) || meals.find(mealContainsFish) || refs.map(mealById).find(Boolean) || dinner;
+    if (meal) {
+      const mx = meal.scaledMacros || meal.data?.macros;
+      const items = getAskDubiMealItems(meal);
+      const label = getAskDubiMealLabel(meal.id, lang);
+      const hasFishInMeal = mealContainsFish(meal);
+      const mealPhrase = meal.id === "cena" ? "nella tua cena" : meal.id === "colazione" ? "nella tua colazione" : `nel tuo ${label}`;
+      if (isEN) {
+        body.push(hasFishInMeal
+          ? `The fish is in your ${label}: ${items}. Nutrition block: ${formatAskDubiMacros(mx)}.`
+          : `In today's visible plan I do not see fish in your ${label}: ${items}. Nutrition block: ${formatAskDubiMacros(mx)}.`);
+        body.push("The logic is recovery and nutrient density: complete protein, omega-3 when the fish is fatty, iodine/selenium, and usually a lighter digestion than heavier meat cuts.");
+        body.push("It is not mandatory. If you already had fish earlier today or you simply do not want it, DUBI should swap it with chicken, eggs, lean beef or legumes while keeping the same macro block.");
+      } else {
+        body.push(hasFishInMeal
+          ? `Il pesce e ${mealPhrase}: ${items}. Blocco nutrizionale: ${formatAskDubiMacros(mx)}.`
+          : `Nel piano visibile oggi non vedo pesce ${mealPhrase}: ${items}. Blocco nutrizionale: ${formatAskDubiMacros(mx)}.`);
+        body.push("La logica e recupero e densita nutrizionale: proteine complete, omega-3 quando il pesce e grasso, iodio/selenio e digestione spesso piu leggera rispetto a tagli di carne piu pesanti.");
+        body.push("Non e obbligatorio. Se oggi hai gia mangiato pesce o non ti va, DUBI deve poterlo sostituire con pollo, uova, manzo magro o legumi mantenendo lo stesso blocco di macro.");
+      }
+    }
+  }
+
+  if (asksCompare && snack && dinner && /(spuntino|snack|merenda)/i.test(lower) && /(cena|dinner|stasera|sera|tonight)/i.test(lower)) {
+    const smx = snack.scaledMacros || snack.data?.macros;
+    const dmx = dinner.scaledMacros || dinner.data?.macros;
+    const snackLabel = getAskDubiMealLabel(snack.id, lang);
+    const dinnerLabel = getAskDubiMealLabel(dinner.id, lang);
+    const delta = Number(smx?.cal || 0) - Number(dmx?.cal || 0);
+    if (isEN) {
+      body.push(`Here is the real comparison: ${snackLabel} ${formatAskDubiMacros(smx)} vs ${dinnerLabel} ${formatAskDubiMacros(dmx)}.`);
+      body.push(delta > 30
+        ? "Yes, the snack is richer. That can make sense if it is close to training or if DUBI is moving more energy earlier in the day, but it should not become a full meal without a timing reason."
+        : "In this plan the snack is not actually richer than dinner by calories. DUBI is keeping dinner lighter and easier to digest.");
+      body.push("Rule: dinner does not need to be the biggest meal. What matters is the daily total and the meals around the workout. If your workout is in the evening, DUBI should rebalance more recovery nutrition around dinner/post-workout.");
+    } else {
+      body.push(`Confronto reale: ${snackLabel} ${formatAskDubiMacros(smx)} vs ${dinnerLabel} ${formatAskDubiMacros(dmx)}.`);
+      body.push(delta > 30
+        ? "Si, lo spuntino e piu ricco. Ha senso se e vicino all'allenamento o se DUBI sta spostando energia prima nella giornata, ma non deve diventare un pasto completo senza una ragione di timing."
+        : "In questo piano lo spuntino non e davvero piu ricco della cena a livello calorico. DUBI sta tenendo la cena piu leggera e digeribile.");
+      body.push("Regola: la cena non deve per forza essere il pasto piu grande. Conta il totale giornaliero e contano soprattutto i pasti vicini al workout. Se ti alleni la sera, DUBI deve ribilanciare piu nutrizione di recupero intorno a cena/post-workout.");
+    }
+  }
+
+  if (!body.length && refs.length) {
+    refs.map(mealById).filter(Boolean).forEach((meal) => {
+      const mx = meal.scaledMacros || meal.data?.macros;
+      const items = getAskDubiMealItems(meal);
+      const label = getAskDubiMealLabel(meal.id, lang);
+      if (isEN) {
+        body.push(`${label}: ${items}. Macro block: ${formatAskDubiMacros(mx)}.`);
+      } else {
+        body.push(`${label}: ${items}. Blocco macro: ${formatAskDubiMacros(mx)}.`);
+      }
+    });
+    body.push(isEN
+      ? "DUBI reads each meal by role: protein source, main carb source, vegetables/fiber, fats and workout timing. If one of these roles is duplicated or missing, the meal should be corrected."
+      : "DUBI legge ogni pasto per ruolo: fonte proteica, carboidrato principale, verdure/fibra, grassi e timing allenamento. Se un ruolo e duplicato o manca, il pasto va corretto.");
+  }
+
+  if (!body.length) return null;
+  return {
+    title: isEN ? "Plan logic, explained" : "Logica del piano, spiegata bene",
+    body,
+    source: isEN ? "DUBI daily plan audit - ISSN nutrient timing 2017" : "DUBI - Audit piano giornaliero - ISSN nutrient timing 2017",
+  };
 }
 
 function buildAskDubiReplacementMeal(mealId, userData, plan, lang = "it") {
   const dayIdx = (new Date().getDay()+6)%7;
   const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
   const slots = getMealSlots(plan?.mealCount || 4);
-  const current = getTodayMealForAskDubi(plan, mealId);
+  const current = getTodayMealForAskDubi(plan, mealId, userData);
   const currentName = current?.data?.name || "";
   const breakfastKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
   const mealKey = mealId === "colazione" ? breakfastKey : mealId;
@@ -7935,6 +8116,9 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
   }
 
   // ── INFORMATIVA: sostituzioni ingredienti ──
+  const planAuditAnswer = buildAskDubiPlanAuditAnswer(q, userData, plan, lang);
+  if (planAuditAnswer) return planAuditAnswer;
+
   const serviceAnswer = getDubiServiceAnswer(t, userData, plan, lang);
   if (serviceAnswer) return serviceAnswer;
 
