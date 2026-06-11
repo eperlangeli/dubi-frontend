@@ -7666,6 +7666,81 @@ function buildAskDubiReplacementMeal(mealId, userData, plan, lang = "it") {
   };
 }
 
+function compactAskDubiMealForAgent(meal, lang = "it") {
+  const macros = meal?.scaledMacros || meal?.data?.macros || {};
+  return {
+    id: meal?.id,
+    label: getAskDubiMealLabel(meal?.id, lang),
+    time: meal?.time || null,
+    items: (meal?.data?.items || []).map(formatFoodText).filter(Boolean).slice(0, 8),
+    macros,
+    why: meal?.data?.why || meal?.data?.whyEN || "",
+  };
+}
+
+function hydrateAskDubiBackendAnswer(answer, userData, plan, lang = "it") {
+  if (!answer || typeof answer !== "object") return null;
+  const next = {
+    title: answer.title || "Risposta DUBI",
+    body: Array.isArray(answer.body) ? answer.body : [String(answer.body || "")].filter(Boolean),
+    source: answer.source || "DUBI",
+    intent: answer.intent || "answer",
+    needsClarification: Boolean(answer.needsClarification),
+    planChange: answer.planChange || null,
+  };
+
+  if (next.planChange?.action === "replace_meal") {
+    const mealId = next.planChange.mealId || detectMealSlotFromText(`${next.title} ${(next.body||[]).join(" ")}`, plan) || "cena";
+    const replacementMeal = buildAskDubiReplacementMeal(mealId, userData, plan, lang);
+    if (replacementMeal) {
+      const label = getAskDubiMealLabel(mealId, lang);
+      next.planChange = {
+        ...next.planChange,
+        mealId,
+        replacement: { data: replacementMeal },
+        banner: next.planChange.banner || `${label} sostituita · macro mantenuti`,
+        planNote: next.planChange.planNote || `DUBI sostituisce ${label} mantenendo calorie e macronutrienti del pasto originale.`,
+        confirmLabel: next.planChange.confirmLabel || `Si, cambia ${label}`,
+      };
+    } else {
+      next.planChange = null;
+    }
+  }
+
+  return next;
+}
+
+async function fetchAskDubiAgentAnswer(message, userData, plan, context = null, lang = "it") {
+  const token = getAuthToken();
+  if (!token) return null;
+  const todayMeals = getAskDubiTodayMeals(plan, userData).map(meal => compactAskDubiMealForAgent(meal, lang));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ask-dubi/message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        message,
+        lang,
+        userData,
+        plan,
+        todayMeals,
+        context,
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return hydrateAskDubiBackendAnswer(data.answer, userData, plan, lang);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function getDubiServiceAnswer(t, userData, plan, lang = "it") {
   const isEN = lang === "en" || lang === "en-US";
   const kcal = plan?.calories || plan?.caloriesTarget || "—";
@@ -7729,7 +7804,7 @@ function detectPlanChange(t, plan, userData, lang = "it") {
     };
   }
 
-  const hasReplacementIntent = /(non mi piace|non voglio|odio|stufo|stufa|cambia|cambiami|sostituisci|sostituire|swap|alternativa|replace|change.*meal|don't like|do not like)/i.test(t);
+  const hasReplacementIntent = /(non mi piace|non voglio|odio|stufo|stufa|cambia|cambiami|sostituisci|sostituire|swap|alternativa|replace|change.*meal|don't like|do not like|vorrei.*(altro|altor|divers|camb|alternativ)|voglio.*(altro|altor|divers|camb|alternativ)|mangiare.*(altro|altor|divers)|mangiarmi.*(altro|altor|divers)|preferirei.*(altro|altor|divers))/i.test(t);
   const mealToReplace = hasReplacementIntent ? detectMealSlotFromText(t, plan) : null;
   if (mealToReplace) {
     const replacementMeal = buildAskDubiReplacementMeal(mealToReplace, userData, plan, lang);
@@ -8404,6 +8479,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [messages, setMessages] = useState([]); // [{id,role:"user"|"dubi",text?,ans?,applied}]
   const [q, setQ] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const scrollRef = React.useRef(null);
   const isWideAsk = typeof window !== "undefined" && window.innerWidth >= 760;
 
@@ -8454,19 +8530,27 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
     setQ("");
   };
 
-  const sendMessage = (text) => {
-    if (!text.trim()) return;
+  const sendMessage = async (text) => {
+    if (!text.trim() || isSending) return;
     const uid = Date.now();
     // aggiungi messaggio utente
     setMessages(ms => [...ms, {id:uid, role:"user", text}]);
     setQ("");
+    setIsSending(true);
     // calcola risposta DUBI passando il contesto dell'ultimo messaggio DUBI
     const context = lastDubiAns;
-    const a = answerAskDubi(text, userData, plan, context, lang);
+    let a = null;
+    try {
+      a = await fetchAskDubiAgentAnswer(text, userData, plan, context, lang);
+    } catch (error) {
+      console.warn("Ask DUBI agent fallback:", error);
+    }
+    if (!a) a = answerAskDubi(text, userData, plan, context, lang);
     // aggiungi risposta DUBI dopo breve delay (effetto "sta scrivendo")
     setTimeout(()=>{
       setMessages(ms => [...ms, {id:uid+1, role:"dubi", ans:a, applied:false}]);
-    }, 400);
+      setIsSending(false);
+    }, 250);
   };
 
   const applyChange = (msgId, planChange) => {
@@ -8653,6 +8737,14 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
               </div>
             );
           })}
+          {isSending && (
+            <div className="dubi-chat-bubble" style={{marginBottom:16}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 13px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
+                <span style={{width:7,height:7,borderRadius:99,background:T.accentD,opacity:.65}} />
+                <span style={{fontSize:12,color:T.muted,fontWeight:700}}>{lang === "it" ? "DUBI sta ragionando sul tuo piano..." : "DUBI is reviewing your plan..."}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input fisso in fondo */}
@@ -8662,14 +8754,15 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
               value={q}
               onChange={e=>setQ(e.target.value)}
               onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage(q);}}}
+              disabled={isSending}
 placeholder={hasMessages ? t("askdubi.input.ph.followup") : t("askdubi.input.ph")}
               rows={2}
               style={{flex:1,padding:"12px 14px",fontSize:14,color:T.text,background:T.card,
-                border:`1.5px solid ${T.border}`,borderRadius:14,outline:"none",resize:"none",lineHeight:1.5,fontFamily:"inherit"}} />
-            <button className="dubi-pressable" onClick={()=>sendMessage(q)}
+                border:`1.5px solid ${T.border}`,borderRadius:14,outline:"none",resize:"none",lineHeight:1.5,fontFamily:"inherit",opacity:isSending ? .65 : 1}} />
+            <button className="dubi-pressable" onClick={()=>sendMessage(q)} disabled={isSending}
               style={{padding:"0 18px",background:T.accentD,color:"#fff",border:"none",borderRadius:14,
-                fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"stretch",minWidth:64}}>
-              {t("askdubi.send")}
+                fontSize:13,fontWeight:700,cursor:isSending?"default":"pointer",alignSelf:"stretch",minWidth:64,opacity:isSending ? .7 : 1}}>
+              {isSending ? "..." : t("askdubi.send")}
             </button>
           </div>
         </div>
