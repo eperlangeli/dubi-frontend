@@ -157,6 +157,94 @@
         border-color: #D8D1C8;
       }
     }
+    .dubi-app-shell {
+      --dubi-shell-max: 430px;
+    }
+    .dubi-desktop-sidebar {
+      display: none;
+    }
+    .dubi-bottom-nav {
+      display: flex;
+    }
+    .dubi-loading-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(107,138,100,.12), transparent 34%),
+        #FAF9F7;
+      color: #2B2B2B;
+      padding: 32px;
+    }
+    .dubi-loading-card {
+      width: min(320px, 100%);
+      border: 1px solid #E7E2DA;
+      border-radius: 28px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 24px 70px rgba(43,43,43,.08);
+      padding: 30px 24px;
+      text-align: center;
+    }
+    .dubi-loading-logo {
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+    .dubi-loading-logo span { color: #6B8A64; }
+    .dubi-loading-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: #EEE9E2;
+      overflow: hidden;
+      margin: 22px 0 12px;
+    }
+    .dubi-loading-bar span {
+      display: block;
+      height: 100%;
+      width: 42%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #6B8A64, #93AA89);
+      animation: dubi-loading-slide 1.15s ease-in-out infinite;
+    }
+    @keyframes dubi-loading-slide {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(260%); }
+    }
+    @media (min-width: 768px) and (max-width: 1199px) {
+      .dubi-app-shell {
+        --dubi-shell-max: 720px;
+      }
+      .dubi-bottom-nav {
+        max-width: var(--dubi-shell-max) !important;
+      }
+    }
+    @media (min-width: 1200px) {
+      .dubi-app-shell.dubi-app-shell--app {
+        --dubi-shell-max: none;
+        width: 100% !important;
+        max-width: none !important;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      .dubi-desktop-sidebar {
+        display: flex;
+      }
+      .dubi-bottom-nav {
+        display: none !important;
+      }
+      .dubi-app-shell--app .dubi-screen-motion {
+        grid-column: 2;
+        height: 100vh;
+        overflow-y: auto;
+      }
+      .dubi-app-shell--app .dubi-screen-motion > div {
+        max-width: 920px;
+        margin: 0 auto;
+      }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.001ms !important;
@@ -850,6 +938,20 @@ const fetchCurrentWearableDataFromBackend = async () => {
     console.error("Wearable current data request failed:", error);
     return null;
   }
+};
+
+const fetchUnifiedWearableSnapshot = async () => {
+  const [status, current] = await Promise.all([
+    fetchWearableStatusFromBackend(),
+    fetchCurrentWearableDataFromBackend()
+  ]);
+  const connection = current?.connection || status?.connection || null;
+  return {
+    ...(current || {}),
+    connection,
+    latest: current?.latest || null,
+    recent: current?.recent || []
+  };
 };
 
 const importWearableDataFromBackend = async () => {
@@ -8458,8 +8560,18 @@ const saveAskDubiThreads = (userData, threads) => {
 };
 
 const makeAskThreadTitle = (messages) => {
-  const firstUserMessage = (messages || []).find(m => m.role === "user" && m.text)?.text || "Chat DUBI";
-  return firstUserMessage.length > 34 ? `${firstUserMessage.slice(0, 34).trim()}...` : firstUserMessage;
+  const firstDubi = (messages || []).find(m => m.role === "dubi" && m.ans);
+  if (firstDubi?.ans?.planChange?.action === "replace_meal") {
+    const meal = firstDubi.ans.planChange.mealId || "pasto";
+    return `Sostituzione ${meal.replace("_"," ")}`;
+  }
+  const source = firstDubi?.ans?.threadTitle || firstDubi?.ans?.title || (messages || []).find(m => m.role === "user" && m.text)?.text || "Chat DUBI";
+  const cleaned = String(source)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = cleaned.split(" ").filter(Boolean).slice(0, 5);
+  return words.join(" ") || "Chat DUBI";
 };
 
 const makeAddablePlanChange = (addableItem, t) => {
@@ -10467,7 +10579,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
     let cancelled = false;
     const loadWearableSnapshot = async () => {
       await autoSyncWearableOnEntry();
-      const snapshot = await fetchCurrentWearableDataFromBackend();
+      const snapshot = await fetchUnifiedWearableSnapshot();
       if (!cancelled) setWearableSnapshot(snapshot);
     };
     loadWearableSnapshot();
@@ -10536,6 +10648,14 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
     const h = new Date().getHours();
     const slot = (h >= 6 && h < 14) ? "morning" : (h >= 17 && h < 23) ? "evening" : null;
     if (!slot) return;
+    if (slot === "evening") {
+      const mealTimesForNotification = planAdaptations.customTimes || plan.mealTimes || ["08:00","13:00","16:30","20:00"];
+      const lastMealTime = mealTimesForNotification[mealTimesForNotification.length - 1] || "20:00";
+      const [lastHour = 20, lastMinute = 0] = String(lastMealTime).split(":").map(v => Number(v));
+      const lastMealDate = new Date();
+      lastMealDate.setHours(Number.isFinite(lastHour) ? lastHour : 20, Number.isFinite(lastMinute) ? lastMinute : 0, 0, 0);
+      if (new Date() < lastMealDate) return;
+    }
     const latest = wearableSnapshot?.latest || null;
     const hasMovementData = latest && (latest.steps || latest.activity_kcal);
     const isItalian = lang === "it";
@@ -10566,13 +10686,21 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
       const stored = JSON.parse(sessionStorage.getItem(storedKey)||"{}");
       if (stored.date === today) return; // già mostrata oggi in questa sessione
       const pick = pool[Math.floor(Math.random()*pool.length)];
+      let dismissTimer = null;
       const timer = setTimeout(() => {
         setActiveNotif(pick);
         sessionStorage.setItem(storedKey, JSON.stringify({date:today}));
-      }, 1500);
-      return () => clearTimeout(timer);
+        dismissTimer = setTimeout(() => {
+          setActiveNotif(null);
+          setNotifDismissed(true);
+        }, 6000);
+      }, 3000);
+      return () => {
+        clearTimeout(timer);
+        if (dismissTimer) clearTimeout(dismissTimer);
+      };
     } catch(e) {}
-  }, [notifDismissed, wearableSnapshot, lang, userData?.trainingTime]);
+  }, [notifDismissed, wearableSnapshot, lang, userData?.trainingTime, plan.mealTimes, planAdaptations.customTimes]);
 
   const handlePlanChange = async (change) => {
     if (!change) return;
@@ -10756,12 +10884,23 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   const scaleP = baseDayProtein  > 0 ? plan.protein  / baseDayProtein  : scaleK;
   const scaleC = baseDayCarbs    > 0 ? plan.carbs    / baseDayCarbs    : scaleK;
   const scaleF = baseDayFat      > 0 ? plan.fat      / baseDayFat      : scaleK;
-  const scaleMx = (mx) => ({
-    cal: Math.round(mx.cal * scaleK),
-    p:   Math.round(mx.p   * scaleP),
-    c:   Math.round(mx.c   * scaleC),
-    f:   Math.round(mx.f   * scaleF),
+  const scaleMx = (mx = {}) => ({
+    cal: Math.round(Number(mx.cal || 0) * scaleK),
+    p:   Math.round(Number(mx.p || 0)   * scaleP),
+    c:   Math.round(Number(mx.c || 0)   * scaleC),
+    f:   Math.round(Number(mx.f || 0)   * scaleF),
   });
+  const getMealMacroAnomaly = (mx) => {
+    if (!mx || !activeMealList.length) return null;
+    const smx = scaleMx(mx);
+    const count = Math.max(1, activeMealList.length);
+    const checks = [
+      {key:"p", label:t("today.macro.prot"), value:smx.p, avg:Number(plan.protein || 0) / count},
+      {key:"c", label:t("today.macro.carb"), value:smx.c, avg:Number(plan.carbs || 0) / count},
+      {key:"f", label:t("today.macro.fat"), value:smx.f, avg:Number(plan.fat || 0) / count},
+    ];
+    return checks.find(item => item.avg > 0 && (item.value > item.avg * 3 || item.value < item.avg / 3)) || null;
+  };
 
   const done = mealList.filter(m=>status[m.id]==="done");
   const consumed = done.reduce((a,m)=>{
@@ -10774,13 +10913,14 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   const wearableProvider = wearableConnection?.provider && wearableConnection.provider !== "demo"
     ? String(wearableConnection.provider).toUpperCase()
     : null;
+  const hasWearableConnection = Boolean(wearableProvider);
   const wearableSource = latestWearable
     ? `${wearableProvider || t("today.wearable.demo")} · ${String(latestWearable.data_date || latestWearable.synced_at || "").slice(0,10)}`
     : t("today.wearable.preview");
   const wearableUiCopy = lang === "it"
     ? {
         none:"Collega un wearable per attivare",
-        noData:"Nessun dato biometrico disponibile. Il piano resta utilizzabile e si basa sul tuo profilo e sui tuoi check-in.",
+        noData:hasWearableConnection ? `${wearableProvider} collegato. Appena il provider invia dati, DUBI li usa qui e nel piano.` : "Il piano funziona anche senza wearable: connettine uno per adattamenti automatici.",
         partialData:"Dati parziali ricevuti. DUBI mostra e utilizza solo i segnali forniti dal provider.",
         unavailable: wearableProvider ? `Non fornito da ${wearableProvider}` : "Non disponibile",
         statusNone:"Non collegato",
@@ -10788,7 +10928,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
       }
     : {
         none:"Connect a wearable to activate",
-        noData:"No biometric data available. Your plan remains usable and is based on your profile and check-ins.",
+        noData:hasWearableConnection ? `${wearableProvider} connected. As soon as the provider sends data, DUBI uses it here and in the plan.` : "Your plan works without a wearable too: connect one for automatic adaptations.",
         partialData:"Partial data received. DUBI only shows and uses signals supplied by the provider.",
         unavailable: wearableProvider ? `Not provided by ${wearableProvider}` : "Unavailable",
         statusNone:"Not connected",
@@ -10932,16 +11072,18 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
       <div style={{padding:"0 24px",marginBottom:18}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <p style={{fontSize:11,color:T.muted,letterSpacing:1,margin:0}}>{t("today.wearable.label")}</p>
-          <span style={{fontSize:10,fontWeight:800,color:availableWearableMetrics.length ? T.accentD : T.muted,background:availableWearableMetrics.length ? T.sel : T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 9px"}}>
-            {!availableWearableMetrics.length ? wearableUiCopy.statusNone : hasPartialWearableData ? wearableUiCopy.statusPartial : (wearableProvider ? t("today.wearable.live") : t("today.wearable.demo"))}
+          <span style={{fontSize:10,fontWeight:800,color:(availableWearableMetrics.length || hasWearableConnection) ? T.accentD : T.muted,background:(availableWearableMetrics.length || hasWearableConnection) ? T.sel : T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 9px"}}>
+            {!availableWearableMetrics.length ? (hasWearableConnection ? t("today.wearable.live") : wearableUiCopy.statusNone) : hasPartialWearableData ? wearableUiCopy.statusPartial : (wearableProvider ? t("today.wearable.live") : t("today.wearable.demo"))}
           </span>
         </div>
         {(!availableWearableMetrics.length || hasPartialWearableData) && (
-          <div style={{padding:"11px 12px",marginBottom:10,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`}}>
-            <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>
+          <button onClick={hasWearableConnection ? undefined : onOpenSettings}
+            style={{width:"100%",padding:"11px 12px",marginBottom:10,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`,textAlign:"left",cursor:hasWearableConnection?"default":"pointer"}}>
+            <p style={{fontSize:11,color:hasWearableConnection ? T.accentD : T.muted,lineHeight:1.45,margin:0,fontWeight:hasWearableConnection ? 700 : 500}}>
               {!availableWearableMetrics.length ? wearableUiCopy.noData : wearableUiCopy.partialData}
+              {!hasWearableConnection && <span style={{color:T.accentD,fontWeight:800}}> →</span>}
             </p>
-          </div>
+          </button>
         )}
         {availableWearableMetrics.length > 0 && (
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -11146,6 +11288,8 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
           const st = status[mt.id];
           const isOpen = expanded===mt.id;
           const meal = mt.data;
+          const mealMacros = scaleMx(meal.macros);
+          const macroAnomaly = getMealMacroAnomaly(meal.macros);
           return (
             <div key={mt.id} style={{marginBottom:10,background:st==="done"?T.sel:mt.isExtra?"rgba(107,138,100,0.07)":T.card,border:`1.5px solid ${mt.adaptSkipped?"#9A8FBF":mt.isExtra?T.accentD:st==="done"?T.accent:T.border}`,borderRadius:18,overflow:"hidden",opacity:st==="skip"?0.5:1,transition:"opacity 0.2s"}}>
               <button onClick={()=>setExpanded(isOpen?null:mt.id)}
@@ -11180,10 +11324,24 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                         {t("today.target",{pct:mt.carbTargetPct})}
                       </span>
                     )}
+                    {macroAnomaly && (
+                      <span title={`${macroAnomaly.label}: ${macroAnomaly.value}g vs media ${Math.round(macroAnomaly.avg)}g`}
+                        style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:8,background:"#FAEEDA",color:"#9A6A1F"}}>
+                        Macro anomali
+                      </span>
+                    )}
                   </div>
-                  <div style={{fontSize:12,color:T.muted}}>{mt.time} · {scaleMx(meal.macros).cal} kcal · {scaleMx(meal.macros).p}g prot</div>
+                  <div style={{fontSize:12,color:T.muted}}>{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {st!=="done" && st!=="skip" && (
+                    <span role="button" tabIndex={0} data-no-haptic="true"
+                      onClick={(e)=>{e.stopPropagation();dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));}}
+                      onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));}}}
+                      style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",borderRadius:999,background:T.accentD,color:T.white,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
+                      <Ico n="check" size={12} c={T.white}/> {lang==="it" ? "Mangiato" : "Eaten"}
+                    </span>
+                  )}
                   {st==="done"&&<div style={{width:22,height:22,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center"}}><Ico n="check" size={11} c={T.white}/></div>}
                   <div style={{transform:isOpen?"rotate(90deg)":"rotate(0)",transition:"0.2s"}}><Ico n="chev" size={16} c={T.muted}/></div>
                 </div>
@@ -13448,8 +13606,8 @@ useEffect(() => {
   let cancelled = false;
 
   const loadWearables = async () => {
-    const status = await fetchWearableStatusFromBackend();
-    if (!cancelled) setWearableStatus(status?.connection || null);
+    const snapshot = await fetchUnifiedWearableSnapshot();
+    if (!cancelled) setWearableStatus(snapshot?.connection || null);
 
     const providersResult = await fetchWearableProvidersFromBackend();
     if (cancelled) return;
@@ -13500,6 +13658,7 @@ const wearableProviderList = normalizedWearableProviderList.filter(provider => i
 const upcomingWearableProviderList = normalizedWearableProviderList
   .filter(provider => !isWearableConnectable(provider.id))
   .filter((provider, index, list) => list.findIndex(item => String(item.id).toLowerCase() === String(provider.id).toLowerCase()) === index);
+const showUpcomingWearables = false;
 
 const handleConnectWearable = async (providerId) => {
   setWearableBusy(true);
@@ -13540,8 +13699,8 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
       return;
     }
 
-    const status = await fetchWearableStatusFromBackend();
-    setWearableStatus(status?.connection || { provider: "demo", status: "demo_seeded" });
+    const snapshot = await fetchUnifiedWearableSnapshot();
+    setWearableStatus(snapshot?.connection || { provider: "demo", status: "demo_seeded" });
     const aiResult = await generateAiPlanFromBackend(userData, { force: true, reason: "wearable_demo_refresh" });
     if (aiResult?.plan) setPlan(aiResult.plan);
     const demoDays = result.importedCount || 14;
@@ -13570,8 +13729,8 @@ const handleImportWearableData = async () => {
       .filter(summary => summary.importedCount > 0)
       .map(summary => summary.type)
       .join(", ");
-    const status = await fetchWearableStatusFromBackend();
-    setWearableStatus(status?.connection || wearableStatus);
+    const snapshot = await fetchUnifiedWearableSnapshot();
+    setWearableStatus(snapshot?.connection || wearableStatus);
     setWearableMessage(
       result.importedCount > 0
         ? sx.syncImported(importedTypes)
@@ -14023,7 +14182,7 @@ const handleSaveProfile = async () => {
       </div>
     )}
 
-    {upcomingWearableProviderList.length > 0 && (
+    {showUpcomingWearables && upcomingWearableProviderList.length > 0 && (
       <div style={{marginTop:12,padding:12,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
         <p style={{margin:0,fontSize:12,fontWeight:900,color:T.text}}>{sx.comingSoon}</p>
         <p style={{margin:"4px 0 10px",fontSize:11,color:T.muted,lineHeight:1.45}}>
@@ -14254,13 +14413,70 @@ const handleSaveProfile = async () => {
     </div>
   );
 };
-const BottomNav = ({active,onChange}) => { const { t } = useT(); return (
-  <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.bg,borderTop:`1px solid ${T.border}`,padding:"10px 0 28px",display:"flex",zIndex:100}}>
-    {[{id:"today",lk:"nav.today",ic:"home"},{id:"weekly",lk:"nav.weekly",ic:"cal"},{id:"shopping",lk:"nav.shopping",ic:"bag"},{id:"progress",lk:"nav.progress",ic:"trend"},{id:"sources",lk:"nav.sources",ic:"book"},{id:"settings",lk:"nav.settings",ic:"gear"}].map(tab=>(
+const DUBI_NAV_TABS = [
+  {id:"today",lk:"nav.today",ic:"home",sub:{it:"Tracker",en:"Tracker",fr:"Suivi",es:"Seguimiento",de:"Tracker"}},
+  {id:"weekly",lk:"nav.weekly",ic:"cal",sub:{it:"Piano completo",en:"Full plan",fr:"Plan complet",es:"Plan completo",de:"Plan"}},
+  {id:"shopping",lk:"nav.shopping",ic:"bag",sub:{it:"Lista spesa",en:"Shopping list",fr:"Courses",es:"Compra",de:"Einkauf"}},
+  {id:"progress",lk:"nav.progress",ic:"trend",sub:{it:"Progressi",en:"Progress",fr:"Progres",es:"Progreso",de:"Fortschritt"}},
+  {id:"sources",lk:"nav.sources",ic:"book",sub:{it:"Metodo",en:"Method",fr:"Methode",es:"Metodo",de:"Methode"}},
+  {id:"settings",lk:"nav.settings",ic:"gear",sub:{it:"Profilo e dati",en:"Profile",fr:"Profil",es:"Perfil",de:"Profil"}}
+];
+
+const navSubtitle = (tab, lang) => tab.sub?.[lang] || tab.sub?.en || tab.sub?.it || "";
+
+const DesktopSidebar = ({active,onChange,userData,plan}) => {
+  const { t, lang } = useT();
+  const name = (userData?.name || "DUBI").split(" ")[0];
+  const kcal = Number(plan?.calories || 0);
+  const dailyProgress = 0;
+  return (
+    <aside className="dubi-desktop-sidebar" style={{gridColumn:1,flexDirection:"column",height:"100vh",position:"sticky",top:0,background:"#F4F1EC",borderRight:`1px solid ${T.border}`,padding:"28px 22px",gap:22}}>
+      <div>
+        <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,color:T.text}}>DU<span style={{color:T.accentD}}>BI</span></div>
+        <p style={{fontSize:12,color:T.muted,marginTop:4,lineHeight:1.4}}>{lang==="it" ? "Piano, tracker e supporto" : "Plan, tracker and support"}</p>
+      </div>
+      <div style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:22,padding:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:58,height:58,borderRadius:"50%",background:`conic-gradient(${T.accentD} 0 ${dailyProgress}%, ${T.border} 0)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{width:44,height:44,borderRadius:"50%",background:T.bg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:T.accentD,fontSize:12}}>
+              {dailyProgress}%
+            </div>
+          </div>
+          <div>
+            <p style={{fontSize:15,fontWeight:850,color:T.text,margin:0}}>{name}</p>
+            <p style={{fontSize:12,color:T.muted,margin:"3px 0 0"}}>{kcal ? `${kcal} kcal target` : "DUBI target"}</p>
+          </div>
+        </div>
+      </div>
+      <nav style={{display:"flex",flexDirection:"column",gap:8}}>
+        {DUBI_NAV_TABS.map(tab => {
+          const selected = active === tab.id;
+          return (
+            <button key={tab.id} onClick={()=>onChange(tab.id)}
+              style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"13px 14px",borderRadius:16,border:`1px solid ${selected ? T.accent : "transparent"}`,background:selected ? T.sel : "transparent",cursor:"pointer",textAlign:"left",boxShadow:selected ? "0 8px 22px rgba(43,43,43,.05)" : "none"}}>
+              <div style={{width:36,height:36,borderRadius:12,background:selected ? T.accentD : T.bg,border:`1px solid ${selected ? T.accentD : T.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ico n={tab.ic} size={18} c={selected ? T.white : T.muted}/>
+              </div>
+              <div>
+                <p style={{fontSize:14,fontWeight:850,color:selected ? T.text : T.muted,margin:0}}>{t(tab.lk)}</p>
+                <p style={{fontSize:11,color:T.muted,margin:"2px 0 0"}}>{navSubtitle(tab, lang)}</p>
+              </div>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+};
+
+const BottomNav = ({active,onChange}) => { const { t, lang } = useT(); return (
+  <div className="dubi-bottom-nav" style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:"var(--dubi-shell-max, 430px)",background:T.bg,borderTop:`1px solid ${T.border}`,padding:"10px 0 24px",zIndex:100}}>
+    {DUBI_NAV_TABS.map(tab=>(
       <button key={tab.id} onClick={()=>onChange(tab.id)}
-        style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:"none",border:"none",cursor:"pointer",padding:"6px 0"}}>
+        style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"6px 0"}}>
         <Ico n={tab.ic} size={20} c={active===tab.id?T.text:T.muted} />
-        <span style={{fontSize:10,color:active===tab.id?T.text:T.muted,fontWeight:active===tab.id?700:400}}>{t(tab.lk)}</span>
+        <span style={{fontSize:10,color:active===tab.id?T.text:T.muted,fontWeight:active===tab.id?800:500}}>{t(tab.lk)}</span>
+        <span style={{fontSize:8,color:T.muted,fontWeight:500,whiteSpace:"nowrap"}}>{navSubtitle(tab, lang)}</span>
       </button>
     ))}
   </div>
@@ -14605,6 +14821,7 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
 };
 
 function DUBIApp() {
+  const { lang } = useT();
   const [phase,setPhase] = useState("checking");
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
@@ -14788,10 +15005,19 @@ setPhase("free-beta");
         button,input,textarea{font-family:'Inter',-apple-system,sans-serif;}
         ::-webkit-scrollbar{display:none;}
       `}</style>
-      <div style={{width:"100%",maxWidth:430,background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
+      <div className={`dubi-app-shell ${phase==="app" ? "dubi-app-shell--app" : ""}`} style={{width:"100%",maxWidth:"var(--dubi-shell-max, 430px)",background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
         {phase==="checking" && (
-  <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg,color:T.text,fontWeight:700}}>
-    Loading DUBI...
+  <div className="dubi-loading-screen">
+    <div className="dubi-loading-card">
+      <div className="dubi-loading-logo">DU<span>BI</span></div>
+      <p style={{fontSize:13,color:T.muted,lineHeight:1.5,margin:0}}>
+        {lang==="it" ? "Sincronizzo profilo, piano e dati disponibili..." : "Syncing profile, plan and available data..."}
+      </p>
+      <div className="dubi-loading-bar"><span /></div>
+      <p style={{fontSize:11,color:T.muted,margin:0}}>
+        {lang==="it" ? "Se Render si sta riattivando puo richiedere qualche secondo." : "If Render is waking up, this can take a few seconds."}
+      </p>
+    </div>
   </div>
 )}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
@@ -14880,6 +15106,7 @@ setPhase("free-beta");
 }} />}
         {phase==="app" && (
           <>
+            <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
             <div className="dubi-screen-motion" style={{height:"100vh",overflowY:"auto",position:"relative"}}>
               {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
