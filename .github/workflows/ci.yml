@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  static-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check static app bundle
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const required = [
+            'id="dubi-html"',
+            'function applyDir',
+            'FINAL_AUDIT_TRANSLATIONS',
+            'WearableProvider',
+            'AllergyChipPicker',
+            'SportChipPicker',
+            'authorizeWearableProviderInBackend'
+          ];
+          const missing = required.filter((needle) => !html.includes(needle));
+          if (missing.length) {
+            console.error('Missing required frontend markers:', missing.join(', '));
+            process.exit(1);
+          }
+          console.log('Frontend static smoke check passed.');
+          NODE
