@@ -72,6 +72,15 @@
       font-size: 13px; color: #c0392b; text-align: center;
       max-width: 280px; line-height: 1.5; display: none;
     }
+    html[dir="rtl"] body { direction: rtl; }
+    html[dir="rtl"] button,
+    html[dir="rtl"] input,
+    html[dir="rtl"] textarea,
+    html[dir="rtl"] select { text-align: start !important; }
+    html[dir="rtl"] .dubi-desktop-sidebar {
+      border-right: none !important;
+      border-left: 1px solid #E7E2DA !important;
+    }
     @keyframes dubi-spin { to { transform: rotate(360deg); } }
 
     /* Rimuove le frecce/spinner dai campi numerici in tutti i browser */
@@ -422,6 +431,199 @@ const normalizeTrainingTime = (value) => {
   return TRAINING_TIME_ALIASES[key] || "varies";
 };
 const getTrainingTimeLabel = (value) => TRAINING_TIME_LABELS[normalizeTrainingTime(value)] || TRAINING_TIME_LABELS.varies;
+
+const cleanCanonicalInput = (value) => String(value || "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .trim()
+  .toLowerCase()
+  .replace(/[_-]+/g, " ")
+  .replace(/\s+/g, " ");
+
+const canonicalFromMap = (value, map, fallback = "") => {
+  const key = cleanCanonicalInput(value);
+  return map[key] || fallback || key;
+};
+
+const GOAL_CANONICAL_MAP = {
+  fatloss: "fat_loss",
+  "fat loss": "fat_loss",
+  "fat loss ": "fat_loss",
+  "fat_loss": "fat_loss",
+  dimagrimento: "fat_loss",
+  "perdita grasso": "fat_loss",
+  "weight loss": "fat_loss",
+  "lose weight": "fat_loss",
+  gain: "muscle_gain",
+  muscle: "muscle_gain",
+  "muscle gain": "muscle_gain",
+  "muscle_gain": "muscle_gain",
+  massa: "muscle_gain",
+  "massa muscolare": "muscle_gain",
+  "aumento muscolare": "muscle_gain",
+  maintain: "maintenance",
+  maintenance: "maintenance",
+  mantenimento: "maintenance",
+  definition: "definition",
+  definizione: "definition",
+  competition: "competition",
+  gara: "competition"
+};
+const GOAL_APP_MAP = {
+  fat_loss: "fatLoss",
+  muscle_gain: "gain",
+  maintenance: "maintain",
+  definition: "definition",
+  competition: "competition"
+};
+const toCanonicalGoal = (value) => canonicalFromMap(value, GOAL_CANONICAL_MAP, "maintenance");
+const toAppGoal = (value) => GOAL_APP_MAP[toCanonicalGoal(value)] || value || "maintain";
+
+const DIET_CANONICAL_MAP = {
+  onnivoro: "omnivore",
+  omnivore: "omnivore",
+  omnivoro: "omnivore",
+  pescetariano: "pescatarian",
+  pescetarian: "pescatarian",
+  pescatarian: "pescatarian",
+  vegetariano: "vegetarian",
+  vegetarian: "vegetarian",
+  vegano: "vegan",
+  vegan: "vegan"
+};
+const toCanonicalDiet = (value) => canonicalFromMap(value, DIET_CANONICAL_MAP, "omnivore");
+
+const INTENSITY_CANONICAL_MAP = {
+  leggera: "low",
+  bassa: "low",
+  light: "low",
+  low: "low",
+  moderata: "moderate",
+  media: "moderate",
+  moderate: "moderate",
+  medium: "moderate",
+  alta: "high",
+  intensa: "high",
+  high: "high",
+  intense: "high"
+};
+const INTENSITY_APP_MAP = { low: "leggera", moderate: "moderata", high: "alta" };
+const toCanonicalIntensity = (value) => canonicalFromMap(value, INTENSITY_CANONICAL_MAP, "moderate");
+const toAppIntensity = (value) => INTENSITY_APP_MAP[toCanonicalIntensity(value)] || "moderata";
+
+const BREAKFAST_CANONICAL_MAP = {
+  dolce: "sweet",
+  sweet: "sweet",
+  salata: "savory",
+  salato: "savory",
+  savory: "savory",
+  savoury: "savory",
+  salty: "savory",
+  entrambi: "both",
+  both: "both",
+  tutte: "both",
+  "both options": "both",
+  none: "none",
+  nessuna: "none",
+  skip: "none"
+};
+const BREAKFAST_APP_MAP = { sweet: "dolce", savory: "salata", both: "entrambi", none: "none" };
+const toCanonicalBreakfast = (value) => canonicalFromMap(value, BREAKFAST_CANONICAL_MAP, "both");
+const toAppBreakfast = (value) => BREAKFAST_APP_MAP[toCanonicalBreakfast(value)] || "entrambi";
+
+const SPORT_KEYS = ["gym", "running", "cycling", "swimming", "yoga", "crossfit", "football", "tennis", "other"];
+const SPORT_CANONICAL_MAP = {
+  palestra: "gym",
+  gym: "gym",
+  "weight training": "gym",
+  bodybuilding: "gym",
+  corsa: "running",
+  running: "running",
+  run: "running",
+  ciclismo: "cycling",
+  bici: "cycling",
+  cycling: "cycling",
+  bike: "cycling",
+  nuoto: "swimming",
+  swimming: "swimming",
+  yoga: "yoga",
+  crossfit: "crossfit",
+  calcio: "football",
+  football: "football",
+  soccer: "football",
+  tennis: "tennis",
+  altro: "other",
+  other: "other"
+};
+const toCanonicalSport = (value) => {
+  const normalized = canonicalFromMap(value, SPORT_CANONICAL_MAP, "");
+  return normalized || cleanCanonicalInput(value);
+};
+
+const ALLERGY_KEYS = ["egg", "gluten", "dairy", "nuts", "shellfish", "soy", "sesame", "fish"];
+const ALLERGY_CANONICAL_MAP = {
+  uovo: "egg",
+  uova: "egg",
+  egg: "egg",
+  eggs: "egg",
+  glutine: "gluten",
+  gluten: "gluten",
+  celiaco: "gluten",
+  celiachia: "gluten",
+  celiac: "gluten",
+  latte: "dairy",
+  lattosio: "dairy",
+  lactose: "dairy",
+  dairy: "dairy",
+  milk: "dairy",
+  "frutta secca": "nuts",
+  noci: "nuts",
+  mandorle: "nuts",
+  arachidi: "nuts",
+  peanuts: "nuts",
+  nuts: "nuts",
+  crostacei: "shellfish",
+  gamberi: "shellfish",
+  shellfish: "shellfish",
+  soia: "soy",
+  soy: "soy",
+  sesamo: "sesame",
+  sesame: "sesame",
+  pesce: "fish",
+  fish: "fish"
+};
+const parseCanonicalList = (value) => {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value || "").split(/[,;\n]+/);
+  return [...new Set(raw
+    .map(item => String(item || "").trim())
+    .filter(Boolean)
+    .map(item => canonicalFromMap(item, ALLERGY_CANONICAL_MAP, cleanCanonicalInput(item)))
+    .filter(Boolean))];
+};
+const serializeCanonicalList = (items) => parseCanonicalList(items).join(", ");
+const getAllergyLabel = (item, t) => ALLERGY_KEYS.includes(item) ? t(`allergy.${item}`) : item;
+const formatAllergyList = (value, t) => {
+  const items = parseCanonicalList(value);
+  return items.length ? items.map(item => getAllergyLabel(item, t)).join(", ") : "—";
+};
+const getSportLabel = (value, t) => {
+  const key = toCanonicalSport(value);
+  return SPORT_KEYS.includes(key) ? t(`sport.${key}`) : (value || "—");
+};
+const getTrainingTimeLabelLocalized = (value, t) => t(`training.timing.${normalizeTrainingTime(value)}`);
+
+const canonicalizeOnboardingForBackend = (data = {}) => ({
+  ...data,
+  goal: toCanonicalGoal(data.goal),
+  diet: toCanonicalDiet(data.diet),
+  allergies: serializeCanonicalList(data.allergies),
+  sport: toCanonicalSport(data.sport),
+  workoutIntensity: toCanonicalIntensity(data.workoutIntensity ?? data.workout_intensity),
+  trainingTime: normalizeTrainingTime(data.trainingTime ?? data.training_time),
+  breakfastPref: toCanonicalBreakfast(data.breakfastPref ?? data.breakfast_pref)
+});
 const getPlanProfileSignature = (userData = {}) => {
   const parseHourForSignature = (value, fallback) => {
     if (value === undefined || value === null || value === "") return fallback;
@@ -461,6 +663,10 @@ const getPlanProfileSignature = (userData = {}) => {
     ...data,
 
     gender: data.gender === "male" ? "M" : data.gender === "female" ? "F" : data.gender,
+    goal: toAppGoal(data.goal),
+    diet: toCanonicalDiet(data.diet),
+    allergies: serializeCanonicalList(data.allergies),
+    sport: toCanonicalSport(data.sport),
 
     targetWeight: data.target_weight ?? data.targetWeight ?? null,
     targetBf: data.target_body_fat ?? data.targetBf ?? null,
@@ -470,13 +676,13 @@ const getPlanProfileSignature = (userData = {}) => {
 
     workoutDays: data.workout_days != null ? String(data.workout_days) : (data.workoutDays || "0"),
     workoutDuration: data.workout_duration ?? data.workoutDuration ?? "45-60",
-    workoutIntensity: data.workout_intensity ?? data.workoutIntensity ?? "moderata",
+    workoutIntensity: toAppIntensity(data.workout_intensity ?? data.workoutIntensity ?? "moderata"),
     dailySteps: data.daily_steps ?? data.dailySteps ?? "unknown",
     sedentaryDays: data.sedentary_days ?? data.sedentaryDays ?? 0,
     dietIntensity: data.diet_intensity ?? data.dietIntensity ?? "balanced",
 
     trainingTime: normalizeTrainingTime(data.training_time ?? data.trainingTime ?? "varies"),
-    breakfastPref: data.breakfast_pref ?? data.breakfastPref ?? "both",
+    breakfastPref: toAppBreakfast(data.breakfast_pref ?? data.breakfastPref ?? "both"),
 
     dayStart: parseHour(data.day_start ?? data.dayStart, 7),
     dayEnd: parseHour(data.day_end ?? data.dayEnd, 22),
@@ -581,6 +787,7 @@ const isAuthorizationUrlUsable = (url = "") => {
 
 const saveOnboardingToBackend = async (data) => {
   const token = getAuthToken();
+  const canonicalData = canonicalizeOnboardingForBackend(data);
 
   if (!token) {
     console.warn("No auth token found. Onboarding saved locally only.");
@@ -594,7 +801,7 @@ const saveOnboardingToBackend = async (data) => {
     height: Number(data.height),
     weight: Number(data.weight),
 
-    goal: data.goal,
+    goal: canonicalData.goal,
     target_weight: data.targetWeight ? Number(data.targetWeight) : null,
     target_body_fat: data.targetBf ? Number(data.targetBf) : null,
 
@@ -604,16 +811,16 @@ const saveOnboardingToBackend = async (data) => {
     occupation: data.occupation,
     workout_days: parseInt(String(data.workoutDays).split("-")[0], 10),
     workout_duration: data.workoutDuration,
-    workout_intensity: data.workoutIntensity,
+    workout_intensity: canonicalData.workoutIntensity,
     daily_steps: data.dailySteps,
     sedentary_days: parseInt(String(data.sedentaryDays).split("-")[0], 10),
 
-    diet: data.diet,
+    diet: canonicalData.diet,
     diet_intensity: data.dietIntensity || "balanced",
-    allergies: data.allergies || "",
-    sport: data.sport || "",
-    training_time: normalizeTrainingTime(data.trainingTime),
-    breakfast_pref: data.breakfastPref,
+    allergies: canonicalData.allergies || "",
+    sport: canonicalData.sport || "",
+    training_time: canonicalData.trainingTime,
+    breakfast_pref: canonicalData.breakfastPref,
 
     day_start: `${String(data.dayStart).padStart(2, "0")}:00`,
     day_end: `${String(data.dayEnd).padStart(2, "0")}:00`,
@@ -941,11 +1148,8 @@ const fetchCurrentWearableDataFromBackend = async () => {
 };
 
 const fetchUnifiedWearableSnapshot = async () => {
-  const [status, current] = await Promise.all([
-    fetchWearableStatusFromBackend(),
-    fetchCurrentWearableDataFromBackend()
-  ]);
-  const connection = current?.connection || status?.connection || null;
+  const current = await fetchCurrentWearableDataFromBackend();
+  const connection = current?.connection || null;
   return {
     ...(current || {}),
     connection,
@@ -4305,6 +4509,166 @@ Object.keys(ASK_DUBI_HISTORY_TRANSLATIONS).forEach(code => {
   TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...ASK_DUBI_HISTORY_TRANSLATIONS[code]};
 });
 
+const FINAL_AUDIT_TRANSLATIONS = {
+  en: {
+    "sidebar.tagline":"Plan, tracker and support",
+    "home.training.title":"Today's training",
+    "home.training.timingMessage":"Confirm timing: DUBI is using {timing} to place carbs and meals.",
+    "home.training.updating":"Updating the plan around training...",
+    "wearable.connected.message":"{provider} connected. As soon as the provider sends data, DUBI uses it here and in the plan.",
+    "wearable.notConnected.message":"Your plan works without a wearable too: connect one for automatic adaptations.",
+    "wearable.partialData.message":"Partial data received. DUBI only shows and uses signals supplied by the provider.",
+    "wearable.unavailable.message":"Not provided by {provider}",
+    "wearable.status.none":"Not connected",
+    "wearable.status.partial":"Partial data",
+    "wearable.connect.prompt":"Connect a wearable to activate",
+    "home.calories.lossEstimate":"~{rate} kg/week loss · ACSM range 0.25-1.0 kg",
+    "home.calories.gainEstimate":"~{rate} kg/week gain · ACSM range 0.1-0.5 kg",
+    "nav.today.subtitle":"Tracker",
+    "nav.weekly.subtitle":"Full plan",
+    "nav.shopping.subtitle":"Shopping list",
+    "nav.progress.subtitle":"Progress",
+    "nav.sources.subtitle":"Method",
+    "nav.settings.subtitle":"Profile",
+    "goal.fatLoss":"Fat Loss",
+    "goal.muscleGain":"Muscle Gain",
+    "goal.maintenance":"Maintenance",
+    "goal.definition":"Definition",
+    "meal.macroAnomaly":"Macro anomaly",
+    "meal.eaten":"Eaten",
+    "diet.omnivore":"Omnivore",
+    "diet.pescatarian":"Pescatarian",
+    "diet.vegetarian":"Vegetarian",
+    "diet.vegan":"Vegan",
+    "sport.gym":"Gym",
+    "sport.running":"Running",
+    "sport.cycling":"Cycling",
+    "sport.swimming":"Swimming",
+    "sport.yoga":"Yoga",
+    "sport.crossfit":"CrossFit",
+    "sport.football":"Football",
+    "sport.tennis":"Tennis",
+    "sport.other":"Other",
+    "allergy.egg":"Egg",
+    "allergy.gluten":"Gluten",
+    "allergy.dairy":"Dairy",
+    "allergy.nuts":"Nuts",
+    "allergy.shellfish":"Shellfish",
+    "allergy.soy":"Soy",
+    "allergy.sesame":"Sesame",
+    "allergy.fish":"Fish",
+    "allergy.addCustom":"Add custom",
+    "allergy.customPlaceholder":"Custom allergy or condition",
+    "allergy.noneSelected":"No allergy selected",
+    "breakfast.both":"Both",
+    "breakfast.sweet":"Sweet",
+    "breakfast.savory":"Savory",
+    "breakfast.none":"None",
+    "training.timing.morning":"Morning",
+    "training.timing.lunch":"Lunch",
+    "training.timing.afternoon":"Afternoon",
+    "training.timing.evening":"Evening",
+    "training.timing.varies":"Varies",
+    "intensity.low":"Low",
+    "intensity.moderate":"Moderate",
+    "intensity.high":"High"
+  },
+  it: {
+    "sidebar.tagline":"Piano, tracker e supporto",
+    "home.training.title":"Allenamento di oggi",
+    "home.training.timingMessage":"Conferma l'orario: DUBI sta usando {timing} per distribuire carboidrati e pasti.",
+    "home.training.updating":"Aggiorno il piano attorno al workout...",
+    "wearable.connected.message":"{provider} collegato. Appena il provider invia dati, DUBI li usa qui e nel piano.",
+    "wearable.notConnected.message":"Il piano funziona anche senza wearable: connettine uno per adattamenti automatici.",
+    "wearable.partialData.message":"Dati parziali ricevuti. DUBI mostra e utilizza solo i segnali forniti dal provider.",
+    "wearable.unavailable.message":"Non fornito da {provider}",
+    "wearable.status.none":"Non collegato",
+    "wearable.status.partial":"Dati parziali",
+    "wearable.connect.prompt":"Collega un wearable per attivare",
+    "home.calories.lossEstimate":"~{rate} kg/settimana di perdita · range ACSM 0,25-1,0 kg",
+    "home.calories.gainEstimate":"~{rate} kg/settimana guadagno · range ACSM 0,1-0,5 kg",
+    "nav.today.subtitle":"Tracker",
+    "nav.weekly.subtitle":"Piano completo",
+    "nav.shopping.subtitle":"Lista spesa",
+    "nav.progress.subtitle":"Progressi",
+    "nav.sources.subtitle":"Metodo",
+    "nav.settings.subtitle":"Profilo e dati",
+    "goal.fatLoss":"Dimagrimento",
+    "goal.muscleGain":"Aumento muscolare",
+    "goal.maintenance":"Mantenimento",
+    "goal.definition":"Definizione",
+    "meal.macroAnomaly":"Macro anomali",
+    "meal.eaten":"Mangiato",
+    "diet.omnivore":"Onnivoro",
+    "diet.pescatarian":"Pescetariano",
+    "diet.vegetarian":"Vegetariano",
+    "diet.vegan":"Vegano",
+    "sport.gym":"Palestra",
+    "sport.running":"Corsa",
+    "sport.cycling":"Ciclismo",
+    "sport.swimming":"Nuoto",
+    "sport.yoga":"Yoga",
+    "sport.crossfit":"CrossFit",
+    "sport.football":"Calcio",
+    "sport.tennis":"Tennis",
+    "sport.other":"Altro",
+    "allergy.egg":"Uovo",
+    "allergy.gluten":"Glutine",
+    "allergy.dairy":"Latte/lattosio",
+    "allergy.nuts":"Frutta secca",
+    "allergy.shellfish":"Crostacei",
+    "allergy.soy":"Soia",
+    "allergy.sesame":"Sesamo",
+    "allergy.fish":"Pesce",
+    "allergy.addCustom":"Aggiungi custom",
+    "allergy.customPlaceholder":"Allergia o patologia",
+    "allergy.noneSelected":"Nessuna allergia selezionata",
+    "breakfast.both":"Entrambi",
+    "breakfast.sweet":"Dolce",
+    "breakfast.savory":"Salata",
+    "breakfast.none":"Nessuna",
+    "training.timing.morning":"Mattina",
+    "training.timing.lunch":"Pausa pranzo",
+    "training.timing.afternoon":"Pomeriggio",
+    "training.timing.evening":"Sera",
+    "training.timing.varies":"Variabile",
+    "intensity.low":"Leggera",
+    "intensity.moderate":"Moderata",
+    "intensity.high":"Alta"
+  },
+  fr: {
+    "sidebar.tagline":"Plan, suivi et support","home.training.title":"Entrainement du jour","home.training.timingMessage":"Confirme l'horaire : DUBI utilise {timing} pour placer glucides et repas.","home.training.updating":"Mise a jour du plan autour de l'entrainement...","wearable.connected.message":"{provider} connecte. Des que le fournisseur envoie les donnees, DUBI les utilise ici et dans le plan.","wearable.notConnected.message":"Ton plan fonctionne aussi sans wearable : connecte-en un pour des adaptations automatiques.","wearable.partialData.message":"Donnees partielles recues. DUBI affiche et utilise seulement les signaux fournis.","wearable.unavailable.message":"Non fourni par {provider}","wearable.status.none":"Non connecte","wearable.status.partial":"Donnees partielles","wearable.connect.prompt":"Connecte un wearable pour activer","home.calories.lossEstimate":"~{rate} kg/semaine de perte · plage ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semaine de gain · plage ACSM 0,1-0,5 kg","nav.today.subtitle":"Suivi","nav.weekly.subtitle":"Plan complet","nav.shopping.subtitle":"Courses","nav.progress.subtitle":"Progres","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Perte de gras","goal.muscleGain":"Prise musculaire","goal.maintenance":"Maintien","goal.definition":"Definition","meal.macroAnomaly":"Anomalie macro","meal.eaten":"Mange","diet.omnivore":"Omnivore","diet.pescatarian":"Pescetarien","diet.vegetarian":"Vegetarien","diet.vegan":"Vegan","sport.gym":"Salle","sport.running":"Course","sport.cycling":"Cyclisme","sport.swimming":"Natation","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Football","sport.tennis":"Tennis","sport.other":"Autre","allergy.egg":"Oeuf","allergy.gluten":"Gluten","allergy.dairy":"Lait/lactose","allergy.nuts":"Fruits a coque","allergy.shellfish":"Crustaces","allergy.soy":"Soja","allergy.sesame":"Sesame","allergy.fish":"Poisson","allergy.addCustom":"Ajouter custom","allergy.customPlaceholder":"Allergie ou condition","allergy.noneSelected":"Aucune allergie selectionnee","breakfast.both":"Les deux","breakfast.sweet":"Sucre","breakfast.savory":"Sale","breakfast.none":"Aucun","training.timing.morning":"Matin","training.timing.lunch":"Dejeuner","training.timing.afternoon":"Apres-midi","training.timing.evening":"Soir","training.timing.varies":"Variable","intensity.low":"Basse","intensity.moderate":"Moderee","intensity.high":"Elevee"
+  },
+  es: {
+    "sidebar.tagline":"Plan, seguimiento y soporte","home.training.title":"Entrenamiento de hoy","home.training.timingMessage":"Confirma la hora: DUBI usa {timing} para colocar carbohidratos y comidas.","home.training.updating":"Actualizando el plan alrededor del entrenamiento...","wearable.connected.message":"{provider} conectado. Cuando el proveedor envie datos, DUBI los usara aqui y en el plan.","wearable.notConnected.message":"Tu plan tambien funciona sin wearable: conecta uno para adaptaciones automaticas.","wearable.partialData.message":"Datos parciales recibidos. DUBI solo muestra y usa senales suministradas.","wearable.unavailable.message":"No proporcionado por {provider}","wearable.status.none":"No conectado","wearable.status.partial":"Datos parciales","wearable.connect.prompt":"Conecta un wearable para activar","home.calories.lossEstimate":"~{rate} kg/semana de perdida · rango ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganancia · rango ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plan completo","nav.shopping.subtitle":"Compra","nav.progress.subtitle":"Progreso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perdida de grasa","goal.muscleGain":"Ganancia muscular","goal.maintenance":"Mantenimiento","goal.definition":"Definicion","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Gimnasio","sport.running":"Correr","sport.cycling":"Ciclismo","sport.swimming":"Natacion","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futbol","sport.tennis":"Tenis","sport.other":"Otro","allergy.egg":"Huevo","allergy.gluten":"Gluten","allergy.dairy":"Leche/lactosa","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.fish":"Pescado","allergy.addCustom":"Anadir custom","allergy.customPlaceholder":"Alergia o condicion","allergy.noneSelected":"Ninguna alergia seleccionada","breakfast.both":"Ambos","breakfast.sweet":"Dulce","breakfast.savory":"Salado","breakfast.none":"Ninguno","training.timing.morning":"Manana","training.timing.lunch":"Almuerzo","training.timing.afternoon":"Tarde","training.timing.evening":"Noche","training.timing.varies":"Variable","intensity.low":"Baja","intensity.moderate":"Moderada","intensity.high":"Alta"
+  },
+  de: {
+    "sidebar.tagline":"Plan, Tracker und Support","home.training.title":"Heutiges Training","home.training.timingMessage":"Timing bestaetigen: DUBI nutzt {timing}, um Kohlenhydrate und Mahlzeiten zu platzieren.","home.training.updating":"Plan rund ums Training wird aktualisiert...","wearable.connected.message":"{provider} verbunden. Sobald der Anbieter Daten sendet, nutzt DUBI sie hier und im Plan.","wearable.notConnected.message":"Dein Plan funktioniert auch ohne Wearable: verbinde eines fuer automatische Anpassungen.","wearable.partialData.message":"Teildaten empfangen. DUBI zeigt und nutzt nur gelieferte Signale.","wearable.unavailable.message":"Nicht von {provider} bereitgestellt","wearable.status.none":"Nicht verbunden","wearable.status.partial":"Teildaten","wearable.connect.prompt":"Wearable verbinden zum Aktivieren","home.calories.lossEstimate":"~{rate} kg/Woche Verlust · ACSM Bereich 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/Woche Zunahme · ACSM Bereich 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Vollplan","nav.shopping.subtitle":"Einkauf","nav.progress.subtitle":"Fortschritt","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Fettabbau","goal.muscleGain":"Muskelaufbau","goal.maintenance":"Erhalt","goal.definition":"Definition","meal.macroAnomaly":"Makro-Anomalie","meal.eaten":"Gegessen","diet.omnivore":"Omnivor","diet.pescatarian":"Pescetarisch","diet.vegetarian":"Vegetarisch","diet.vegan":"Vegan","sport.gym":"Fitnessstudio","sport.running":"Laufen","sport.cycling":"Radfahren","sport.swimming":"Schwimmen","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Fussball","sport.tennis":"Tennis","sport.other":"Andere","allergy.egg":"Ei","allergy.gluten":"Gluten","allergy.dairy":"Milch/Laktose","allergy.nuts":"Nuesse","allergy.shellfish":"Schalentiere","allergy.soy":"Soja","allergy.sesame":"Sesam","allergy.fish":"Fisch","allergy.addCustom":"Custom hinzufuegen","allergy.customPlaceholder":"Allergie oder Zustand","allergy.noneSelected":"Keine Allergie ausgewaehlt","breakfast.both":"Beides","breakfast.sweet":"Suess","breakfast.savory":"Herzhaft","breakfast.none":"Keine","training.timing.morning":"Morgen","training.timing.lunch":"Mittag","training.timing.afternoon":"Nachmittag","training.timing.evening":"Abend","training.timing.varies":"Variiert","intensity.low":"Niedrig","intensity.moderate":"Moderat","intensity.high":"Hoch"
+  },
+  pt: {
+    "sidebar.tagline":"Plano, tracker e suporte","home.training.title":"Treino de hoje","home.training.timingMessage":"Confirma o horario: DUBI usa {timing} para posicionar hidratos e refeicoes.","home.training.updating":"A atualizar o plano em torno do treino...","wearable.connected.message":"{provider} ligado. Assim que o provider enviar dados, a DUBI usa-os aqui e no plano.","wearable.notConnected.message":"O teu plano tambem funciona sem wearable: liga um para adaptacoes automaticas.","wearable.partialData.message":"Dados parciais recebidos. A DUBI so mostra e usa sinais fornecidos.","wearable.unavailable.message":"Nao fornecido por {provider}","wearable.status.none":"Nao ligado","wearable.status.partial":"Dados parciais","wearable.connect.prompt":"Liga um wearable para ativar","home.calories.lossEstimate":"~{rate} kg/semana de perda · intervalo ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganho · intervalo ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plano completo","nav.shopping.subtitle":"Compras","nav.progress.subtitle":"Progresso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perda de gordura","goal.muscleGain":"Ganho muscular","goal.maintenance":"Manutencao","goal.definition":"Definicao","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Ginasio","sport.running":"Corrida","sport.cycling":"Ciclismo","sport.swimming":"Natacao","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futebol","sport.tennis":"Tenis","sport.other":"Outro","allergy.egg":"Ovo","allergy.gluten":"Gluten","allergy.dairy":"Leite/lactose","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.fish":"Peixe","allergy.addCustom":"Adicionar custom","allergy.customPlaceholder":"Alergia ou condicao","allergy.noneSelected":"Nenhuma alergia selecionada","breakfast.both":"Ambos","breakfast.sweet":"Doce","breakfast.savory":"Salgado","breakfast.none":"Nenhum","training.timing.morning":"Manha","training.timing.lunch":"Almoco","training.timing.afternoon":"Tarde","training.timing.evening":"Noite","training.timing.varies":"Varia","intensity.low":"Baixa","intensity.moderate":"Moderada","intensity.high":"Alta"
+  },
+  ar: {
+    "sidebar.tagline":"الخطة والتتبع والدعم","home.training.title":"تمرين اليوم","home.training.timingMessage":"أكد التوقيت: تستخدم DUBI {timing} لتوزيع الكربوهيدرات والوجبات.","home.training.updating":"يتم تحديث الخطة حول التمرين...","wearable.connected.message":"تم ربط {provider}. عند إرسال البيانات، تستخدمها DUBI هنا وفي الخطة.","wearable.notConnected.message":"تعمل خطتك أيضا بدون wearable: اربط واحدا للتعديلات التلقائية.","wearable.partialData.message":"تم استلام بيانات جزئية. تعرض DUBI فقط الإشارات المتاحة.","wearable.unavailable.message":"غير متاح من {provider}","wearable.status.none":"غير متصل","wearable.status.partial":"بيانات جزئية","wearable.connect.prompt":"اربط wearable للتفعيل","home.calories.lossEstimate":"~{rate} كغ/أسبوع فقدان · نطاق ACSM 0.25-1.0 كغ","home.calories.gainEstimate":"~{rate} كغ/أسبوع زيادة · نطاق ACSM 0.1-0.5 كغ","nav.today.subtitle":"التتبع","nav.weekly.subtitle":"الخطة الكاملة","nav.shopping.subtitle":"قائمة التسوق","nav.progress.subtitle":"التقدم","nav.sources.subtitle":"المنهج","nav.settings.subtitle":"الملف","goal.fatLoss":"فقدان الدهون","goal.muscleGain":"زيادة العضلات","goal.maintenance":"الحفاظ","goal.definition":"التنشيف","meal.macroAnomaly":"خلل في الماكروز","meal.eaten":"تم الأكل","diet.omnivore":"متنوع","diet.pescatarian":"نباتي مع سمك","diet.vegetarian":"نباتي","diet.vegan":"نباتي صارم","sport.gym":"النادي","sport.running":"الجري","sport.cycling":"الدراجات","sport.swimming":"السباحة","sport.yoga":"يوغا","sport.crossfit":"كروسفت","sport.football":"كرة القدم","sport.tennis":"تنس","sport.other":"آخر","allergy.egg":"بيض","allergy.gluten":"غلوتين","allergy.dairy":"حليب/لاكتوز","allergy.nuts":"مكسرات","allergy.shellfish":"قشريات","allergy.soy":"صويا","allergy.sesame":"سمسم","allergy.fish":"سمك","allergy.addCustom":"إضافة مخصص","allergy.customPlaceholder":"حساسية أو حالة","allergy.noneSelected":"لا توجد حساسية محددة","breakfast.both":"كلاهما","breakfast.sweet":"حلو","breakfast.savory":"مالح","breakfast.none":"بدون","training.timing.morning":"الصباح","training.timing.lunch":"الغداء","training.timing.afternoon":"بعد الظهر","training.timing.evening":"المساء","training.timing.varies":"متغير","intensity.low":"منخفضة","intensity.moderate":"متوسطة","intensity.high":"عالية"
+  },
+  zh: {
+    "sidebar.tagline":"计划、追踪和支持","home.training.title":"今日训练","home.training.timingMessage":"确认时间：DUBI 正使用 {timing} 安排碳水和餐食。","home.training.updating":"正在围绕训练更新计划...","wearable.connected.message":"{provider} 已连接。Provider 发送数据后，DUBI 会在这里和计划中使用。","wearable.notConnected.message":"没有 wearable 也能使用计划；连接后可自动调整。","wearable.partialData.message":"收到部分数据。DUBI 只显示并使用 provider 提供的信号。","wearable.unavailable.message":"{provider} 未提供","wearable.status.none":"未连接","wearable.status.partial":"部分数据","wearable.connect.prompt":"连接 wearable 以启用","home.calories.lossEstimate":"~{rate} kg/周减重 · ACSM 范围 0.25-1.0 kg","home.calories.gainEstimate":"~{rate} kg/周增重 · ACSM 范围 0.1-0.5 kg","nav.today.subtitle":"追踪","nav.weekly.subtitle":"完整计划","nav.shopping.subtitle":"购物清单","nav.progress.subtitle":"进展","nav.sources.subtitle":"方法","nav.settings.subtitle":"资料","goal.fatLoss":"减脂","goal.muscleGain":"增肌","goal.maintenance":"维持","goal.definition":"塑形","meal.macroAnomaly":"宏量异常","meal.eaten":"已吃","diet.omnivore":"杂食","diet.pescatarian":"鱼素","diet.vegetarian":"素食","diet.vegan":"纯素","sport.gym":"健身房","sport.running":"跑步","sport.cycling":"骑行","sport.swimming":"游泳","sport.yoga":"瑜伽","sport.crossfit":"CrossFit","sport.football":"足球","sport.tennis":"网球","sport.other":"其他","allergy.egg":"鸡蛋","allergy.gluten":"麸质","allergy.dairy":"乳制品/乳糖","allergy.nuts":"坚果","allergy.shellfish":"贝类","allergy.soy":"大豆","allergy.sesame":"芝麻","allergy.fish":"鱼","allergy.addCustom":"添加自定义","allergy.customPlaceholder":"过敏或状况","allergy.noneSelected":"未选择过敏","breakfast.both":"都可以","breakfast.sweet":"甜","breakfast.savory":"咸","breakfast.none":"无","training.timing.morning":"早上","training.timing.lunch":"午餐","training.timing.afternoon":"下午","training.timing.evening":"晚上","training.timing.varies":"不固定","intensity.low":"低","intensity.moderate":"中","intensity.high":"高"
+  },
+  ja: {
+    "sidebar.tagline":"プラン、トラッカー、サポート","home.training.title":"今日のトレーニング","home.training.timingMessage":"時間を確認：DUBI は {timing} を使って炭水化物と食事を配置します。","home.training.updating":"トレーニングに合わせてプランを更新中...","wearable.connected.message":"{provider} が接続されました。Provider がデータを送ると、DUBI はここでもプランでも使用します。","wearable.notConnected.message":"wearable なしでもプランは使えます。接続すると自動調整できます。","wearable.partialData.message":"一部データを受信しました。DUBI は提供された信号だけを表示・使用します。","wearable.unavailable.message":"{provider} から未提供","wearable.status.none":"未接続","wearable.status.partial":"一部データ","wearable.connect.prompt":"wearable を接続して有効化","home.calories.lossEstimate":"~{rate} kg/週 減量 · ACSM 範囲 0.25-1.0 kg","home.calories.gainEstimate":"~{rate} kg/週 増量 · ACSM 範囲 0.1-0.5 kg","nav.today.subtitle":"トラッカー","nav.weekly.subtitle":"全体プラン","nav.shopping.subtitle":"買い物リスト","nav.progress.subtitle":"進捗","nav.sources.subtitle":"方法","nav.settings.subtitle":"プロフィール","goal.fatLoss":"脂肪減少","goal.muscleGain":"筋肉増加","goal.maintenance":"維持","goal.definition":"引き締め","meal.macroAnomaly":"マクロ異常","meal.eaten":"食べた","diet.omnivore":"雑食","diet.pescatarian":"魚中心","diet.vegetarian":"ベジタリアン","diet.vegan":"ヴィーガン","sport.gym":"ジム","sport.running":"ランニング","sport.cycling":"サイクリング","sport.swimming":"水泳","sport.yoga":"ヨガ","sport.crossfit":"CrossFit","sport.football":"サッカー","sport.tennis":"テニス","sport.other":"その他","allergy.egg":"卵","allergy.gluten":"グルテン","allergy.dairy":"乳製品/乳糖","allergy.nuts":"ナッツ","allergy.shellfish":"甲殻類","allergy.soy":"大豆","allergy.sesame":"ごま","allergy.fish":"魚","allergy.addCustom":"カスタム追加","allergy.customPlaceholder":"アレルギーまたは状態","allergy.noneSelected":"アレルギー未選択","breakfast.both":"両方","breakfast.sweet":"甘い","breakfast.savory":"塩味","breakfast.none":"なし","training.timing.morning":"朝","training.timing.lunch":"昼","training.timing.afternoon":"午後","training.timing.evening":"夜","training.timing.varies":"不定","intensity.low":"低い","intensity.moderate":"中程度","intensity.high":"高い"
+  },
+  ru: {
+    "sidebar.tagline":"План, трекер и поддержка","home.training.title":"Сегодняшняя тренировка","home.training.timingMessage":"Подтверди время: DUBI использует {timing}, чтобы распределить углеводы и приемы пищи.","home.training.updating":"Обновляю план вокруг тренировки...","wearable.connected.message":"{provider} подключен. Когда provider пришлет данные, DUBI использует их здесь и в плане.","wearable.notConnected.message":"План работает и без wearable: подключи устройство для автоматических адаптаций.","wearable.partialData.message":"Получены частичные данные. DUBI показывает и использует только доступные сигналы.","wearable.unavailable.message":"Не предоставлено {provider}","wearable.status.none":"Не подключено","wearable.status.partial":"Частичные данные","wearable.connect.prompt":"Подключи wearable для активации","home.calories.lossEstimate":"~{rate} кг/неделю снижение · диапазон ACSM 0.25-1.0 кг","home.calories.gainEstimate":"~{rate} кг/неделю набор · диапазон ACSM 0.1-0.5 кг","nav.today.subtitle":"Трекер","nav.weekly.subtitle":"Полный план","nav.shopping.subtitle":"Покупки","nav.progress.subtitle":"Прогресс","nav.sources.subtitle":"Метод","nav.settings.subtitle":"Профиль","goal.fatLoss":"Снижение жира","goal.muscleGain":"Набор мышц","goal.maintenance":"Поддержание","goal.definition":"Рельеф","meal.macroAnomaly":"Аномалия макро","meal.eaten":"Съедено","diet.omnivore":"Всеядный","diet.pescatarian":"Пескетарианский","diet.vegetarian":"Вегетарианский","diet.vegan":"Веганский","sport.gym":"Зал","sport.running":"Бег","sport.cycling":"Велоспорт","sport.swimming":"Плавание","sport.yoga":"Йога","sport.crossfit":"CrossFit","sport.football":"Футбол","sport.tennis":"Теннис","sport.other":"Другое","allergy.egg":"Яйцо","allergy.gluten":"Глютен","allergy.dairy":"Молоко/лактоза","allergy.nuts":"Орехи","allergy.shellfish":"Моллюски","allergy.soy":"Соя","allergy.sesame":"Кунжут","allergy.fish":"Рыба","allergy.addCustom":"Добавить свое","allergy.customPlaceholder":"Аллергия или состояние","allergy.noneSelected":"Аллергия не выбрана","breakfast.both":"Оба","breakfast.sweet":"Сладкий","breakfast.savory":"Соленый","breakfast.none":"Нет","training.timing.morning":"Утро","training.timing.lunch":"Обед","training.timing.afternoon":"День","training.timing.evening":"Вечер","training.timing.varies":"По-разному","intensity.low":"Низкая","intensity.moderate":"Средняя","intensity.high":"Высокая"
+  }
+};
+LANGUAGES.forEach(({code}) => {
+  TRANSLATIONS[code] = {
+    ...(TRANSLATIONS[code] || {}),
+    ...FINAL_AUDIT_TRANSLATIONS.en,
+    ...(FINAL_AUDIT_TRANSLATIONS[code] || {})
+  };
+});
+
 function applyDir(lang){
   const meta = LANGUAGES.find(l=>l.code===lang) || LANGUAGES[0];
   const root = document.getElementById("dubi-html") || document.documentElement;
@@ -4324,6 +4688,88 @@ function LangProvider({ children }){
   return <LangCtx.Provider value={{ lang, setLang, t }}>{children}</LangCtx.Provider>;
 }
 function useT(){ return React.useContext(LangCtx); }
+
+const WearableCtx = React.createContext({
+  snapshot: null,
+  connection: null,
+  providers: [],
+  ready: false,
+  loading: false,
+  refreshSnapshot: async () => null,
+  refreshProviders: async () => ({ providers: [] }),
+  clearSnapshot: () => {}
+});
+
+function WearableProvider({ children }) {
+  const [snapshot, setSnapshot] = React.useState(null);
+  const [providers, setProviders] = React.useState([]);
+  const [ready, setReady] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const refreshRef = React.useRef(null);
+
+  const refreshSnapshot = React.useCallback(async ({ forceSync = false } = {}) => {
+    if (!getAuthToken()) {
+      setSnapshot(null);
+      return null;
+    }
+
+    if (refreshRef.current) return refreshRef.current;
+
+    refreshRef.current = (async () => {
+      setLoading(true);
+      try {
+        if (forceSync) await autoSyncWearableOnEntry();
+        const nextSnapshot = await fetchUnifiedWearableSnapshot();
+        setSnapshot(nextSnapshot || null);
+        return nextSnapshot || null;
+      } finally {
+        setLoading(false);
+        refreshRef.current = null;
+      }
+    })();
+
+    return refreshRef.current;
+  }, []);
+
+  const refreshProviders = React.useCallback(async () => {
+    const result = await fetchWearableProvidersFromBackend();
+    const normalizedProviders = Array.isArray(result.providers)
+      ? result.providers
+      : Object.values(result.providers || {});
+    if (!result.error) {
+      setProviders(normalizedProviders);
+      setReady(normalizedProviders.length > 0);
+    } else {
+      setProviders([]);
+      setReady(false);
+    }
+    return result;
+  }, []);
+
+  const clearSnapshot = React.useCallback(() => {
+    setSnapshot(null);
+  }, []);
+
+  React.useEffect(() => {
+    refreshSnapshot();
+    refreshProviders();
+  }, [refreshSnapshot, refreshProviders]);
+
+  const value = React.useMemo(() => ({
+    snapshot,
+    connection: snapshot?.connection || null,
+    providers,
+    ready,
+    loading,
+    refreshSnapshot,
+    refreshProviders,
+    clearSnapshot
+  }), [snapshot, providers, ready, loading, refreshSnapshot, refreshProviders, clearSnapshot]);
+
+  return <WearableCtx.Provider value={value}>{children}</WearableCtx.Provider>;
+}
+
+function useWearable(){ return React.useContext(WearableCtx); }
 
 const I18N_TEXT_BANK = {
   en: {high:"high", sourceBasis:"DUBI scientific basis", whEfHa:"WHO, EFSA and Harvard nutrition principles", recoveryTiming:"recovery-oriented carbohydrate timing and protein distribution", fishCat:"Lean protein from the sea", nutrient:"Nutrient density useful for your goal and context.", satiety:"Supports satiety and helps you stay consistent.", recovery:"Fits the meal timing and recovery support.", tip:"DUBI placed it here to balance energy, macros and meal quality."},
@@ -9696,6 +10142,92 @@ const ActivityStep = ({d,u}) => {
   </div>
 );};
 
+const AllergyChipPicker = ({ value, onChange, compact = false }) => {
+  const { t } = useT();
+  const [custom, setCustom] = React.useState("");
+  const selected = parseCanonicalList(value);
+  const toggle = (key) => {
+    const next = selected.includes(key)
+      ? selected.filter(item => item !== key)
+      : [...selected, key];
+    onChange(serializeCanonicalList(next));
+  };
+  const addCustom = () => {
+    const clean = canonicalFromMap(custom, ALLERGY_CANONICAL_MAP, cleanCanonicalInput(custom));
+    if (!clean) return;
+    onChange(serializeCanonicalList([...selected, clean]));
+    setCustom("");
+  };
+  return (
+    <div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {ALLERGY_KEYS.map(key => {
+          const active = selected.includes(key);
+          return (
+            <button key={key} onClick={() => toggle(key)}
+              style={{padding:compact ? "8px 10px" : "10px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+              {getAllergyLabel(key, t)}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:10}}>
+        <input value={custom} onChange={e=>setCustom(e.target.value)} placeholder={t("allergy.customPlaceholder")}
+          onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addCustom(); }}}
+          style={{flex:1,padding:"11px 12px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,fontSize:13,color:T.text,fontFamily:"inherit",outline:"none"}} />
+        <button onClick={addCustom}
+          style={{padding:"0 12px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.bg,color:T.text,fontSize:12,fontWeight:900,cursor:"pointer"}}>
+          {t("allergy.addCustom")}
+        </button>
+      </div>
+      <p style={{fontSize:11,color:T.muted,margin:"8px 2px 0",lineHeight:1.4}}>
+        {selected.length ? formatAllergyList(selected, t) : t("allergy.noneSelected")}
+      </p>
+    </div>
+  );
+};
+
+const SportChipPicker = ({ value, onChange, compact = false }) => {
+  const { t } = useT();
+  const [custom, setCustom] = React.useState("");
+  const selected = toCanonicalSport(value);
+  const addCustom = () => {
+    const clean = toCanonicalSport(custom);
+    if (!clean) return;
+    onChange(clean);
+    setCustom("");
+  };
+  return (
+    <div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {SPORT_KEYS.map(key => {
+          const active = selected === key;
+          return (
+            <button key={key} onClick={() => onChange(key)}
+              style={{padding:compact ? "8px 10px" : "10px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+              {getSportLabel(key, t)}
+            </button>
+          );
+        })}
+      </div>
+      {!SPORT_KEYS.includes(selected) && selected && (
+        <p style={{fontSize:11,color:T.accentD,margin:"8px 2px 0",fontWeight:800}}>
+          {selected}
+        </p>
+      )}
+      <div style={{display:"flex",gap:8,marginTop:10}}>
+        <input value={custom} onChange={e=>setCustom(e.target.value)} placeholder={t("pref.sport.ph")}
+          onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addCustom(); }}}
+          style={{flex:1,padding:"11px 12px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.card,fontSize:13,color:T.text,fontFamily:"inherit",outline:"none"}} />
+        <button onClick={addCustom}
+          style={{padding:"0 12px",borderRadius:13,border:`1.5px solid ${T.border}`,background:T.bg,color:T.text,fontSize:12,fontWeight:900,cursor:"pointer"}}>
+          {t("allergy.addCustom")}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const PreferencesStep = ({d,u}) => {
   const { t, lang } = useT();
   const tx = (key, fallback) => {
@@ -9740,13 +10272,11 @@ const PreferencesStep = ({d,u}) => {
 
       {/* Allergie */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.allergies")}</p>
-      <textarea value={d.allergies||""} onChange={e=>u("allergies",e.target.value)} placeholder={t("pref.allergies.ph")}
-        style={{width:"100%",padding:14,borderRadius:14,border:`1.5px solid ${T.border}`,background:T.card,fontSize:14,color:T.text,fontFamily:"inherit",resize:"none",minHeight:60,outline:"none"}} />
+      <AllergyChipPicker value={d.allergies} onChange={v=>u("allergies",v)} />
 
       {/* Sport */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.sport")}</p>
-      <input type="text" value={d.sport||""} onChange={e=>u("sport",e.target.value)} placeholder={t("pref.sport.ph")}
-        style={{width:"100%",padding:14,borderRadius:14,border:`1.5px solid ${T.border}`,background:T.card,fontSize:14,color:T.text,fontFamily:"inherit",outline:"none"}} />
+      <SportChipPicker value={d.sport} onChange={v=>u("sport",v)} />
 
       {/* Orario allenamento */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.training")}</p>
@@ -9761,7 +10291,7 @@ const PreferencesStep = ({d,u}) => {
       {/* Colazione pref */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.bf")}</p>
       <div style={{display:"flex",gap:8,marginBottom:20}}>
-        {[{id:"dolce",ic:"sunrise",lk:"pref.bf.plain.sweet"},{id:"salata",ic:"fork",lk:"pref.bf.plain.salty"},{id:"entrambi",ic:"refresh",lk:"pref.bf.plain.both"}].map(o=>(
+        {[{id:"dolce",ic:"sunrise",lk:"breakfast.sweet"},{id:"salata",ic:"fork",lk:"breakfast.savory"},{id:"entrambi",ic:"refresh",lk:"breakfast.both"},{id:"none",ic:"info",lk:"breakfast.none"}].map(o=>(
           <button key={o.id} onClick={()=>u("breakfastPref",o.id)}
             style={{flex:1,padding:"12px 6px",borderRadius:14,border:`1.5px solid ${d.breakfastPref===o.id?T.accent:T.border}`,background:d.breakfastPref===o.id?T.sel:T.card,cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
             <Ico n={o.ic} size={18} c={d.breakfastPref===o.id?T.accentD:T.muted}/>
@@ -9925,7 +10455,7 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   occupation:"sedentary",
   workoutDays:"3-4",
   workoutDuration:"45-60",
-  workoutIntensity:"moderate",
+  workoutIntensity:"moderata",
   dailySteps:"",
   sedentaryDays:"",
   diet:"omnivore",
@@ -9984,7 +10514,7 @@ const normalizeInitialOnboardingData = (source) => {
     age: source.age || defaultOnboardingData.age,
     height: source.height || defaultOnboardingData.height,
     weight: source.weight || defaultOnboardingData.weight,
-    goal: source.goal || defaultOnboardingData.goal,
+    goal: toAppGoal(source.goal || defaultOnboardingData.goal),
     targetWeight: source.target_weight || source.targetWeight || "",
     targetBodyFat: source.target_body_fat || source.targetBodyFat || "",
     competitionSport: source.competition_sport || source.competitionSport || "",
@@ -9992,15 +10522,15 @@ const normalizeInitialOnboardingData = (source) => {
     occupation: source.occupation || defaultOnboardingData.occupation,
     workoutDays: source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
     workoutDuration: source.workout_duration || source.workoutDuration || defaultOnboardingData.workoutDuration,
-    workoutIntensity: source.workout_intensity || source.workoutIntensity || defaultOnboardingData.workoutIntensity,
+    workoutIntensity: toAppIntensity(source.workout_intensity || source.workoutIntensity || defaultOnboardingData.workoutIntensity),
     dailySteps: source.daily_steps || source.dailySteps || "",
     sedentaryDays: source.sedentary_days || source.sedentaryDays || "",
-    diet: source.diet || defaultOnboardingData.diet,
+    diet: toCanonicalDiet(source.diet || defaultOnboardingData.diet),
     dietIntensity: source.diet_intensity || source.dietIntensity || defaultOnboardingData.dietIntensity,
-    allergies: source.allergies || "",
-    sport: source.sport || "",
+    allergies: serializeCanonicalList(source.allergies || ""),
+    sport: toCanonicalSport(source.sport || ""),
     trainingTime: normalizeTrainingTime(source.training_time || source.trainingTime || defaultOnboardingData.trainingTime),
-    breakfastPref: source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref,
+    breakfastPref: toAppBreakfast(source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref),
     dayStart: safeTime(source.day_start || source.dayStart, "07:00"),
     dayEnd: safeTime(source.day_end || source.dayEnd, "22:00"),
     wearable: getPrimaryWearable(source) || defaultOnboardingData.wearable,
@@ -10545,6 +11075,7 @@ const ANOMALY_CAUSE_OPTIONS = [
 
 const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
+  const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
 
   const todayMealStatusStorageKey = React.useMemo(() => {
     const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
@@ -10563,7 +11094,6 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   const [ingModal,setIngModal] = useState(null);
   const [askOpen,setAskOpen] = useState(false);
   const [planAdaptations,setPlanAdaptations] = useState({skipped:[],banner:null,note:null,extraMeals:[],replacements:{}});
-  const [wearableSnapshot,setWearableSnapshot] = useState(null);
   const [trainingSaving,setTrainingSaving] = useState(false);
   const [trainingMessage,setTrainingMessage] = useState("");
 
@@ -10576,15 +11106,8 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   }, [todayMealStatusStorageKey, status]);
 
   React.useEffect(() => {
-    let cancelled = false;
-    const loadWearableSnapshot = async () => {
-      await autoSyncWearableOnEntry();
-      const snapshot = await fetchUnifiedWearableSnapshot();
-      if (!cancelled) setWearableSnapshot(snapshot);
-    };
-    loadWearableSnapshot();
-    return () => { cancelled = true; };
-  }, []);
+    refreshSnapshot({ forceSync: true });
+  }, [refreshSnapshot]);
 
   // ── Anomalia wearable — rilevamento sbalzi improvvisi ──
   const [anomalyState, setAnomalyState] = React.useState(null); // null | "pending" | "yes" | "no"
@@ -10606,7 +11129,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
       try { sessionStorage.setItem("dubi_anomaly", JSON.stringify({date: today})); } catch(e) {}
     }, 6000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [wearableSnapshot?.latest?.hrv]);
 
   const anomalyTxt = ANOMALY_TEXTS[lang] || ANOMALY_TEXTS.it;
   const confirmAnomaly = async (cause) => {
@@ -10917,23 +11440,16 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   const wearableSource = latestWearable
     ? `${wearableProvider || t("today.wearable.demo")} · ${String(latestWearable.data_date || latestWearable.synced_at || "").slice(0,10)}`
     : t("today.wearable.preview");
-  const wearableUiCopy = lang === "it"
-    ? {
-        none:"Collega un wearable per attivare",
-        noData:hasWearableConnection ? `${wearableProvider} collegato. Appena il provider invia dati, DUBI li usa qui e nel piano.` : "Il piano funziona anche senza wearable: connettine uno per adattamenti automatici.",
-        partialData:"Dati parziali ricevuti. DUBI mostra e utilizza solo i segnali forniti dal provider.",
-        unavailable: wearableProvider ? `Non fornito da ${wearableProvider}` : "Non disponibile",
-        statusNone:"Non collegato",
-        statusPartial:"Dati parziali"
-      }
-    : {
-        none:"Connect a wearable to activate",
-        noData:hasWearableConnection ? `${wearableProvider} connected. As soon as the provider sends data, DUBI uses it here and in the plan.` : "Your plan works without a wearable too: connect one for automatic adaptations.",
-        partialData:"Partial data received. DUBI only shows and uses signals supplied by the provider.",
-        unavailable: wearableProvider ? `Not provided by ${wearableProvider}` : "Unavailable",
-        statusNone:"Not connected",
-        statusPartial:"Partial data"
-      };
+  const wearableUiCopy = {
+    none: t("wearable.connect.prompt"),
+    noData: hasWearableConnection
+      ? t("wearable.connected.message", { provider: wearableProvider })
+      : t("wearable.notConnected.message"),
+    partialData: t("wearable.partialData.message"),
+    unavailable: wearableProvider ? t("wearable.unavailable.message", { provider: wearableProvider }) : t("wearable.status.none"),
+    statusNone: t("wearable.status.none"),
+    statusPartial: t("wearable.status.partial")
+  };
   const hasWearableMetric = (value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
   const fmtInt = (value) => hasWearableMetric(value)
     ? Number(value).toLocaleString((LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0]).locale)
@@ -10995,22 +11511,20 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
           </div>
           <div style={{flex:1}}>
             <p style={{fontSize:13,fontWeight:850,color:T.text,margin:0}}>
-              {lang === "it" ? "Allenamento di oggi" : "Today's training"}
+              {t("home.training.title")}
             </p>
             <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"3px 0 0"}}>
-              {lang === "it"
-                ? `Conferma l'orario: ora DUBI sta usando ${getTrainingTimeLabel(userData?.trainingTime).toLowerCase()} per distribuire carboidrati e pasti.`
-                : `Confirm timing: DUBI is using ${getTrainingTimeLabel(userData?.trainingTime).toLowerCase()} to place carbs and meals.`}
+              {t("home.training.timingMessage", { timing: getTrainingTimeLabelLocalized(userData?.trainingTime, t).toLowerCase() })}
             </p>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(5, minmax(0, 1fr))",gap:7}}>
           {[
-            ["morning", lang === "it" ? "Mattina" : "Morning"],
-            ["lunch", lang === "it" ? "Pranzo" : "Lunch"],
-            ["afternoon", lang === "it" ? "Pomer." : "Aft."],
-            ["evening", lang === "it" ? "Sera" : "Evening"],
-            ["varies", lang === "it" ? "Varia" : "Varies"]
+            ["morning", t("training.timing.morning")],
+            ["lunch", t("training.timing.lunch")],
+            ["afternoon", t("training.timing.afternoon")],
+            ["evening", t("training.timing.evening")],
+            ["varies", t("training.timing.varies")]
           ].map(([id,label]) => {
             const active = normalizeTrainingTime(userData?.trainingTime) === id;
             return (
@@ -11023,7 +11537,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
         </div>
         {(trainingSaving || trainingMessage) && (
           <p style={{fontSize:11,color:trainingMessage.includes("Non") || trainingMessage.includes("could not") ? "#B64C3B" : T.accentD,margin:"10px 2px 0",lineHeight:1.4,fontWeight:700}}>
-            {trainingSaving ? (lang === "it" ? "Aggiorno il piano attorno al workout..." : "Updating the plan around training...") : trainingMessage}
+            {trainingSaving ? t("home.training.updating") : trainingMessage}
           </p>
         )}
       </div>
@@ -11242,9 +11756,9 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
             ? (Math.abs(plan.weeklyLossKg) >= 0.25 && Math.abs(plan.weeklyLossKg) <= 1.0)
             : (Math.abs(plan.weeklyLossKg) >= 0.1  && Math.abs(plan.weeklyLossKg) <= 0.5);
           const dotColor = inRange ? T.accentD : "#C9A87C";
-          const label = lang !== "it"
-            ? (isGain ? `~${rate} kg/week gain · ACSM range 0.1–0.5 kg` : `~${rate} kg/week loss · ACSM range 0.25–1.0 kg`)
-            : (isGain ? `~${rate} kg/settimana guadagno · range ACSM 0,1–0,5 kg` : `~${rate} kg/settimana di perdita · range ACSM 0,25–1,0 kg`);
+          const label = isGain
+            ? t("home.calories.gainEstimate", { rate })
+            : t("home.calories.lossEstimate", { rate });
           return (
             <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7}}>
               <div style={{width:7,height:7,borderRadius:"50%",background:dotColor,flexShrink:0}}/>
@@ -11327,7 +11841,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                     {macroAnomaly && (
                       <span title={`${macroAnomaly.label}: ${macroAnomaly.value}g vs media ${Math.round(macroAnomaly.avg)}g`}
                         style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:8,background:"#FAEEDA",color:"#9A6A1F"}}>
-                        Macro anomali
+                        {t("meal.macroAnomaly")}
                       </span>
                     )}
                   </div>
@@ -11339,7 +11853,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                       onClick={(e)=>{e.stopPropagation();dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));}}
                       onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));}}}
                       style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",borderRadius:999,background:T.accentD,color:T.white,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
-                      <Ico n="check" size={12} c={T.white}/> {lang==="it" ? "Mangiato" : "Eaten"}
+                      <Ico n="check" size={12} c={T.white}/> {t("meal.eaten")}
                     </span>
                   )}
                   {st==="done"&&<div style={{width:22,height:22,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center"}}><Ico n="check" size={11} c={T.white}/></div>}
@@ -12601,6 +13115,7 @@ function evaluateWeightPlanDecision(weightLog, nextWeight, plan, userData, lang)
 
 const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const { t, lang } = useT();
+  const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
 
   const [weightLog, setWeightLog] = useState(MOCK_METRIC_DATA.peso.map(d=>({week:d.w,weight:d.v})));
   const [newWeight, setNewWeight] = useState("");
@@ -12611,7 +13126,6 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const [progressHistory, setProgressHistory] = useState([]);
   const [editingProgressId, setEditingProgressId] = useState(null);
   const [editingWeight, setEditingWeight] = useState("");
-  const [wearableSnapshot, setWearableSnapshot] = useState(null);
   const [manualDailySteps, setManualDailySteps] = useState(userData?.dailySteps || "unknown");
   const [manualWorkoutDays, setManualWorkoutDays] = useState(userData?.workoutDays || "3-4");
   const [manualWorkoutIntensity, setManualWorkoutIntensity] = useState(userData?.workoutIntensity || "moderata");
@@ -12626,12 +13140,8 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   loadProgressHistory();
 }, []);
   useEffect(() => {
-    let cancelled = false;
-    fetchCurrentWearableDataFromBackend().then(snapshot => {
-      if (!cancelled) setWearableSnapshot(snapshot);
-    });
-    return () => { cancelled = true; };
-  }, [wearableSnapshot?.latest?.hrv]);
+    refreshSnapshot();
+  }, [refreshSnapshot]);
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
 
   const startWeight = weightLog[0]?.weight || userData?.weight || 78;
@@ -13580,6 +14090,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
 // ═══════════════════════════════════════════════
 const SettingsScreen = ({userData, setUserData, plan, setPlan, onLogout, onDeleteAccount, onEditOnboarding}) => {
   const { t, lang, setLang } = useT();
+  const { snapshot: wearableSnapshot, connection: wearableStatus, refreshSnapshot, clearSnapshot } = useWearable();
   const sx = getSettingsScreenCopy(lang);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -13590,7 +14101,6 @@ const [profileMessage, setProfileMessage] = useState("");
 const [savingProfile, setSavingProfile] = useState(false);
 const [selectedProfileField, setSelectedProfileField] = useState("goal");
 const [confirmProfileSave, setConfirmProfileSave] = useState(false);
-const [wearableStatus, setWearableStatus] = useState(null);
 const [wearableProviders, setWearableProviders] = useState([]);
 const [wearableMessage, setWearableMessage] = useState("");
 const [wearableBusy, setWearableBusy] = useState(false);
@@ -13606,8 +14116,7 @@ useEffect(() => {
   let cancelled = false;
 
   const loadWearables = async () => {
-    const snapshot = await fetchUnifiedWearableSnapshot();
-    if (!cancelled) setWearableStatus(snapshot?.connection || null);
+    await refreshSnapshot();
 
     const providersResult = await fetchWearableProvidersFromBackend();
     if (cancelled) return;
@@ -13632,7 +14141,7 @@ useEffect(() => {
 
   loadWearables();
   return () => { cancelled = true; };
-}, [lang]);
+}, [lang, refreshSnapshot]);
 
 const fallbackWearableProviders = [
   { id: "garmin", name: "Garmin" },
@@ -13699,8 +14208,7 @@ const handleSeedDemoWearable = async (scenario = "balanced") => {
       return;
     }
 
-    const snapshot = await fetchUnifiedWearableSnapshot();
-    setWearableStatus(snapshot?.connection || { provider: "demo", status: "demo_seeded" });
+    await refreshSnapshot();
     const aiResult = await generateAiPlanFromBackend(userData, { force: true, reason: "wearable_demo_refresh" });
     if (aiResult?.plan) setPlan(aiResult.plan);
     const demoDays = result.importedCount || 14;
@@ -13729,8 +14237,7 @@ const handleImportWearableData = async () => {
       .filter(summary => summary.importedCount > 0)
       .map(summary => summary.type)
       .join(", ");
-    const snapshot = await fetchUnifiedWearableSnapshot();
-    setWearableStatus(snapshot?.connection || wearableStatus);
+    await refreshSnapshot();
     setWearableMessage(
       result.importedCount > 0
         ? sx.syncImported(importedTypes)
@@ -13751,7 +14258,7 @@ const handleDisconnectWearable = async () => {
       setWearableMessage(sx.disconnectError);
       return;
     }
-    setWearableStatus(null);
+    clearSnapshot();
     const updatedData = {...userData, wearable:"none", wearable_provider:"none", wearableConsent:false};
     setUserData(updatedData);
     saveDubiProfile(updatedData);
@@ -13791,7 +14298,7 @@ const [profileForm, setProfileForm] = useState({
   age: userData?.age || "",
   height: userData?.height || "",
   weight: userData?.weight || "",
-  goal: userData?.goal || "",
+  goal: toAppGoal(userData?.goal || ""),
   target_weight: userData?.target_weight || userData?.targetWeight || "",
   target_body_fat: userData?.target_body_fat || userData?.targetBf || "",
   competition_sport: userData?.competition_sport || "",
@@ -13799,14 +14306,14 @@ const [profileForm, setProfileForm] = useState({
   occupation: userData?.occupation || "",
   workout_days: userData?.workout_days || userData?.workoutDays || "",
   workout_duration: userData?.workout_duration || userData?.workoutDuration || "",
-  workout_intensity: userData?.workout_intensity || userData?.workoutIntensity || "",
+  workout_intensity: toAppIntensity(userData?.workout_intensity || userData?.workoutIntensity || ""),
   daily_steps: userData?.daily_steps || userData?.dailySteps || "",
   sedentary_days: userData?.sedentary_days || userData?.sedentaryDays || "",
-  diet: userData?.diet || "",
-  allergies: userData?.allergies || "",
-  sport: userData?.sport || "",
+  diet: toCanonicalDiet(userData?.diet || ""),
+  allergies: serializeCanonicalList(userData?.allergies || ""),
+  sport: toCanonicalSport(userData?.sport || ""),
   training_time: normalizeTrainingTime(userData?.training_time || userData?.trainingTime || ""),
-  breakfast_pref: userData?.breakfast_pref || userData?.breakfastPref || "",
+  breakfast_pref: toAppBreakfast(userData?.breakfast_pref || userData?.breakfastPref || ""),
   day_start: userData?.day_start || userData?.dayStart || "",
   day_end: userData?.day_end || userData?.dayEnd || "",
   wearable_provider: userData?.wearable_provider || userData?.wearable || ""
@@ -13816,17 +14323,17 @@ const PROFILE_FIELDS = [
   {key:"age", label:t("set.field.age"), section:t("set.edit.body"), type:"number", unit:t("phys.age.unit"), impactsDiet:true, reason:t("set.reason.energy")},
   {key:"height", label:t("set.field.height"), section:t("set.edit.body"), type:"number", unit:"cm", impactsDiet:true, reason:t("set.reason.energy")},
   {key:"weight", label:t("set.field.weight"), section:t("set.edit.body"), type:"number", unit:"kg", impactsDiet:true, reason:t("set.reason.energy")},
-  {key:"goal", label:t("set.field.goal"), section:t("set.edit.body"), type:"select", impactsDiet:true, reason:t("set.reason.energy"), options:[["fatLoss",t("goal.fatLoss.t")],["definition",t("goal.definition.t")],["gain",t("goal.gain.t")],["maintain",t("goal.maintain.t")]]},
+  {key:"goal", label:t("set.field.goal"), section:t("set.edit.body"), type:"select", impactsDiet:true, reason:t("set.reason.energy"), options:[["fatLoss",t("goal.fatLoss")],["definition",t("goal.definition")],["gain",t("goal.muscleGain")],["maintain",t("goal.maintenance")]]},
   {key:"target_weight", label:t("set.field.targetWeight"), section:t("set.edit.body"), type:"number", unit:"kg", impactsDiet:true, reason:t("set.reason.energy")},
   {key:"target_body_fat", label:t("set.field.targetBf"), section:t("set.edit.body"), type:"number", unit:"%", impactsDiet:true, reason:t("set.reason.energy")},
   {key:"workout_days", label:t("set.field.workoutDays"), section:t("set.edit.training"), type:"number", unit:"/7", impactsDiet:true, reason:t("set.reason.training")},
   {key:"workout_duration", label:t("set.field.workoutDuration"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["<30",t("act.dur.short")],["30-45",t("act.dur.mid1")],["45-60",t("act.dur.mid2")],["60-90",t("act.dur.long")],[">90",t("act.dur.xlong")]]},
-  {key:"workout_intensity", label:t("set.field.workoutIntensity"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["leggera",t("act.int.light")],["moderata",t("act.int.moderate")],["alta",t("act.int.high")]]},
-  {key:"diet", label:t("set.field.diet"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["omnivore",t("pref.diet.omni")],["pescatarian",(t("pref.diet.pesc")==="pref.diet.pesc"?"Pescetariano":t("pref.diet.pesc"))],["vegetarian",t("pref.diet.veg")],["vegan",t("pref.diet.vegan")]]},
-  {key:"allergies", label:t("set.field.allergies"), section:t("set.edit.nutrition"), type:"text", impactsDiet:true, reason:t("set.reason.foods")},
-  {key:"sport", label:t("set.field.sport"), section:t("set.edit.training"), type:"text", impactsDiet:true, reason:t("set.reason.training")},
-  {key:"training_time", label:t("set.field.trainingTime"), section:t("set.edit.routine"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["morning",t("pref.training.morning")],["lunch",t("pref.training.lunch")],["afternoon",t("pref.training.afternoon")],["evening",t("pref.training.evening")],["varies",t("pref.training.varies")]]},
-  {key:"breakfast_pref", label:t("set.field.breakfastPref"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["dolce",t("pref.bf.plain.sweet")],["salata",t("pref.bf.plain.salty")],["entrambi",t("pref.bf.plain.both")]]},
+  {key:"workout_intensity", label:t("set.field.workoutIntensity"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["leggera",t("intensity.low")],["moderata",t("intensity.moderate")],["alta",t("intensity.high")]]},
+  {key:"diet", label:t("set.field.diet"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["omnivore",t("diet.omnivore")],["pescatarian",t("diet.pescatarian")],["vegetarian",t("diet.vegetarian")],["vegan",t("diet.vegan")]]},
+  {key:"allergies", label:t("set.field.allergies"), section:t("set.edit.nutrition"), type:"allergy_chips", impactsDiet:true, reason:t("set.reason.foods")},
+  {key:"sport", label:t("set.field.sport"), section:t("set.edit.training"), type:"sport_chips", impactsDiet:true, reason:t("set.reason.training")},
+  {key:"training_time", label:t("set.field.trainingTime"), section:t("set.edit.routine"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["morning",t("training.timing.morning")],["lunch",t("training.timing.lunch")],["afternoon",t("training.timing.afternoon")],["evening",t("training.timing.evening")],["varies",t("training.timing.varies")]]},
+  {key:"breakfast_pref", label:t("set.field.breakfastPref"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["dolce",t("breakfast.sweet")],["salata",t("breakfast.savory")],["entrambi",t("breakfast.both")],["none",t("breakfast.none")]]},
   {key:"day_start", label:t("set.field.dayStart"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
   {key:"day_end", label:t("set.field.dayEnd"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
   {key:"wearable_provider", label:t("set.field.wearable"), section:t("set.edit.profile"), type:"select", impactsDiet:false, reason:t("set.reason.profile"), options:[["none",t("wear.none")],["apple",t("wear.apple")],["whoop",t("wear.whoop")],["garmin","Garmin"],["oura","Oura"],["polar","Polar"]]},
@@ -13835,6 +14342,8 @@ const selectedProfileDef = PROFILE_FIELDS.find(f => f.key === selectedProfileFie
 const profileFieldGroups = [...new Set(PROFILE_FIELDS.map(f => f.section))];
 const profileFieldValue = (field) => {
   const value = profileForm[field.key] ?? "";
+  if (field.key === "allergies") return formatAllergyList(value, t);
+  if (field.key === "sport") return getSportLabel(value, t);
   if (field.options) return (field.options.find(o => String(o[0]) === String(value)) || [null,value])[1] || "—";
   return value ? `${value}${field.unit ? ` ${field.unit}` : ""}` : "—";
 };
@@ -13852,7 +14361,16 @@ const currentProfileValue = (key) => ({
   day_end: userData?.day_end ?? userData?.dayEnd,
   wearable_provider: userData?.wearable_provider ?? userData?.wearable
 }[key] ?? userData?.[key] ?? "");
-const comparableProfileValue = (key, value) => key === "training_time" ? normalizeTrainingTime(value) : String(value ?? "");
+const comparableProfileValue = (key, value) => {
+  if (key === "training_time") return normalizeTrainingTime(value);
+  if (key === "goal") return toAppGoal(value);
+  if (key === "workout_intensity") return toAppIntensity(value);
+  if (key === "breakfast_pref") return toAppBreakfast(value);
+  if (key === "diet") return toCanonicalDiet(value);
+  if (key === "sport") return toCanonicalSport(value);
+  if (key === "allergies") return serializeCanonicalList(value);
+  return String(value ?? "");
+};
 const changedProfileFields = () => PROFILE_FIELDS.filter(f => comparableProfileValue(f.key, profileForm[f.key]) !== comparableProfileValue(f.key, currentProfileValue(f.key)));
 const selectedProfileImpactsDiet = changedProfileFields().some(f => f.impactsDiet);
 const parseProfileHour = (value, fallback) => {
@@ -13869,8 +14387,8 @@ const handleSaveProfile = async () => {
     return;
   }
   const goalChanged = changed.some(f => f.key === "goal");
-  const nextGoal = String(profileForm.goal || userData?.goal || "").toLowerCase();
-  const goalNeedsTarget = goalChanged && !["maintain", "mantenimento"].includes(nextGoal);
+  const nextGoal = toAppGoal(profileForm.goal || userData?.goal || "");
+  const goalNeedsTarget = goalChanged && nextGoal !== "maintain";
   if (goalNeedsTarget && !Number(profileForm.target_weight)) {
     setSelectedProfileField("target_weight");
     setConfirmProfileSave(false);
@@ -13896,7 +14414,7 @@ const handleSaveProfile = async () => {
     age: Number(pick("age", userData?.age || 18)),
     height: Number(pick("height", userData?.height || 170)),
     weight: Number(pick("weight", userData?.weight || 70)),
-    goal: pick("goal", userData?.goal || "maintain"),
+    goal: toAppGoal(pick("goal", userData?.goal || "maintain")),
     targetWeight: pick("target_weight", userData?.targetWeight || null) ? Number(pick("target_weight", userData?.targetWeight || null)) : null,
     targetBf: pick("target_body_fat", userData?.targetBf || null) ? Number(pick("target_body_fat", userData?.targetBf || null)) : null,
     competitionSport: pick("competition_sport", userData?.competitionSport || null),
@@ -13904,14 +14422,14 @@ const handleSaveProfile = async () => {
     occupation: pick("occupation", userData?.occupation || "sedentary"),
     workoutDays: String(pick("workout_days", userData?.workoutDays || "0")),
     workoutDuration: pick("workout_duration", userData?.workoutDuration || "45-60"),
-    workoutIntensity: pick("workout_intensity", userData?.workoutIntensity || "moderata"),
+    workoutIntensity: toAppIntensity(pick("workout_intensity", userData?.workoutIntensity || "moderata")),
     dailySteps: pick("daily_steps", userData?.dailySteps || "unknown"),
     sedentaryDays: Number(pick("sedentary_days", userData?.sedentaryDays || 0)),
-    diet: pick("diet", userData?.diet || "omnivore"),
-    allergies: pick("allergies", userData?.allergies || ""),
-    sport: pick("sport", userData?.sport || ""),
+    diet: toCanonicalDiet(pick("diet", userData?.diet || "omnivore")),
+    allergies: serializeCanonicalList(pick("allergies", userData?.allergies || "")),
+    sport: toCanonicalSport(pick("sport", userData?.sport || "")),
     trainingTime: normalizeTrainingTime(pick("training_time", userData?.trainingTime || "varies")),
-    breakfastPref: pick("breakfast_pref", userData?.breakfastPref || "entrambi"),
+    breakfastPref: toAppBreakfast(pick("breakfast_pref", userData?.breakfastPref || "entrambi")),
     dayStart: parseProfileHour(pick("day_start", userData?.dayStart || userData?.day_start || 7), 7),
     dayEnd: parseProfileHour(pick("day_end", userData?.dayEnd || userData?.day_end || 22), 22),
     wearable: pick("wearable_provider", userData?.wearable || "none")
@@ -13951,11 +14469,14 @@ const handleSaveProfile = async () => {
 
   const GOAL_LABELS = {
     fatLoss:   t("goal.fatLoss.t"),
+    fat_loss:  t("goal.fatLoss"),
     definition:t("goal.definition.t"),
     gain:      t("goal.gain.t"),
+    muscle_gain:t("goal.muscleGain"),
     muscle:    t("goal.gain.t"),
     recomp:    t("goal.definition.t"),
     maintain:  t("goal.maintain.t"),
+    maintenance:t("goal.maintenance"),
     athletic:  t("goal.athletic.t"),
   };
 
@@ -14077,7 +14598,19 @@ const handleSaveProfile = async () => {
       {selectedProfileDef && (
         <div style={{marginTop:4,padding:14,borderRadius:16,background:T.sel,border:`1px solid ${T.border}`}}>
           <p style={{margin:"0 0 8px",fontSize:12,fontWeight:800,color:T.text}}>{t("set.edit.value")} · {selectedProfileDef.label}</p>
-          {selectedProfileDef.type==="select" ? (
+          {selectedProfileDef.type==="allergy_chips" ? (
+            <AllergyChipPicker
+              compact
+              value={profileForm[selectedProfileDef.key]}
+              onChange={value=>{handleProfileFieldChange(selectedProfileDef.key,value);setConfirmProfileSave(false);}}
+            />
+          ) : selectedProfileDef.type==="sport_chips" ? (
+            <SportChipPicker
+              compact
+              value={profileForm[selectedProfileDef.key]}
+              onChange={value=>{handleProfileFieldChange(selectedProfileDef.key,value);setConfirmProfileSave(false);}}
+            />
+          ) : selectedProfileDef.type==="select" ? (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               {(selectedProfileDef.options||[]).map(([value,label])=>(
                 <button key={value} onClick={()=>{handleProfileFieldChange(selectedProfileDef.key,value);setConfirmProfileSave(false);}}
@@ -14414,15 +14947,15 @@ const handleSaveProfile = async () => {
   );
 };
 const DUBI_NAV_TABS = [
-  {id:"today",lk:"nav.today",ic:"home",sub:{it:"Tracker",en:"Tracker",fr:"Suivi",es:"Seguimiento",de:"Tracker"}},
-  {id:"weekly",lk:"nav.weekly",ic:"cal",sub:{it:"Piano completo",en:"Full plan",fr:"Plan complet",es:"Plan completo",de:"Plan"}},
-  {id:"shopping",lk:"nav.shopping",ic:"bag",sub:{it:"Lista spesa",en:"Shopping list",fr:"Courses",es:"Compra",de:"Einkauf"}},
-  {id:"progress",lk:"nav.progress",ic:"trend",sub:{it:"Progressi",en:"Progress",fr:"Progres",es:"Progreso",de:"Fortschritt"}},
-  {id:"sources",lk:"nav.sources",ic:"book",sub:{it:"Metodo",en:"Method",fr:"Methode",es:"Metodo",de:"Methode"}},
-  {id:"settings",lk:"nav.settings",ic:"gear",sub:{it:"Profilo e dati",en:"Profile",fr:"Profil",es:"Perfil",de:"Profil"}}
+  {id:"today",lk:"nav.today",ic:"home",subKey:"nav.today.subtitle"},
+  {id:"weekly",lk:"nav.weekly",ic:"cal",subKey:"nav.weekly.subtitle"},
+  {id:"shopping",lk:"nav.shopping",ic:"bag",subKey:"nav.shopping.subtitle"},
+  {id:"progress",lk:"nav.progress",ic:"trend",subKey:"nav.progress.subtitle"},
+  {id:"sources",lk:"nav.sources",ic:"book",subKey:"nav.sources.subtitle"},
+  {id:"settings",lk:"nav.settings",ic:"gear",subKey:"nav.settings.subtitle"}
 ];
 
-const navSubtitle = (tab, lang) => tab.sub?.[lang] || tab.sub?.en || tab.sub?.it || "";
+const navSubtitle = (tab, t) => t(tab.subKey || "");
 
 const DesktopSidebar = ({active,onChange,userData,plan}) => {
   const { t, lang } = useT();
@@ -14433,7 +14966,7 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
     <aside className="dubi-desktop-sidebar" style={{gridColumn:1,flexDirection:"column",height:"100vh",position:"sticky",top:0,background:"#F4F1EC",borderRight:`1px solid ${T.border}`,padding:"28px 22px",gap:22}}>
       <div>
         <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,color:T.text}}>DU<span style={{color:T.accentD}}>BI</span></div>
-        <p style={{fontSize:12,color:T.muted,marginTop:4,lineHeight:1.4}}>{lang==="it" ? "Piano, tracker e supporto" : "Plan, tracker and support"}</p>
+        <p style={{fontSize:12,color:T.muted,marginTop:4,lineHeight:1.4}}>{t("sidebar.tagline")}</p>
       </div>
       <div style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:22,padding:16}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -14459,7 +14992,7 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
               </div>
               <div>
                 <p style={{fontSize:14,fontWeight:850,color:selected ? T.text : T.muted,margin:0}}>{t(tab.lk)}</p>
-                <p style={{fontSize:11,color:T.muted,margin:"2px 0 0"}}>{navSubtitle(tab, lang)}</p>
+                <p style={{fontSize:11,color:T.muted,margin:"2px 0 0"}}>{navSubtitle(tab, t)}</p>
               </div>
             </button>
           );
@@ -14476,7 +15009,7 @@ const BottomNav = ({active,onChange}) => { const { t, lang } = useT(); return (
         style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"6px 0"}}>
         <Ico n={tab.ic} size={20} c={active===tab.id?T.text:T.muted} />
         <span style={{fontSize:10,color:active===tab.id?T.text:T.muted,fontWeight:active===tab.id?800:500}}>{t(tab.lk)}</span>
-        <span style={{fontSize:8,color:T.muted,fontWeight:500,whiteSpace:"nowrap"}}>{navSubtitle(tab, lang)}</span>
+        <span style={{fontSize:8,color:T.muted,fontWeight:500,whiteSpace:"nowrap"}}>{navSubtitle(tab, t)}</span>
       </button>
     ))}
   </div>
@@ -14822,6 +15355,7 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
 
 function DUBIApp() {
   const { lang } = useT();
+  const { refreshSnapshot, clearSnapshot } = useWearable();
   const [phase,setPhase] = useState("checking");
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
@@ -14866,7 +15400,7 @@ function DUBIApp() {
 
   setUserData(normalizedOnboarding);
 
-  await autoSyncWearableOnEntry();
+  await refreshSnapshot({ forceSync: true });
   const currentAiPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding);
   const sessionPlan = currentAiPlan || (await generateAiPlanFromBackend(normalizedOnboarding)).plan || calcPlan(normalizedOnboarding);
   setPlan(sessionPlan);
@@ -14893,6 +15427,7 @@ function DUBIApp() {
 const handleLogout = () => {
   localStorage.removeItem("dubi_token");
   localStorage.removeItem("dubi_email");
+  clearSnapshot();
   setUserData(null);
   setPlan(null);
   setActiveTab("today");
@@ -14913,7 +15448,7 @@ const handleDeleteAccount = async () => {
     if (phase !== "app") return undefined;
     const syncOnVisibleEntry = () => {
       if (document.visibilityState === "visible") {
-        autoSyncWearableOnEntry();
+        refreshSnapshot({ forceSync: true });
       }
     };
     window.addEventListener("focus", syncOnVisibleEntry);
@@ -14922,7 +15457,7 @@ const handleDeleteAccount = async () => {
       window.removeEventListener("focus", syncOnVisibleEntry);
       document.removeEventListener("visibilitychange", syncOnVisibleEntry);
     };
-  }, [phase]);
+  }, [phase, refreshSnapshot]);
 
   const handleAiPlanRefreshFromProgress = (aiPlan, weightValue) => {
     const nextUserData = {...userData, weight: weightValue};
@@ -15024,7 +15559,7 @@ setPhase("free-beta");
 {phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding) => {
   if (existingOnboarding) {
    setUserData(existingOnboarding);
-   await autoSyncWearableOnEntry();
+   await refreshSnapshot({ forceSync: true });
    const currentAiPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding);
    const authPlan = currentAiPlan || (await generateAiPlanFromBackend(existingOnboarding)).plan || calcPlan(existingOnboarding);
    setPlan(authPlan);
@@ -15151,7 +15686,7 @@ function DUBIRoot() {
 }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<LangProvider><DUBIRoot /></LangProvider>);
+    root.render(<LangProvider><WearableProvider><DUBIRoot /></WearableProvider></LangProvider>);
 
     // Nascondi schermata di boot non appena React ha montato il componente
     window._dubiReady = true;
