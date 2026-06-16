@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icons/dubi-icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/dubi-icon.svg" />
-  <title>DUBI â€” Data-Driven Understanding of Body Intelligence</title>
+  <title>DUBI - Data-Driven Understanding of Body Intelligence</title>
 
   <!-- CDN primario: cdnjs (Cloudflare) â€” piÃ¹ veloce su mobile rispetto a unpkg -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"
@@ -230,6 +230,11 @@
       0% { transform: translateX(-120%); }
       100% { transform: translateX(260%); }
     }
+    @media (min-width: 768px) {
+      .dubi-app-shell:not(.dubi-app-shell--app) {
+        --dubi-shell-max: 600px;
+      }
+    }
     @media (min-width: 768px) and (max-width: 1199px) {
       .dubi-app-shell.dubi-app-shell--app {
         --dubi-shell-max: 900px;
@@ -356,11 +361,11 @@
 </head>
 <body>
 
-  <!-- Schermata di boot â€” nascosta non appena React monta il componente root -->
+  <!-- Schermata di boot: nascosta non appena React monta il componente root -->
   <div id="dubi-boot">
     <div class="dubi-boot-logo">DU<span>BI</span></div>
     <div class="dubi-boot-spinner"></div>
-    <div class="dubi-boot-msg">Caricamento in corsoâ€¦</div>
+    <div class="dubi-boot-msg">Caricamento in corso...</div>
     <div class="dubi-boot-error" id="dubi-boot-error">
       Connessione assente o lenta.<br>
       Assicurati di essere sulla stessa rete WiFi del computer e che il WiFi abbia accesso a internet.
@@ -388,7 +393,6 @@
  * Ultimo aggiornamento: Giugno 2026
  *
  * INTEGRAZIONE (Babel standalone, no Vite):
- *   <script src="dubi_legal.js"><\/script>
  *   window.DUBI_LEGAL.privacy.it
  *   window.DUBI_LEGAL.terms.en
  *   window.DUBI_LEGAL.health.it
@@ -418,11 +422,11 @@
         '<h3>2. Quali dati raccogliamo</h3>' +
         '<p><strong>Dati identificativi e di account:</strong> nome, email, password (in forma hash &mdash; non accessibile a noi).</p>' +
         '<p><strong>Dati di profilo e onboarding:</strong> data di nascita, sesso biologico, altezza, peso, obiettivo nutrizionale, tipo di sport, frequenza e timing degli allenamenti, preferenze alimentari, tipo di dieta, allergie e intolleranze.</p>' +
-        '<p><strong>Dati sanitari (Art. 9 GDPR):</strong> i dati relativi ad allergie, intolleranze, obiettivi fisici e preferenze alimentari sono considerati dati relativi alla salute. Se connetti un dispositivo wearable: frequenza cardiaca, HRV, qualitÃ  del sonno, calorie attive, passi, score di recupero.</p>' +
+        '<p><strong>Dati sanitari (Art. 9 GDPR):</strong> i dati relativi ad allergie, intolleranze, obiettivi fisici e preferenze alimentari sono considerati dati relativi alla salute. Se connetti un dispositivo wearable: frequenza cardiaca, HRV, qualita del sonno, calorie attive, passi, score di recupero.</p>' +
         '<p><strong>Dati di utilizzo:</strong> pasti registrati, aderenza al piano, feedback NPS, log di accesso.</p>' +
         '<p><strong>Dati AI:</strong> se usi &ldquo;Chiedi a DUBI&rdquo;, il testo delle conversazioni Ã¨ trasmesso a OpenAI per generare la risposta. <strong>Lo storico non Ã¨ conservato sui nostri server</strong>; puÃ² essere presente solo localmente sul tuo dispositivo (memoria del browser) e non Ã¨ accessibile ai nostri server.</p>' +
 
-        '<h3>3. FinalitÃ  e base giuridica</h3>' +
+        '<h3>3. Finalita e base giuridica</h3>' +
         '<ul>' +
         '<li>Gestione account &rarr; esecuzione del contratto (Art. 6.1.b)</li>' +
         '<li>Generazione piano nutrizionale &rarr; esecuzione del contratto (Art. 6.1.b)</li>' +
@@ -430,7 +434,7 @@
         '<li>Dati sanitari &rarr; consenso esplicito (Art. 9.2.a)</li>' +
         '<li>Sicurezza &rarr; legittimo interesse (Art. 6.1.f)</li>' +
         '</ul>' +
-        '<p><strong>Non utilizziamo i tuoi dati per finalitÃ  pubblicitarie. Non vendiamo i tuoi dati.</strong></p>' +
+        '<p><strong>Non utilizziamo i tuoi dati per finalita pubblicitarie. Non vendiamo i tuoi dati.</strong></p>' +
 
         '<h3>4. Provider terzi</h3>' +
         '<p>Ci avvaliamo dei seguenti fornitori, che trattano dati per nostro conto ai sensi dei rispettivi data processing terms ove disponibili:</p>' +
@@ -453,7 +457,7 @@
         '</ul>' +
 
         '<h3>6. I tuoi diritti (Art. 15&ndash;22 GDPR)</h3>' +
-        '<p>Hai diritto di accesso, rettifica, cancellazione, portabilitÃ , opposizione, revoca del consenso e reclamo al Garante (<a href="https://www.garanteprivacy.it" target="_blank">garanteprivacy.it</a>).<br>' +
+        '<p>Hai diritto di accesso, rettifica, cancellazione, portabilita, opposizione, revoca del consenso e reclamo al Garante (<a href="https://www.garanteprivacy.it" target="_blank">garanteprivacy.it</a>).<br>' +
         'Scrivi a <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> &mdash; risponderemo entro 30 giorni.</p>' +
 
         '<h3>7. Sicurezza</h3>' +
@@ -465,10 +469,10 @@
         '</ul>' +
 
         '<h3>8. Minori</h3>' +
-        '<p>DUBI Ã¨ riservato a persone di almeno <strong>18 anni</strong>. Per segnalare account di minori: <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>.</p>' +
+        '<p>DUBI e riservato a persone di almeno <strong>18 anni</strong>. Per segnalare account di minori: <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>.</p>' +
 
         '<h3>9. Decisioni automatizzate</h3>' +
-        '<p>Il piano nutrizionale Ã¨ una <strong>raccomandazione</strong>, non una decisione vincolante (Art. 22 GDPR).</p>' +
+        '<p>Il piano nutrizionale e una <strong>raccomandazione</strong>, non una decisione vincolante (Art. 22 GDPR).</p>' +
 
         '<h3>10. Modifiche</h3>' +
         '<p>Notificheremo modifiche sostanziali almeno 14 giorni prima dell&rsquo;entrata in vigore.</p>',
@@ -550,7 +554,7 @@
         '<p><em>Ultimo aggiornamento: Giugno 2026</em></p>' +
 
         '<h3>1. Accettazione</h3>' +
-        '<p>Utilizzando DUBI accetti i presenti Termini nella loro interezza. DUBI Ã¨ riservato a persone di almeno <strong>18 anni</strong>.</p>' +
+        '<p>Utilizzando DUBI accetti i presenti Termini nella loro interezza. DUBI e riservato a persone di almeno <strong>18 anni</strong>.</p>' +
 
         '<h3>2. Descrizione del Servizio</h3>' +
         '<p>DUBI Ã¨ unâ€™applicazione di nutrizione personalizzata attualmente in <strong>fase beta gratuita</strong>. <strong>Non Ã¨ un servizio medico.</strong> I piani nutrizionali sono suggerimenti algoritmici, non prescrizioni.</p>' +
@@ -662,13 +666,13 @@
     consent: {
       // Consenso Art. 9 GDPR: da mostrare PRIMA di raccogliere allergie/obiettivi
       healthData: {
-        it: 'Acconsento al trattamento dei miei dati relativi alla salute (allergie, intolleranze, obiettivi fisici) per la personalizzazione del piano nutrizionale DUBI, ai sensi dellâ€™Art. 9.2.a GDPR. Posso revocare il consenso in qualsiasi momento dalle impostazioni.',
+        it: 'Acconsento al trattamento dei miei dati relativi alla salute (allergie, intolleranze, obiettivi fisici) per la personalizzazione del piano nutrizionale DUBI, ai sensi dell\'Art. 9.2.a GDPR. Posso revocare il consenso in qualsiasi momento dalle impostazioni.',
         en: 'I consent to the processing of my health-related data (allergies, intolerances, physical goals) for personalisation of my DUBI nutritional plan (Art. 9.2.a GDPR). I can withdraw consent at any time from settings.',
       },
       // Consenso contestuale wearable: da mostrare al momento della connessione
       wearable: {
         it: function (provider) {
-          return 'Connettendo ' + provider + ' autorizzi DUBI a leggere i tuoi dati di attivitÃ  fisica e sonno tramite token OAuth, senza accedere alla tua password. Puoi disconnettere il dispositivo in qualsiasi momento dalle impostazioni.';
+          return 'Connettendo ' + provider + ' autorizzi DUBI a leggere i tuoi dati di attivita fisica e sonno tramite token OAuth, senza accedere alla tua password. Puoi disconnettere il dispositivo in qualsiasi momento dalle impostazioni.';
         },
         en: function (provider) {
           return 'By connecting ' + provider + ' you authorise DUBI to read your physical activity and sleep data via OAuth token, without accessing your password. You can disconnect at any time from settings.';
@@ -676,7 +680,7 @@
       },
       // Accettazione Termini + Privacy: checkbox obbligatoria al primo login
       terms: {
-        it: 'Ho letto e accetto i Termini di Servizio e lâ€™Informativa sulla Privacy di DUBI.',
+        it: 'Ho letto e accetto i Termini di Servizio e l\'Informativa sulla Privacy di DUBI.',
         en: 'I have read and accept DUBIâ€™s Terms of Service and Privacy Policy.',
       },
     },
@@ -8060,19 +8064,21 @@ const NumInput = ({label,unit,value,onChange,min,max}) => {
     <div style={{marginBottom:18}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
         <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:0}}>{label}</p>
-        {error && <span style={{fontSize:11,color:"#C47B7B"}}>Valore non valido ({min}â€“{max})</span>}
+        {error && <span style={{fontSize:11,color:"#C47B7B"}}>Valore non valido ({min}-{max})</span>}
       </div>
       <div style={{display:"flex",alignItems:"center",background:T.card,
         border:`1.5px solid ${borderColor}`,borderRadius:14,
         transition:"border-color 0.2s",overflow:"hidden"}}>
 
-        {/* Pulsante âˆ’ */}
+        {/* Pulsante decremento */}
         <button onClick={dec}
           style={{padding:"14px 18px",background:"none",border:"none",
             fontSize:24,color:T.text,cursor:"pointer",flexShrink:0,lineHeight:1,
-            borderRight:`1px solid ${T.border}`,userSelect:"none"}}>âˆ’</button>
+            borderRight:`1px solid ${T.border}`,userSelect:"none"}}>
+          <span style={{fontSize:20,fontWeight:300,lineHeight:1}}>-</span>
+        </button>
 
-        {/* Input centrale â€” digitabile direttamente */}
+        {/* Input centrale digitabile direttamente */}
         <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",
           padding:"0 8px",position:"relative",cursor:"text"}}
           onClick={()=>inputRef.current?.focus()}>
@@ -8097,11 +8103,13 @@ const NumInput = ({label,unit,value,onChange,min,max}) => {
             position:"absolute",right:10,pointerEvents:"none",bottom:16}}>{unit}</span>
         </div>
 
-        {/* Pulsante + */}
+        {/* Pulsante incremento */}
         <button onClick={inc}
           style={{padding:"14px 18px",background:"none",border:"none",
             fontSize:24,color:T.text,cursor:"pointer",flexShrink:0,lineHeight:1,
-            borderLeft:`1px solid ${T.border}`,userSelect:"none"}}>+</button>
+            borderLeft:`1px solid ${T.border}`,userSelect:"none"}}>
+          <span style={{fontSize:20,fontWeight:300,lineHeight:1}}>+</span>
+        </button>
       </div>
     </div>
   );
@@ -10364,9 +10372,7 @@ const RejectionScreen = ({ onBack }) => {
   const { t, lang } = useT();
   const copy = getAuthCopy(lang);
 
-  // Default to "login" if there is already a saved token or saved email, otherwise "register"
-  const hasExistingSession = !!(localStorage.getItem("dubi_token") || localStorage.getItem("dubi_email"));
-  const [mode, setMode] = useState(hasExistingSession ? "login" : "register");
+  const [mode, setMode] = useState("login");
 
   // Pre-fill email only for login mode
   const [email, setEmail] = useState(mode === "login" ? (localStorage.getItem("dubi_email") || "") : "");
@@ -10756,7 +10762,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
                 type="number" inputMode="decimal"
                 value={d.targetWeight||""}
                 onChange={e=>{ const v=e.target.value; if(v===""||(!isNaN(parseFloat(v))&&parseFloat(v)>0)) u("targetWeight",v); }}
-                placeholder="â€”"
+                placeholder="-"
                 style={{flex:1,fontSize:20,fontWeight:700,color:T.text,background:"none",border:"none",outline:"none",
                   fontFamily:"inherit",MozAppearance:"textfield",WebkitAppearance:"none",appearance:"textfield",textAlign:"center"}}
               />
@@ -10790,7 +10796,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
                   type="number" inputMode="decimal"
                   value={d.targetBf||""}
                   onChange={e=>{ const v=e.target.value; if(v===""||(!isNaN(parseFloat(v))&&parseFloat(v)>0)) u("targetBf",v); }}
-                  placeholder="â€”"
+                  placeholder="-"
                   style={{flex:1,fontSize:20,fontWeight:700,color:T.text,background:"none",border:"none",outline:"none",
                     fontFamily:"inherit",MozAppearance:"textfield",WebkitAppearance:"none",appearance:"textfield",textAlign:"center"}}
                 />
@@ -16466,7 +16472,7 @@ function DUBIApp() {
     const token = localStorage.getItem("dubi_token");
 
     if (!token) {
-      setPhase("welcome");
+      setPhase("auth");
       return;
     }
 
@@ -16510,7 +16516,7 @@ function DUBIApp() {
       if (currentUser) setUserData(normalizeOnboarding(currentUser));
     } catch (error) {
       console.error("Session check failed:", error);
-      setPhase("welcome");
+      setPhase("auth");
     }
   };
 
@@ -16526,7 +16532,7 @@ const handleLogout = () => {
   setUserData(null);
   setPlan(null);
   setActiveTab("today");
-  setPhase("welcome");
+  setPhase("auth");
 };
 const handleDeleteAccount = async () => {
   const result = await deleteAccountFromBackend();
@@ -16636,7 +16642,7 @@ setPhase("free-beta");
         button,input,textarea{font-family:'Inter',-apple-system,sans-serif;}
         ::-webkit-scrollbar{display:none;}
       `}</style>
-      <div className={`dubi-app-shell ${phase==="app" ? "dubi-app-shell--app" : ""}`} style={{width:"100%",maxWidth:"var(--dubi-shell-max, 430px)",background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
+      <div className={`dubi-app-shell ${phase==="app" ? "dubi-app-shell--app" : ""}`} style={{width:"100%",maxWidth:"var(--dubi-shell-max, 440px)",background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
         {phase==="checking" && (
   <div className="dubi-loading-screen">
     <div className="dubi-loading-card">
@@ -16673,7 +16679,7 @@ setPhase("free-beta");
 }} onAgeBlocked={(blockedData) => {
   setUserData(blockedData || null);
   setPhase("rejected");
-}} onBack={() => setPhase("welcome")} />}
+}} onBack={() => setPhase("auth")} />}
 
         {phase==="rejected" && <RejectionScreen onBack={() => setPhase("auth")} />}
 
@@ -16740,7 +16746,7 @@ setPhase("free-beta");
               await finalizeData(dataToGenerate);
               setPendingPlanData(null);
             }}
-            onDecline={()=>setPhase("welcome")}
+            onDecline={()=>setPhase("auth")}
           />
         )}
         {phase==="wearable-connect" && (
