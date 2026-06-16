@@ -7532,7 +7532,7 @@ function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
   const _parse = (str) => {
     const out = [];
     // Match: "Name (qty unit [extra text])" â€” piÃ¹ occorrenze per stringa
-    const re = /([A-Za-zÃ€-Ã¿'\s%&Â°\/]+?)\s*\(\s*(?:[Â¼Â½Â¾]\s*(?:,\s*)?)?(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|cl|pz)?\b[^)]*\)/gi;
+    const re = /([^()]+?)\s*\(\s*(?:[^0-9)]*?)?(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|cl|pz)?\b[^)]*\)/gi;
     let m;
     while ((m = re.exec(str)) !== null) {
       let raw = m[1].trim();
