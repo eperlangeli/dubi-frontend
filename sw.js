@@ -1,4 +1,4 @@
-const CACHE_NAME = "dubi-beta-v2";
+const CACHE_NAME = "dubi-beta-v3";
 const APP_SHELL = ["/", "/index.html", "/offline.html", "/privacy.html", "/manifest.webmanifest", "/icons/dubi-icon.svg"];
 
 self.addEventListener("install", (event) => {
