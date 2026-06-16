@@ -262,6 +262,51 @@
         scroll-behavior: auto !important;
       }
     }
+
+    .dubi-legal-content {
+      color: #2B2B2B;
+      font-size: 13px;
+      line-height: 1.62;
+      overflow-wrap: anywhere;
+    }
+    .dubi-legal-content h2 {
+      margin: 0 0 12px;
+      font-family: 'Manrope','Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      font-size: 23px;
+      line-height: 1.14;
+      letter-spacing: -0.5px;
+      color: #2B2B2B;
+    }
+    .dubi-legal-content h3 {
+      margin: 18px 0 7px;
+      font-size: 13px;
+      font-weight: 900;
+      color: #2B2B2B;
+    }
+    .dubi-legal-content p {
+      margin: 0 0 10px;
+      color: #5F5A56;
+    }
+    .dubi-legal-content ul {
+      margin: 0 0 12px 18px;
+      padding: 0;
+      color: #5F5A56;
+    }
+    .dubi-legal-content li {
+      margin: 5px 0;
+    }
+    .dubi-legal-content a {
+      color: #6B8A64;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .dubi-legal-consent-card {
+      background: #F5F3EF;
+      border: 1px solid #E7E2DA;
+      border-radius: 16px;
+      padding: 18px 16px;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
@@ -290,6 +335,7 @@
   </script>
 
   <div id="root"></div>
+  <script src="/dubi_legal.js"></script>
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 const API_BASE_URL = "https://dubi-backend.onrender.com";
@@ -691,11 +737,61 @@ const getPlanProfileSignature = (userData = {}) => {
     wearables: Array.isArray(data.wearables)
       ? data.wearables
       : String(data.wearable_provider ?? data.wearable ?? "none").split(",").filter(Boolean),
-    wearableConsent: Boolean(data.wearable_consent ?? data.wearableConsent)
+    wearableConsent: Boolean(data.wearable_consent ?? data.wearableConsent),
+    isMinor: Boolean(data.is_minor ?? data.isMinor),
+    guardianEmail: data.guardian_email ?? data.guardianEmail ?? null,
+    parentalConsentStatus: data.parental_consent_status ?? data.parentalConsentStatus ?? "not_required",
+    parentalConsentVerifiedAt: data.parental_consent_verified_at ?? data.parentalConsentVerifiedAt ?? null
   };
 };
 const getAuthToken = () => {
   return localStorage.getItem("dubi_token") || "";
+};
+
+const calculateAgeFromBirthDate = (birthDate) => {
+  if (!birthDate) return null;
+  const dob = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDelta = today.getMonth() - dob.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) age -= 1;
+  return age;
+};
+
+const getCurrentUserFromBackend = async (token = getAuthToken()) => {
+  if (!token) return null;
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.warn("Auth user check failed:", error);
+    return null;
+  }
+};
+
+const requestParentalConsentEmail = async ({ guardianName, guardianEmail, language }) => {
+  const token = getAuthToken();
+  if (!token) return { success:false, error:"missing_token" };
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/parental-consent/request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ guardianName, guardianEmail, language })
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? { success:true, ...data } : { success:false, error:data.error || "request_failed" };
+  } catch (error) {
+    console.error("Parental consent request failed:", error);
+    return { success:false, error:"network_error" };
+  }
 };
 
 const deleteAccountFromBackend = async () => {
@@ -827,7 +923,15 @@ const saveOnboardingToBackend = async (data) => {
 
     wearable_provider: getPrimaryWearable(data),
     wearable_providers: getSelectedWearables(data),
-    wearable_consent: Boolean(data.wearableConsent)
+    wearable_consent: Boolean(data.wearableConsent),
+    terms_accepted: data.termsAccepted ?? data.terms ?? null,
+    privacy_accepted: data.privacyAccepted ?? data.terms ?? null,
+    health_data_consent: data.healthDataConsent ?? data.healthConsent ?? null,
+    privacy_policy_version: data.privacyPolicyVersion || null,
+    terms_version: data.termsVersion || null,
+    health_disclaimer_version: data.healthDisclaimerVersion || null,
+    legal_accepted_at: data.legalAcceptedAt || data.privacyAcceptedAt || null,
+    health_data_consent_at: data.healthDataConsentAt || data.privacyAcceptedAt || null
   };
 
   try {
@@ -894,6 +998,11 @@ const saveOnboardingToBackend = async (data) => {
 };
 
 const mapAiPlanToFrontend = (aiPlan, userData) => {
+  const ingredientPlan = normalizeIngredientPlanPayload(aiPlan);
+  if (ingredientPlan?.meals) {
+    return mapIngredientPlanToFrontend(ingredientPlan, userData);
+  }
+
   const fallbackPlan = calcPlan(userData);
   const slots = aiPlan?.mealStructure?.slots || [];
 
@@ -912,6 +1021,228 @@ const mapAiPlanToFrontend = (aiPlan, userData) => {
   };
 };
 
+const getTodayIsoDate = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+};
+
+const normalizeIngredientPlanPayload = (raw) => {
+  if (!raw) return null;
+  if (raw.plan_data) return raw.plan_data;
+  if (raw.planData) return raw.planData;
+  if (raw.plan?.plan_data) return raw.plan.plan_data;
+  if (raw.planDataJson) return raw.planDataJson;
+  return raw;
+};
+
+const INGREDIENT_MEAL_META = {
+  breakfast: { id:"colazione", labelKey:"meal.colazione", label:"Colazione", icon:"sunrise" },
+  snack_morning: { id:"snack_m", labelKey:"meal.snack_m", label:"Spuntino mattina", icon:"leaf2" },
+  lunch: { id:"pranzo", labelKey:"meal.pranzo", label:"Pranzo", icon:"fork" },
+  snack: { id:"snack", labelKey:"meal.snack_pm", label:"Spuntino pomeriggio", icon:"leaf2" },
+  snack_afternoon: { id:"snack", labelKey:"meal.snack_pm", label:"Spuntino pomeriggio", icon:"leaf2" },
+  dinner: { id:"cena", labelKey:"meal.cena", label:"Cena", icon:"moon" },
+  pre_workout: { id:"pre_workout", labelKey:"today.preWorkout", label:"Pre-allenamento", icon:"zap" },
+  post_workout: { id:"post_workout", labelKey:"today.postWorkout", label:"Post-allenamento", icon:"refresh" }
+};
+
+const ingredientMealsToArray = (plan = {}) => {
+  if (Array.isArray(plan.meals)) return plan.meals;
+  if (plan.meals && typeof plan.meals === "object") {
+    return Object.entries(plan.meals).map(([mealType, meal]) => ({
+      mealType,
+      ...(meal || {})
+    }));
+  }
+  return [];
+};
+
+const normalizeIngredientItemForUi = (item = {}) => {
+  const grams = Number(item.portionG ?? item.grams ?? item.quantity ?? 0);
+  const fatValue = Number(item.fat ?? item.fats ?? 0);
+  const name = item.name || item.display_name || item.displayName || item.source_food_name || item.label || "Ingrediente";
+  return {
+    ...item,
+    name,
+    quantity: grams ? Math.round(grams) : undefined,
+    unit: grams ? "g" : undefined,
+    calories: Math.round(Number(item.calories || 0)),
+    protein: Math.round(Number(item.protein || 0) * 10) / 10,
+    carbs: Math.round(Number(item.carbs || 0) * 10) / 10,
+    fats: Math.round(fatValue * 10) / 10,
+    fiber: Math.round(Number(item.fiber || 0) * 10) / 10,
+    source_id: item.source_id || item.sourceId || null,
+    source_confidence: item.source_confidence ?? item.sourceConfidence ?? null
+  };
+};
+
+const mapIngredientMealToUi = (meal, index, times) => {
+  const mealType = meal.mealType || meal.meal_type || meal.type || `meal_${index}`;
+  const meta = INGREDIENT_MEAL_META[mealType] || { id:mealType, label:meal.displayName?.it || mealType, icon:"fork" };
+  const macros = meal.totalMacros || meal.macros || {};
+  const ingredients = (meal.ingredients || []).map(normalizeIngredientItemForUi);
+  const sourceIds = [...new Set(ingredients.map(i => i.source_id).filter(Boolean))];
+  const sourceText = sourceIds.length ? `Fonti dati: ${sourceIds.join(", ")}` : "Fonti dati nutrizionali ufficiali DUBI.";
+
+  return {
+    ...meta,
+    time: times[index] || "--:--",
+    data: {
+      items: ingredients,
+      alts: [],
+      macros: {
+        cal: Math.round(Number(meal.totalCalories || meal.calories || 0)),
+        p: Math.round(Number(macros.protein || meal.protein || 0) * 10) / 10,
+        c: Math.round(Number(macros.carbs || meal.carbs || 0) * 10) / 10,
+        f: Math.round(Number(macros.fat || macros.fats || meal.fat || meal.fats || 0) * 10) / 10,
+      },
+      why: `${sourceText} Le porzioni sono adattate al tuo target calorico, proteico, preferenze e restrizioni inserite in onboarding.`,
+      whyEN: `${sourceText} Portions are adapted to your calorie target, protein target, preferences and onboarding restrictions.`,
+      source: sourceText,
+      practical: meal.practical || null,
+      ingredientMeal: meal
+    },
+    workoutLabel: mealType === "pre_workout" ? "PRE" : mealType === "post_workout" ? "POST" : null,
+    carbTargetPct: null,
+    adaptSkipped: false
+  };
+};
+
+const getIngredientMealListForDay = (plan, times = []) => {
+  const ingredientPlan = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
+  if (!ingredientPlan?.meals) return null;
+  return ingredientMealsToArray(ingredientPlan).map((meal, index) => mapIngredientMealToUi(meal, index, times));
+};
+
+const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
+  const ingredientPlan = normalizeIngredientPlanPayload(ingredientPlanRaw);
+  const fallbackPlan = calcPlan(userData);
+  const summary = ingredientPlan?.daySummary || {};
+  const meals = ingredientMealsToArray(ingredientPlan);
+  const mealCount = meals.length || fallbackPlan.mealCount;
+  const mealTimes = calcMealTimes({
+    dayStart: userData?.dayStart || userData?.day_start || 7,
+    dayEnd: userData?.dayEnd || userData?.day_end || 22,
+    meals: mealCount
+  });
+
+  return {
+    ...fallbackPlan,
+    calories: Math.round(Number(summary.totalCalories || ingredientPlan?.total_calories || ingredientPlan?.targetCalories || fallbackPlan.calories)),
+    protein: Math.round(Number(summary.totalProtein || ingredientPlan?.total_protein || ingredientPlan?.targetProtein || fallbackPlan.protein)),
+    carbs: Math.round(Number(summary.totalCarbs || ingredientPlan?.total_carbs || fallbackPlan.carbs)),
+    fat: Math.round(Number(summary.totalFat || ingredientPlan?.total_fat || fallbackPlan.fat)),
+    mealCount,
+    mealTimes,
+    aiGenerated: true,
+    ingredientGenerated: true,
+    ingredientPlan,
+    giSummary: ingredientPlan?.gi_summary || null,
+    pathologyFilter: ingredientPlan?.pathology_filter || null,
+    profileSignature: getPlanProfileSignature(userData),
+    scienceTrace: ["DUBI ingredient-based engine", "USDA/CIQUAL/CREA/BLS mapped ingredient references where available"]
+  };
+};
+
+const GI_BADGE_THEME = {
+  low: "#22c55e",
+  medium: "#f97316",
+  high: "#ef4444",
+  mixed: "#a855f7",
+  unknown: "#9ca3af"
+};
+
+const GI_BADGE_COPY = {
+  it: {
+    prefix: "GI del piano",
+    known: "ingredienti con GI noto",
+    labels: { low: "BASSO", medium: "MEDIO", high: "ALTO", mixed: "MISTO", unknown: "N/D" }
+  },
+  en: {
+    prefix: "Plan GI",
+    known: "ingredients with known GI",
+    labels: { low: "LOW", medium: "MEDIUM", high: "HIGH", mixed: "MIXED", unknown: "N/A" }
+  }
+};
+
+const PATHOLOGY_BADGE_COPY = {
+  it: {
+    prefix: "Piano adattato",
+    excluded: "ingredienti esclusi su",
+    labels: {
+      gerd: "GERD",
+      ibs_fodmap: "IBS",
+      histamine: "Istamina",
+      diabetic: "Diabete",
+      renal: "Renale",
+      gout: "Gotta",
+      nickel: "Nichel",
+      celiac: "Celiaco",
+      lactose_intolerant: "Intolleranza Lattosio"
+    }
+  },
+  en: {
+    prefix: "Plan adapted",
+    excluded: "ingredients excluded out of",
+    labels: {
+      gerd: "GERD",
+      ibs_fodmap: "IBS",
+      histamine: "Histamine",
+      diabetic: "Diabetes",
+      renal: "Renal",
+      gout: "Gout",
+      nickel: "Nickel",
+      celiac: "Celiac",
+      lactose_intolerant: "Lactose intolerance"
+    }
+  }
+};
+
+async function generateIngredientPlan(options = {}) {
+  const token = localStorage.getItem("dubi_token");
+  if (!token) throw new Error("missing_token");
+  const today = options.date || getTodayIsoDate();
+
+  const genRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/generate`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ date: today })
+  });
+
+  if (!genRes.ok) {
+    const err = await genRes.json().catch(() => ({}));
+    throw new Error(err.error || "Errore nella generazione del piano");
+  }
+
+  const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+
+  if (!fetchRes.ok) throw new Error("Errore nel recupero del piano");
+  return normalizeIngredientPlanPayload(await fetchRes.json());
+}
+
+const fetchCurrentIngredientPlanFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return null;
+  try {
+    const today = getTodayIsoDate();
+    const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return null;
+    return normalizeIngredientPlanPayload(await response.json());
+  } catch (error) {
+    console.error("Current ingredient plan load failed:", error);
+    return null;
+  }
+};
+
 const generateAiPlanFromBackend = async (userData, options = {}) => {
   const token = getAuthToken();
   const fallbackPlan = calcPlan(userData);
@@ -921,28 +1252,10 @@ const generateAiPlanFromBackend = async (userData, options = {}) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/generate-plan`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        force: Boolean(options.force),
-        reason: options.reason || (options.force ? "explicit_frontend_regeneration" : null)
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      console.error("AI plan generation failed:", err);
-      return { plan: fallbackPlan, savedByAi: false };
-    }
-
-    const data = await response.json();
-    return { plan: mapAiPlanToFrontend(data.plan, userData), savedByAi: true };
+    const ingredientPlan = await generateIngredientPlan(options);
+    return { plan: mapIngredientPlanToFrontend(ingredientPlan, userData), savedByAi: true };
   } catch (error) {
-    console.error("AI plan request failed:", error);
+    console.error("Ingredient plan request failed:", error);
     return { plan: fallbackPlan, savedByAi: false };
   }
 };
@@ -952,27 +1265,10 @@ const fetchCurrentAiPlanFromBackend = async (userData) => {
   if (!token) return null;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/plan/current`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const rawPlan = data?.plan?.plan_json;
-    const aiPlan = typeof rawPlan === "string" ? JSON.parse(rawPlan) : rawPlan;
-    const expectedSignature = getPlanProfileSignature(userData);
-    if (aiPlan?.profileSignature !== expectedSignature) return null;
-    const planText = JSON.stringify(aiPlan || {});
-    if (planText.includes("Fonte proteica principale")) return null;
-    const hasIngredientSwaps = aiPlan?.mealStructure?.days?.some(day =>
-      day?.meals?.some(meal => meal?.ingredients?.some(item => item?.alternatives?.length))
-    );
-    if (!hasIngredientSwaps) return null;
-    return aiPlan ? mapAiPlanToFrontend(aiPlan, userData) : null;
+    const ingredientPlan = await fetchCurrentIngredientPlanFromBackend();
+    return ingredientPlan ? mapIngredientPlanToFrontend(ingredientPlan, userData) : null;
   } catch (error) {
-    console.error("Current AI plan load failed:", error);
+    console.error("Current ingredient plan load failed:", error);
     return null;
   }
 };
@@ -1451,8 +1747,46 @@ const T = {
   accentD:"#6B8A64", sel:"#EDF0EC", white:"#FFFFFF",
 };
 
-const DUBI_SUPPORT_EMAIL = "support@dubi.app";
+const DUBI_SUPPORT_EMAIL = "support@dubi.health";
 const PRIVACY_POLICY_VERSION = "dubi-beta-privacy-2026-06-10";
+const TERMS_VERSION = "dubi-beta-terms-2026-06-10";
+const HEALTH_DISCLAIMER_VERSION = "dubi-beta-health-2026-06-12";
+const getLegalLang = (lang = null) => {
+  const current = lang || localStorage.getItem("dubi_lang") || "it";
+  return current === "it" ? "it" : "en";
+};
+const getLegal = (section, lang = null) => {
+  const legal = window.DUBI_LEGAL || {};
+  const key = getLegalLang(lang);
+  return legal?.[section]?.[key] || legal?.[section]?.en || "";
+};
+const getLegalConsent = (section, lang = null, provider = "") => {
+  const legal = window.DUBI_LEGAL || {};
+  const key = getLegalLang(lang);
+  const value = legal?.consent?.[section]?.[key] || legal?.consent?.[section]?.en || "";
+  return typeof value === "function" ? value(provider) : value;
+};
+const getLegalMeta = (section, lang = null) => {
+  const isIt = getLegalLang(lang) === "it";
+  const meta = {
+    privacy: {
+      title: isIt ? "Informativa sulla Privacy" : "Privacy Policy",
+      subtitle: isIt ? "Come DUBI raccoglie, protegge e usa i tuoi dati." : "How DUBI collects, protects and uses your data."
+    },
+    terms: {
+      title: isIt ? "Termini di Servizio" : "Terms of Service",
+      subtitle: isIt ? "Le condizioni della beta gratuita DUBI." : "The conditions of the free DUBI beta."
+    },
+    health: {
+      title: isIt ? "Disclaimer Sanitario" : "Health Disclaimer",
+      subtitle: isIt ? "DUBI e supporto educativo: non un servizio medico." : "DUBI as educational support, not a medical service."
+    }
+  };
+  return {
+    ...(meta[section] || meta.privacy),
+    close: isIt ? "Chiudi" : "Close"
+  };
+};
 const PRIVACY_COPY = {
   it: {
     title: "Privacy Policy",
@@ -1701,7 +2035,6 @@ const PRIVACY_COPY = {
 };
 const getPrivacyCopy = (lang) => PRIVACY_COPY[lang] || PRIVACY_COPY.en;
 
-const TERMS_VERSION = "dubi-beta-terms-2026-06-10";
 const TERMS_COPY = {
   it: {
     title: "Termini e nota salute",
@@ -2021,23 +2354,13 @@ const WEARABLE_CONNECT_COPY = {
 const getWearableConnectCopy = (lang) => ({...WEARABLE_CONNECT_COPY.en, ...(WEARABLE_CONNECT_COPY[lang] || {})});
 
 const PrivacyPolicyContent = ({lang}) => {
-  const copy = getPrivacyCopy(lang);
   return (
-    <div>
-      <p style={{fontSize:13,color:T.muted,lineHeight:1.6,margin:"0 0 14px"}}>{copy.intro}</p>
-      {copy.sections.map((section) => (
-        <div key={section.title} style={{padding:"12px 0",borderTop:`1px solid ${T.border}`}}>
-          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:900,color:T.text}}>{section.title}</p>
-          <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.55}}>{section.body}</p>
-        </div>
-      ))}
-      <p style={{margin:"10px 0 0",fontSize:11,color:T.muted,fontWeight:700}}>{copy.version}</p>
-    </div>
+    <div className="dubi-legal-content" dangerouslySetInnerHTML={{__html:getLegal("privacy", lang)}} />
   );
 };
 
 const PrivacyPolicyModal = ({lang, onClose}) => {
-  const copy = getPrivacyCopy(lang);
+  const copy = getLegalMeta("privacy", lang);
   return ReactDOM.createPortal((
     <div
       style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:DUBI_MODAL_Z + 10,display:"flex",alignItems:"center",justifyContent:"center",padding:"max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom))",overscrollBehavior:"contain"}}
@@ -2076,7 +2399,7 @@ const PrivacyPolicyModal = ({lang, onClose}) => {
 
 const PrivacyPolicyPage = () => {
   const { lang } = useT();
-  const copy = getPrivacyCopy(lang);
+  const copy = getLegalMeta("privacy", lang);
   const sx = getSettingsScreenCopy(lang);
   return (
     <div style={{background:T.bg,minHeight:"100vh",padding:"42px 20px 48px",fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif"}}>
@@ -2110,23 +2433,13 @@ const PrivacyPolicyPage = () => {
    ═══════════════════════════════════════════════════════════════ */
 
 const TermsContent = ({lang}) => {
-  const copy = getTermsCopy(lang);
   return (
-    <div>
-      <p style={{fontSize:13,color:T.muted,lineHeight:1.6,margin:"0 0 14px"}}>{copy.intro}</p>
-      {copy.sections.map((section) => (
-        <div key={section.title} style={{padding:"12px 0",borderTop:`1px solid ${T.border}`}}>
-          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:900,color:T.text}}>{section.title}</p>
-          <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.55}}>{section.body}</p>
-        </div>
-      ))}
-      <p style={{margin:"10px 0 0",fontSize:11,color:T.muted,fontWeight:700}}>{copy.version}</p>
-    </div>
+    <div className="dubi-legal-content" dangerouslySetInnerHTML={{__html:getLegal("terms", lang)}} />
   );
 };
 
 const TermsModal = ({lang, onClose}) => {
-  const copy = getTermsCopy(lang);
+  const copy = getLegalMeta("terms", lang);
   return ReactDOM.createPortal((
     <div
       style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:DUBI_MODAL_Z + 10,display:"flex",alignItems:"center",justifyContent:"center",padding:"max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom))",overscrollBehavior:"contain"}}
@@ -2163,9 +2476,51 @@ const TermsModal = ({lang, onClose}) => {
   ), document.body);
 };
 
+const HealthDisclaimerContent = ({lang}) => (
+  <div className="dubi-legal-content" dangerouslySetInnerHTML={{__html:getLegal("health", lang)}} />
+);
+
+const HealthDisclaimerModal = ({lang, onClose}) => {
+  const copy = getLegalMeta("health", lang);
+  return ReactDOM.createPortal((
+    <div
+      style={{position:"fixed",inset:0,background:"rgba(43,43,43,.42)",zIndex:DUBI_MODAL_Z + 10,display:"flex",alignItems:"center",justifyContent:"center",padding:"max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom))",overscrollBehavior:"contain"}}
+      onClick={onClose}
+      onWheel={e=>e.stopPropagation()}
+      onTouchMove={e=>e.stopPropagation()}
+    >
+      <div
+        className="dubi-card"
+        onClick={e=>e.stopPropagation()}
+        style={{width:"min(430px, calc(100vw - 28px))",maxHeight:"min(86dvh, 720px)",overflowY:"auto",background:T.bg,borderRadius:24,border:`1px solid ${T.border}`,boxShadow:"0 24px 60px rgba(43,43,43,.18)",overscrollBehavior:"contain"}}
+      >
+        <div style={{position:"sticky",top:0,background:T.bg,padding:"18px 18px 10px",borderBottom:`1px solid ${T.border}`,zIndex:1}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+            <div>
+              <p style={{margin:0,fontSize:20,fontWeight:950,color:T.text,letterSpacing:-.4}}>{copy.title}</p>
+              <p style={{margin:"4px 0 0",fontSize:12,color:T.muted,lineHeight:1.45}}>{copy.subtitle}</p>
+            </div>
+            <button onClick={onClose} aria-label={copy.close}
+              style={{width:34,height:34,borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:18,fontWeight:900,cursor:"pointer"}}>
+              x
+            </button>
+          </div>
+        </div>
+        <div style={{padding:"14px 18px 18px"}}>
+          <HealthDisclaimerContent lang={lang} />
+          <button onClick={onClose}
+            style={{width:"100%",padding:"13px",marginTop:18,borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>
+            {copy.close}
+          </button>
+        </div>
+      </div>
+    </div>
+  ), document.body);
+};
+
 const TermsPage = () => {
   const { lang } = useT();
-  const copy = getTermsCopy(lang);
+  const copy = getLegalMeta("terms", lang);
   const sx = getSettingsScreenCopy(lang);
   return (
     <div style={{background:T.bg,minHeight:"100vh",padding:"42px 20px 48px",fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif"}}>
@@ -5201,6 +5556,9 @@ const AI_SLOT_IDS = {
 };
 
 function getAiMealListForDay(plan, dayIdx, slots, times) {
+  const ingredientMealList = getIngredientMealListForDay(plan, times);
+  if (ingredientMealList?.length) return ingredientMealList;
+
   const aiDay = plan?.aiEnginePlan?.mealStructure?.days?.[dayIdx];
   if (!aiDay?.meals?.length) return null;
 
@@ -9517,15 +9875,15 @@ const AUTH_COPY = {
   it: {
     tagline:"Il tuo pilota nutrizionale", registerTitle:"Inizia il tuo piano personalizzato.", loginTitle:"Bentornato.",
     registerSub:"Crea un account per salvare onboarding, profilo e piano nutrizionale.", loginSub:"Accedi per continuare con il tuo profilo DUBI.",
-    signup:"Registrati", login:"Accedi", email:"Email", password:"Password", passwordHint:"La password deve avere almeno 6 caratteri.",
-    missing:"Inserisci email e password.", short:"La password deve avere almeno 6 caratteri.", registerError:"Questa email potrebbe essere gia registrata. Prova ad accedere oppure usa una password di almeno 6 caratteri.",
+    signup:"Registrati", login:"Accedi", email:"Email", password:"Password", birthDate:"Data di nascita", passwordHint:"La password deve avere almeno 6 caratteri.",
+    missing:"Inserisci email e password.", birthDateMissing:"Inserisci la tua data di nascita.", ageBlocked:"DUBI non puo creare account per utenti sotto i 13 anni.", short:"La password deve avere almeno 6 caratteri.", registerError:"Questa email potrebbe essere gia registrata. Prova ad accedere oppure usa una password di almeno 6 caratteri.",
     loginError:"Email o password non validi. Controlla i dati.", network:"Errore di connessione. Riprova.", loading:"Caricamento...", create:"Crea account", back:"Indietro"
   },
   en: {
     tagline:"Your nutrition autopilot", registerTitle:"Start your personalized plan.", loginTitle:"Welcome back.",
     registerSub:"Create an account to save your onboarding, profile and nutrition plan.", loginSub:"Log in to continue with your DUBI profile.",
-    signup:"Sign up", login:"Login", email:"Email", password:"Password", passwordHint:"Password must be at least 6 characters.",
-    missing:"Please enter email and password.", short:"Password must be at least 6 characters.", registerError:"This email may already be registered. Try Login, or use a password with at least 6 characters.",
+    signup:"Sign up", login:"Login", email:"Email", password:"Password", birthDate:"Date of birth", passwordHint:"Password must be at least 6 characters.",
+    missing:"Please enter email and password.", birthDateMissing:"Please enter your date of birth.", ageBlocked:"DUBI cannot create accounts for users under 13.", short:"Password must be at least 6 characters.", registerError:"This email may already be registered. Try Login, or use a password with at least 6 characters.",
     loginError:"Invalid email or password. Please check your credentials.", network:"Connection error. Please try again.", loading:"Loading...", create:"Create account", back:"Back"
   },
   fr: {
@@ -9586,9 +9944,74 @@ const AUTH_COPY = {
   }
 };
 
-const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
+const getAuthCopy = (lang) => ({...AUTH_COPY.en, ...(AUTH_COPY[lang] || AUTH_COPY.it)});
 
-    const AuthScreen = ({ onSuccess, onBack }) => {
+const MINOR_COPY = {
+  it: {
+    rejectedTitle:"Non puoi usare DUBI",
+    rejectedBody:"Per motivi legali (GDPR/COPPA), DUBI non e accessibile a chi ha meno di 13 anni.",
+    rejectedMistake:"Hai inserito la data di nascita per errore? Torna indietro e correggila.",
+    rejectedContact:"Per domande: privacy@dubi.health",
+    rejectedBack:"<- Torna indietro",
+    consentTitle:"Autorizzazione del genitore richiesta",
+    consentBody:"Hai meno di 18 anni. Prima di poter usare DUBI, un tuo genitore o tutore legale deve autorizzare il tuo account. Inserisci qui sotto i suoi dati: invieremo un link di conferma.",
+    guardianName:"Nome del genitore/tutore",
+    guardianEmail:"Email del genitore/tutore",
+    send:"Invia richiesta",
+    sending:"Invio in corso...",
+    sent:email=>`Email inviata a ${email}. Chiedi al tuo genitore di controllare la posta e cliccare il link. Il link scade tra 7 giorni.`,
+    resend:"Reinvia email",
+    wait:"Potrai reinviare tra",
+    approved:"Il tuo genitore ha autorizzato il tuo account. Puoi continuare!",
+    missing:"Inserisci nome ed email del genitore/tutore.",
+    invalid:"Inserisci un indirizzo email valido.",
+    pendingNote:"Dopo la conferma, rientra in DUBI o effettua di nuovo il login per continuare l onboarding."
+  },
+  en: {
+    rejectedTitle:"You can't use DUBI",
+    rejectedBody:"For legal reasons (GDPR/COPPA), DUBI is not available to users under 13 years of age.",
+    rejectedMistake:"Did you enter your date of birth by mistake? Go back and correct it.",
+    rejectedContact:"Questions: privacy@dubi.health",
+    rejectedBack:"<- Go back",
+    consentTitle:"Parental authorisation required",
+    consentBody:"You are under 18. Before you can use DUBI, a parent or legal guardian must authorise your account. Enter their details below and we will send them a confirmation link.",
+    guardianName:"Parent/guardian name",
+    guardianEmail:"Parent/guardian email",
+    send:"Send request",
+    sending:"Sending...",
+    sent:email=>`Email sent to ${email}. Ask your parent to check their inbox and click the link. The link expires in 7 days.`,
+    resend:"Resend email",
+    wait:"You can resend in",
+    approved:"Your parent has authorised your account. You can continue!",
+    missing:"Please enter parent/guardian name and email.",
+    invalid:"Please enter a valid email address.",
+    pendingNote:"After confirmation, come back to DUBI or log in again to continue onboarding."
+  }
+};
+["fr","es","de","ar","pt","zh","ja","ru"].forEach(code => { MINOR_COPY[code] = {...MINOR_COPY.en}; });
+const getMinorCopy = (lang) => ({...MINOR_COPY.en, ...(MINOR_COPY[lang] || MINOR_COPY.it)});
+
+const RejectionScreen = ({ onBack }) => {
+  const { lang } = useT();
+  const copy = getMinorCopy(lang);
+  return (
+    <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column",justifyContent:"center",padding:"32px 24px",textAlign:"center",position:"relative"}}>
+      <LanguageSelector />
+      <div style={{width:68,height:68,borderRadius:24,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 22px",border:`1px solid ${T.border}`}}>
+        <Ico n="info" size={28} c={T.accentD}/>
+      </div>
+      <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:28,fontWeight:900,color:T.text,letterSpacing:-0.8,margin:"0 0 12px"}}>{copy.rejectedTitle}</h1>
+      <p style={{fontSize:15,color:T.text,lineHeight:1.6,margin:"0 0 10px"}}>{copy.rejectedBody}</p>
+      <p style={{fontSize:13,color:T.muted,lineHeight:1.55,margin:"0 0 8px"}}>{copy.rejectedMistake}</p>
+      <p style={{fontSize:12,color:T.muted,lineHeight:1.45,margin:"0 0 28px"}}>{copy.rejectedContact}</p>
+      <button onClick={onBack} style={{width:"100%",padding:"16px 22px",borderRadius:50,border:"none",background:T.text,color:T.bg,fontWeight:850,fontSize:15,cursor:"pointer"}}>
+        {copy.rejectedBack}
+      </button>
+    </div>
+  );
+};
+
+    const AuthScreen = ({ onSuccess, onBack, onMinorRequired = () => {}, onAgeBlocked = () => {} }) => {
   const { t, lang } = useT();
   const copy = getAuthCopy(lang);
 
@@ -9599,6 +10022,7 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
   // Pre-fill email only for login mode
   const [email, setEmail] = useState(mode === "login" ? (localStorage.getItem("dubi_email") || "") : "");
   const [password, setPassword] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -9606,6 +10030,7 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
     setMode(newMode);
     setError("");
     setPassword("");
+    setBirthDate("");
     // Pre-fill email only when switching to login
     if (newMode === "login") {
       setEmail(localStorage.getItem("dubi_email") || "");
@@ -9627,12 +10052,24 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
       return;
     }
 
+    const registerAge = mode === "register" ? calculateAgeFromBirthDate(birthDate) : null;
+    if (mode === "register" && registerAge === null) {
+      setError(copy.birthDateMissing);
+      return;
+    }
+
+    if (mode === "register" && registerAge < 13) {
+      setError("");
+      onAgeBlocked({ birthDate, age: registerAge });
+      return;
+    }
+
     setLoading(true);
 
     try {
       const endpoint = mode === "register" ? "register" : "login";
       const body = mode === "register"
-        ? { email, password, age: 25, weight: 75, height: 180, goal: "fitness" }
+        ? { email, password, dateOfBirth: birthDate, age: registerAge }
         : { email, password };
 
       const response = await fetch(`${API_BASE_URL}/auth/${endpoint}`, {
@@ -9643,9 +10080,27 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
 
       const data = await response.json();
 
+      if (data.error === "age_blocked") {
+        setError("");
+        onAgeBlocked({ birthDate, age: registerAge });
+        return;
+      }
+
       if (data.token) {
         localStorage.setItem("dubi_token", data.token);
         localStorage.setItem("dubi_email", email);
+
+        const user = data.user || await getCurrentUserFromBackend(data.token);
+        const consentStatus = user?.parental_consent_status || user?.parentalConsentStatus || "not_required";
+        if (consentStatus === "pending" || consentStatus === "expired") {
+          onMinorRequired({
+            ...user,
+            age: user?.age ?? registerAge,
+            isMinor: true,
+            parentalConsentStatus: consentStatus
+          });
+          return;
+        }
 
         try {
           const onboardingResponse = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
@@ -9656,7 +10111,7 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
           if (onboardingResponse.ok) {
             const onboardingData = await onboardingResponse.json();
             if (onboardingData.onboarding) {
-              onSuccess(normalizeOnboarding(onboardingData.onboarding));
+              onSuccess(normalizeOnboarding({...user, ...onboardingData.onboarding}));
               return;
             }
           }
@@ -9664,7 +10119,7 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
           console.warn("Onboarding check after login failed:", onboardingError);
         }
 
-        onSuccess(null);
+        onSuccess(null, user);
         return;
       }
 
@@ -9745,6 +10200,21 @@ const getAuthCopy = (lang) => AUTH_COPY[lang] || AUTH_COPY.it;
           color:T.text, fontSize:15, marginBottom:8, boxSizing:"border-box"
         }}
       />
+
+      {mode === "register" && (
+        <input
+          value={birthDate}
+          onChange={(e) => setBirthDate(e.target.value)}
+          placeholder={copy.birthDate}
+          type="date"
+          autoComplete="bday"
+          style={{
+            width:"100%", padding:"16px", borderRadius:18,
+            border:`1px solid ${T.border}`, background:T.card,
+            color:T.text, fontSize:15, marginBottom:8, boxSizing:"border-box"
+          }}
+        />
+      )}
 
       {mode === "register" && (
         <p style={{fontSize:12,color:T.muted,marginBottom:12,paddingLeft:4}}>
@@ -10228,6 +10698,35 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
   );
 };
 
+const HealthDataConsentPrompt = ({accepted, onChange}) => {
+  const { lang } = useT();
+  return (
+    <div className="dubi-legal-consent-card" style={{background:T.card}}>
+      <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+        <div
+          onClick={()=>onChange(!accepted)}
+          style={{width:26,height:26,borderRadius:8,border:`2px solid ${accepted?T.accentD:T.border}`,background:accepted?T.accentD:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,marginTop:2}}
+        >
+          {accepted && <Ico n="check" size={14} c={T.bg}/>}
+        </div>
+        <div style={{flex:1}}>
+          <p style={{fontSize:13,fontWeight:900,color:T.text,margin:"0 0 6px"}}>
+            {lang==="it" ? "Consenso dati salute Art. 9 GDPR" : "Health data consent under Art. 9 GDPR"}
+          </p>
+          <p style={{fontSize:12,color:T.muted,lineHeight:1.55,margin:0}}>
+            {getLegalConsent("healthData", lang)}
+          </p>
+          <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"10px 0 0"}}>
+            {lang==="it"
+              ? "DUBI te lo chiede prima di raccogliere obiettivi fisici, allergie, intolleranze o condizioni alimentari."
+              : "DUBI asks this before collecting physical goals, allergies, intolerances or nutrition-related conditions."}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PreferencesStep = ({d,u}) => {
   const { t, lang } = useT();
   const tx = (key, fallback) => {
@@ -10434,7 +10933,7 @@ const WearableStep = ({d,u,connectableWearables = VERIFIED_CONNECTABLE_WEARABLES
 );};
 
 const STEP_NAMES_KEYS = ["onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
-const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, onCancelEdit = () => {}, }) => {
+const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, onCancelEdit = () => {}, onMinorDetected = () => {}, onAgeRejected = () => {}, allowMinorOnboarding = false }) => {
   const { t, lang } = useT();
 
   const [step,setStep] = useState(0);
@@ -10468,7 +10967,8 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   dayEnd:"22:00",
   wearable:"none",
   wearables:["none"],
-  wearableConsent:false
+  wearableConsent:false,
+  healthDataConsent:false
 };
 
   const safeTime = (value, fallback = "07:00") => {
@@ -10535,7 +11035,10 @@ const normalizeInitialOnboardingData = (source) => {
     dayEnd: safeTime(source.day_end || source.dayEnd, "22:00"),
     wearable: getPrimaryWearable(source) || defaultOnboardingData.wearable,
     wearables: getSelectedWearables(source),
-    wearableConsent: Boolean(source.wearable_consent ?? source.wearableConsent)
+    wearableConsent: Boolean(source.wearable_consent ?? source.wearableConsent),
+    healthDataConsent: Boolean(source.health_data_consent ?? source.healthDataConsent),
+    isMinor: Boolean(source.is_minor ?? source.isMinor),
+    parentalConsentStatus: source.parental_consent_status || source.parentalConsentStatus || "not_required"
   };
 };
 
@@ -10561,19 +11064,23 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   }
 }, [isEditing]);
   const u = (k,v) => setData(p=>({...p,[k]:v}));
+  const healthConsentGate = (
+    <HealthDataConsentPrompt
+      accepted={Boolean(data.healthDataConsent)}
+      onChange={value=>u("healthDataConsent", value)}
+    />
+  );
   const content = [
     <PhysicalStep d={data} u={u}/>,
-    <GoalStep
-  d={data}
-  u={u}
-/>,
+    data.healthDataConsent ? <GoalStep d={data} u={u}/> : healthConsentGate,
 <ActivityStep d={data} u={u}/>,
-    <PreferencesStep d={data} u={u}/>,
+    data.healthDataConsent ? <PreferencesStep d={data} u={u}/> : healthConsentGate,
     <WearableStep d={data} u={u} connectableWearables={connectableWearables}/>,
   ];
   const selectedWearables = getSelectedWearables(data).filter(id => id !== "none");
   const wearableConsentRequired = step === 4 && selectedWearables.length > 0;
-  const canContinueStep = !wearableConsentRequired || Boolean(data.wearableConsent);
+  const healthConsentRequired = (step === 1 || step === 3) && !data.healthDataConsent;
+  const canContinueStep = !wearableConsentRequired && !healthConsentRequired;
 
   
   return (
@@ -10618,10 +11125,21 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
           <button disabled={!canContinueStep || savingOnboarding} onClick={async () => {
   if (!canContinueStep) return;
   if (step < 4) {
+    if (step === 0 && !isEditing) {
+      const ageValue = Number(data.age);
+      if (Number.isFinite(ageValue) && ageValue < 13) {
+        onAgeRejected(data);
+        return;
+      }
+      if (Number.isFinite(ageValue) && ageValue >= 13 && ageValue < 18 && !allowMinorOnboarding) {
+        onMinorDetected(data);
+        return;
+      }
+    }
     setStep(s => s + 1);
   } else {
-    if (Number(data.age) < 18) {
-      setBetaAccessMessage("La beta iniziale di DUBI e disponibile solo per utenti maggiorenni. Il percorso per minori verra aperto quando il consenso genitoriale sara attivo.");
+    if (Number(data.age) < 18 && !allowMinorOnboarding) {
+      setBetaAccessMessage("Serve prima l'autorizzazione del genitore/tutore per continuare.");
       return;
     }
     setSavingOnboarding(true);
@@ -11469,6 +11987,24 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   ];
   const availableWearableMetrics = wearableMetrics.filter(metric => metric.available);
   const hasPartialWearableData = availableWearableMetrics.length > 0 && availableWearableMetrics.length < wearableMetrics.length;
+  const ingredientPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
+  const giSummary = plan?.giSummary || ingredientPlanMeta?.gi_summary || null;
+  const pathologyFilter = plan?.pathologyFilter || ingredientPlanMeta?.pathology_filter || null;
+  const giCopy = GI_BADGE_COPY[lang] || GI_BADGE_COPY.en;
+  const pathologyCopy = PATHOLOGY_BADGE_COPY[lang] || PATHOLOGY_BADGE_COPY.en;
+  const giCategory = String(giSummary?.giCategory || giSummary?.gi_category || "unknown").toLowerCase();
+  const giKnownCount = Number(giSummary?.ingredientsWithGi ?? giSummary?.ingredients_with_gi ?? 0);
+  const giTotalCount = Number(giSummary?.totalIngredients ?? giSummary?.total_ingredients ?? 0);
+  const showGiSummary = giSummary && giKnownCount > 0;
+  const activePathologies = Array.isArray(pathologyFilter?.activePathologies)
+    ? pathologyFilter.activePathologies
+    : (Array.isArray(pathologyFilter?.active_pathologies) ? pathologyFilter.active_pathologies : []);
+  const pathologyExcludedCount = Number(pathologyFilter?.excludedCount ?? pathologyFilter?.excluded_count ?? 0);
+  const pathologyTotalPool = Number(pathologyFilter?.totalPool ?? pathologyFilter?.total_pool ?? 0);
+  const showPathologyFilter = activePathologies.length > 0;
+  const pathologyListText = activePathologies
+    .map((pathology) => pathologyCopy.labels[pathology] || pathology.replace(/_/g, " "))
+    .join(", ");
 
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
@@ -11795,6 +12331,50 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
         </div>
       )}
 
+      {(showGiSummary || showPathologyFilter) && (
+        <div style={{padding:"0 24px",marginBottom:16}}>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"stretch"}}>
+            {showGiSummary && (
+              <div style={{
+                display:"inline-flex",
+                alignItems:"center",
+                gap:8,
+                padding:"7px 12px",
+                borderRadius:999,
+                background:GI_BADGE_THEME[giCategory] || GI_BADGE_THEME.unknown,
+                color:"#fff",
+                fontSize:12,
+                fontWeight:700,
+                lineHeight:1.2,
+                maxWidth:"100%"
+              }}>
+                <span style={{whiteSpace:"nowrap"}}>{giCopy.prefix}: {giCopy.labels[giCategory] || giCopy.labels.unknown}</span>
+                <span style={{fontSize:11,fontWeight:500,opacity:0.92}}>
+                  ({giKnownCount}/{giTotalCount || giKnownCount} {giCopy.known})
+                </span>
+              </div>
+            )}
+            {showPathologyFilter && (
+              <div style={{
+                flex:"1 1 100%",
+                padding:"9px 12px",
+                borderRadius:12,
+                background:"#eff6ff",
+                border:"1px solid #bfdbfe",
+                color:"#1e40af",
+                fontSize:12,
+                lineHeight:1.45
+              }}>
+                <strong>{pathologyCopy.prefix}:</strong> {pathologyListText}
+                {Number.isFinite(pathologyExcludedCount) && Number.isFinite(pathologyTotalPool) && pathologyTotalPool > 0
+                  ? ` (${pathologyExcludedCount} ${pathologyCopy.excluded} ${pathologyTotalPool})`
+                  : ""}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Meals */}
       <div style={{padding:"0 24px"}}>
         <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:12}}>{t("today.meals")}</p>
@@ -11813,7 +12393,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                 </div>
                 <div style={{flex:1,textAlign:"left"}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:15,fontWeight:600,color:T.text}}>{t(mt.labelKey||"meal."+mt.id)}</span>
+                    <span style={{fontSize:15,fontWeight:600,color:T.text}}>{mt.labelKey ? t(mt.labelKey) : (mt.label || t("meal."+mt.id))}</span>
                     {mt.isExtra && (
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
                         background:"rgba(107,138,100,0.22)",color:T.accentD}}>
@@ -11867,14 +12447,27 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                     {meal.items.map((item,i)=>{
                       const _tSwapKey = `${dayIdx}-${mt.id}-${i}`;
                       const _tDispItem = (swaps && swaps[_tSwapKey]) ? swaps[_tSwapKey] : item;
-                      const _tName = splitIngredientDisplay(_tDispItem).name;
+                      const _tDisplay = splitIngredientDisplay(_tDispItem);
+                      const _tName = _tDisplay.name;
+                      const _tCalories = Number(_tDispItem?.calories || 0);
+                      const _tProtein = Number(_tDispItem?.protein || 0);
+                      const _tCarbs = Number(_tDispItem?.carbs || 0);
+                      const _tFats = Number(_tDispItem?.fats ?? _tDispItem?.fat ?? 0);
+                      const _tMeta = [
+                        _tDisplay.quantity,
+                        _tCalories ? `${Math.round(_tCalories)} kcal` : "",
+                        (_tProtein || _tCarbs || _tFats) ? `P ${Math.round(_tProtein)}g · C ${Math.round(_tCarbs)}g · G ${Math.round(_tFats)}g` : ""
+                      ].filter(Boolean).join(" · ");
                       return (
                       <div key={i} onClick={()=>setIngModal(_tDispItem)}
                         style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"6px 8px",borderRadius:10,cursor:"pointer",background:"transparent",border:`1px solid transparent`,transition:"all 0.15s"}}
                         onMouseEnter={e=>{e.currentTarget.style.background=T.sel;e.currentTarget.style.borderColor=T.border;}}
                         onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
                         <div style={{width:5,height:5,borderRadius:"50%",background:T.accent,flexShrink:0}} />
-                        <span style={{fontSize:14,color:T.text,flex:1}}>{localizeFood(_tName, lang)}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <span style={{display:"block",fontSize:14,color:T.text}}>{localizeFood(_tName, lang)}</span>
+                          {_tMeta && <span style={{display:"block",fontSize:10.5,color:T.muted,lineHeight:1.35,marginTop:2}}>{_tMeta}</span>}
+                        </div>
                         <Ico n="chev" size={12} c={T.muted}/>
                       </div>
                       );
@@ -14111,6 +14704,7 @@ const [feedbackMessage, setFeedbackMessage] = useState("");
 const [feedbackSending, setFeedbackSending] = useState(false);
 const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
 const [showTerms, setShowTerms] = useState(false);
+const [showHealthDisclaimer, setShowHealthDisclaimer] = useState(false);
 
 useEffect(() => {
   let cancelled = false;
@@ -14170,6 +14764,8 @@ const upcomingWearableProviderList = normalizedWearableProviderList
 const showUpcomingWearables = false;
 
 const handleConnectWearable = async (providerId) => {
+  const providerLabel = getWearableProviderLabel(providerId);
+  if (!window.confirm(getLegalConsent("wearable", lang, providerLabel))) return;
   setWearableBusy(true);
   setWearableMessage("");
 
@@ -14831,6 +15427,33 @@ const handleSaveProfile = async () => {
           </div>
         </Card>
 
+        <Card style={{marginTop:10}}>
+          <button onClick={()=>setShowHealthDisclaimer(true)}
+            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"16px",border:"none",background:"transparent",cursor:"pointer",textAlign:"left"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:38,height:38,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ico n="heart" size={18} c={T.accentD}/>
+              </div>
+              <div>
+                <p style={{margin:0,fontSize:14,fontWeight:900,color:T.text}}>{getLegalMeta("health", lang).title}</p>
+                <p style={{margin:"3px 0 0",fontSize:11,color:T.muted,lineHeight:1.45}}>
+                  {lang==="it"
+                    ? "Chiarisce che DUBI offre supporto educativo e non sostituisce medico o nutrizionista."
+                    : "Clarifies that DUBI provides educational support and does not replace a doctor or nutritionist."}
+                </p>
+              </div>
+            </div>
+            <span style={{fontSize:20,color:T.muted,lineHeight:1}}>&rsaquo;</span>
+          </button>
+          <div style={{padding:"0 16px 16px"}}>
+            <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
+              {lang==="it"
+                ? "Leggi questo documento prima di seguire cambiamenti importanti al piano, soprattutto in caso di patologie, farmaci, gravidanza o disturbi alimentari."
+                : "Read this before following major plan changes, especially with medical conditions, medication, pregnancy or eating-disorder history."}
+            </p>
+          </div>
+        </Card>
+
         <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>{sx.feedbackSection}</p>
         <Card>
           <div style={{padding:16}}>
@@ -14943,6 +15566,7 @@ const handleSaveProfile = async () => {
       </div>
       {showPrivacyPolicy && <PrivacyPolicyModal lang={lang} onClose={()=>setShowPrivacyPolicy(false)} />}
       {showTerms && <TermsModal lang={lang} onClose={()=>setShowTerms(false)} />}
+      {showHealthDisclaimer && <HealthDisclaimerModal lang={lang} onClose={()=>setShowHealthDisclaimer(false)} />}
     </div>
   );
 };
@@ -15021,11 +15645,16 @@ const BottomNav = ({active,onChange}) => { const { t, lang } = useT(); return (
 // ═══════════════════════════════════════════════════════════════
 const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [insuranceConsent, setInsuranceConsent] = React.useState(false);
+  const [termsConsent, setTermsConsent] = React.useState(false);
   const [gdprConsent, setGdprConsent] = React.useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = React.useState(false);
+  const [showTerms, setShowTerms] = React.useState(false);
+  const [showHealthDisclaimer, setShowHealthDisclaimer] = React.useState(false);
   const [acceptingConsent, setAcceptingConsent] = React.useState(false);
   const { lang } = useT();
   const privacyCopy = getPrivacyCopy(lang);
+  const termsConsentText = getLegalConsent("terms", lang);
+  const healthConsentText = getLegalConsent("healthData", lang);
   const hasOAuthWearable = Boolean(getOAuthWearableProvider(userData) && userData?.wearableConsent);
 
   return (
@@ -15041,6 +15670,35 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
       </div>
 
       <div style={{padding:"0 20px"}}>
+        <div className="dubi-legal-consent-card">
+          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div
+              onClick={()=>setTermsConsent(!termsConsent)}
+              style={{width:24,height:24,borderRadius:6,border:`2px solid ${termsConsent?T.accentD:T.border}`,background:termsConsent?T.accentD:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,marginTop:2}}
+            >
+              {termsConsent && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+            </div>
+            <div style={{flex:1}}>
+              <p style={{margin:"0 0 4px",fontSize:13,fontWeight:800,color:T.text}}>
+                {lang==="it" ? "Termini e Privacy" : "Terms and Privacy"}
+              </p>
+              <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
+                {termsConsentText}
+              </p>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:9}}>
+                <button onClick={()=>setShowTerms(true)} type="button"
+                  style={{border:"none",background:"transparent",padding:0,color:T.accentD,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+                  {getLegalMeta("terms", lang).title}
+                </button>
+                <button onClick={()=>setShowPrivacyPolicy(true)} type="button"
+                  style={{border:"none",background:"transparent",padding:0,color:T.accentD,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+                  {getLegalMeta("privacy", lang).title}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* GDPR Consent — obbligatorio */}
         <div style={{background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:12}}>
           <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
@@ -15051,21 +15709,21 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
               {gdprConsent && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
             </div>
             <div style={{flex:1}}>
-              <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:T.text}}>{privacyCopy.required}</p>
+              <p style={{margin:"0 0 4px",fontSize:13,fontWeight:700,color:T.text}}>
+                {lang==="it" ? "Consenso dati salute Art. 9 GDPR" : "Health data consent under Art. 9 GDPR"}
+              </p>
               <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
-                {privacyCopy.requiredBody}
+                {healthConsentText}
               </p>
               <p style={{margin:"8px 0 0",fontSize:11,color:T.muted}}>
                 {lang==="it"
                   ? "Questo consenso e richiesto per trattare dati salute e generare un piano personalizzato affidabile."
                   : "This consent is required to process health data and generate a reliable personalized plan."}
               </p>
-              <div
-                onClick={()=>setShowPrivacyPolicy(true)}
-                style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,cursor:"pointer"}}
-              >
-                <span style={{fontSize:12,color:T.accentD,fontWeight:600}}>{privacyCopy.link}</span>
-              </div>
+              <button onClick={()=>setShowHealthDisclaimer(true)} type="button"
+                style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,cursor:"pointer",border:"none",background:"transparent",padding:0}}>
+                <span style={{fontSize:12,color:T.accentD,fontWeight:600}}>{getLegalMeta("health", lang).title}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -15107,30 +15765,36 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </p>
 
         <button
-          disabled={!gdprConsent || acceptingConsent}
+          disabled={!termsConsent || !gdprConsent || acceptingConsent}
           onClick={async ()=> {
-            if (!gdprConsent || acceptingConsent) return;
+            if (!termsConsent || !gdprConsent || acceptingConsent) return;
             setAcceptingConsent(true);
             try {
               await onAccept({
+                terms:true,
                 gdpr:true,
+                healthConsent:true,
                 medicalDisclaimer:true,
                 privacyPolicyVersion:PRIVACY_POLICY_VERSION,
-                privacyAcceptedAt:new Date().toISOString()
+                termsVersion:TERMS_VERSION,
+                healthDisclaimerVersion:HEALTH_DISCLAIMER_VERSION,
+                privacyAcceptedAt:new Date().toISOString(),
+                legalAcceptedAt:new Date().toISOString(),
+                healthDataConsentAt:new Date().toISOString()
               });
             } finally {
               setAcceptingConsent(false);
             }
           }}
           style={{
-            width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:gdprConsent&&!acceptingConsent?"pointer":"not-allowed",
-            background:gdprConsent?"linear-gradient(135deg,#6B8A64,#4A6844)":"#ccc",
+            width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:termsConsent&&gdprConsent&&!acceptingConsent?"pointer":"not-allowed",
+            background:termsConsent&&gdprConsent?"linear-gradient(135deg,#6B8A64,#4A6844)":"#ccc",
             color:"#fff",fontSize:15,fontWeight:700,marginBottom:12,opacity:acceptingConsent ? .85 : 1
           }}
         >
           {acceptingConsent
             ? (hasOAuthWearable ? (lang==="it" ? "Continuo..." : "Continuing...") : (lang==="it" ? "Genero il tuo piano..." : "Generating your plan..."))
-            : (gdprConsent ? (hasOAuthWearable ? (lang==="it" ? "Continua al collegamento wearable" : "Continue to wearable connection") : privacyCopy.accept) : privacyCopy.acceptDisabled)}
+            : (termsConsent && gdprConsent ? (hasOAuthWearable ? (lang==="it" ? "Continua al collegamento wearable" : "Continue to wearable connection") : privacyCopy.accept) : privacyCopy.acceptDisabled)}
         </button>
 
         <button
@@ -15142,6 +15806,8 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         </button>
       </div>
       {showPrivacyPolicy && <PrivacyPolicyModal lang={lang} onClose={()=>setShowPrivacyPolicy(false)} />}
+      {showTerms && <TermsModal lang={lang} onClose={()=>setShowTerms(false)} />}
+      {showHealthDisclaimer && <HealthDisclaimerModal lang={lang} onClose={()=>setShowHealthDisclaimer(false)} />}
     </div>
   );
 };
@@ -15156,10 +15822,11 @@ const WearableConnectScreen = ({userData, onSkip}) => {
   const provider = getOAuthWearableProvider(userData);
   const providerLabel = getWearableProviderLabel(provider);
   const [connecting, setConnecting] = React.useState(false);
+  const [wearableConsent, setWearableConsent] = React.useState(false);
   const [message, setMessage] = React.useState("");
 
   const connect = async () => {
-    if (!provider || connecting) return;
+    if (!provider || !wearableConsent || connecting) return;
     setConnecting(true);
     setMessage("");
 
@@ -15208,8 +15875,27 @@ const WearableConnectScreen = ({userData, onSkip}) => {
           </p>
         </div>
 
-        <button onClick={connect} disabled={!provider || connecting}
-          style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:T.accentD,color:"#fff",fontSize:15,fontWeight:900,cursor:connecting?"default":"pointer",opacity:connecting ? .75 : 1,marginBottom:10}}>
+        <div className="dubi-legal-consent-card">
+          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div
+              onClick={()=>setWearableConsent(!wearableConsent)}
+              style={{width:24,height:24,borderRadius:6,border:`2px solid ${wearableConsent?T.accentD:T.border}`,background:wearableConsent?T.accentD:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,marginTop:2}}
+            >
+              {wearableConsent && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+            </div>
+            <div style={{flex:1}}>
+              <p style={{margin:"0 0 4px",fontSize:13,fontWeight:800,color:T.text}}>
+                {lang==="it" ? "Consenso collegamento wearable" : "Wearable connection consent"}
+              </p>
+              <p style={{fontSize:12,color:T.muted,lineHeight:1.55,margin:0}}>
+                {getLegalConsent("wearable", lang, providerLabel)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={connect} disabled={!provider || !wearableConsent || connecting}
+          style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:wearableConsent?T.accentD:"#ccc",color:"#fff",fontSize:15,fontWeight:900,cursor:wearableConsent&&!connecting?"pointer":"not-allowed",opacity:connecting ? .75 : 1,marginBottom:10}}>
           {connecting
             ? wx.opening
             : wx.connect(providerLabel)}
@@ -15231,19 +15917,59 @@ const WearableConnectScreen = ({userData, onSkip}) => {
 };
 
 const MinorScreen = ({userData, onComplete, onBack}) => {
-  const [parentEmail, setParentEmail] = React.useState("");
+  const { lang } = useT();
+  const copy = getMinorCopy(lang);
+  const [parentEmail, setParentEmail] = React.useState(userData?.guardian_email || userData?.guardianEmail || "");
   const [parentName, setParentName] = React.useState("");
   const [submitted, setSubmitted] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [checking, setChecking] = React.useState(false);
+  const [resendIn, setResendIn] = React.useState(0);
 
   const age = userData?.age || 0;
-  const needsDocument = age < 16;
+  const needsDocument = false;
 
-  const handleSubmit = () => {
-    if (!parentEmail || !parentName) { setError("Please enter both parent name and email."); return; }
-    if (!/^[^@]+@[^@]+\.[^@]+$/.test(parentEmail)) { setError("Please enter a valid email address."); return; }
+  React.useEffect(() => {
+    if (!resendIn) return undefined;
+    const timer = setInterval(() => setResendIn(value => Math.max(0, value - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [resendIn]);
+
+  const handleSubmit = async () => {
+    if (!parentEmail || !parentName) { setError(copy.missing); return; }
+    if (!/^[^@]+@[^@]+\.[^@]+$/.test(parentEmail)) { setError(copy.invalid); return; }
+    setLoading(true);
     setError("");
+    const result = await requestParentalConsentEmail({
+      guardianName: parentName,
+      guardianEmail: parentEmail,
+      language: lang
+    });
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error || "request_failed");
+      return;
+    }
     setSubmitted(true);
+    setResendIn(60);
+  };
+
+  const checkApproval = async () => {
+    setChecking(true);
+    const user = await getCurrentUserFromBackend();
+    setChecking(false);
+    const status = user?.parental_consent_status || user?.parentalConsentStatus;
+    if (status === "approved") {
+      onComplete({
+        ...userData,
+        ...user,
+        isMinor: true,
+        parentalConsentStatus: "approved"
+      });
+      return;
+    }
+    setError(copy.pendingNote);
   };
 
   if (submitted) {
@@ -15255,12 +15981,12 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
             <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
         </div>
-        <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:24,fontWeight:800,color:T.text,margin:"0 0 12px"}}>Consent request sent!</h2>
+        <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:24,fontWeight:800,color:T.text,margin:"0 0 12px"}}>{copy.consentTitle}</h2>
         <p style={{fontSize:14,color:T.muted,lineHeight:1.6,marginBottom:8}}>
-          We sent a consent form to <strong style={{color:T.text}}>{parentEmail}</strong>.
+          {copy.sent(parentEmail)}
         </p>
         <p style={{fontSize:13,color:T.muted,lineHeight:1.6,marginBottom:32}}>
-          Your parent or guardian needs to open the email, review the form, and sign it digitally. Your DUBI account will be activated as soon as they complete the process.
+          {copy.pendingNote}
         </p>
         {needsDocument && (
           <div style={{background:T.sel,borderRadius:12,padding:"12px 16px",marginBottom:24,textAlign:"left",width:"100%"}}>
@@ -15269,11 +15995,20 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
           </div>
         )}
         <button
-          onClick={onComplete}
+          onClick={checkApproval}
+          disabled={checking}
           style={{width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#6B8A64,#4A6844)",color:"#fff",fontSize:15,fontWeight:700}}
         >
-          Got it, I'll wait for confirmation
+          {checking ? "..." : "OK"}
         </button>
+        <button
+          onClick={handleSubmit}
+          disabled={loading || resendIn > 0}
+          style={{width:"100%",padding:"14px",borderRadius:16,border:`1px solid ${T.border}`,cursor:loading||resendIn>0?"default":"pointer",background:T.card,color:T.text,fontSize:14,fontWeight:700,marginTop:10,opacity:(loading||resendIn>0) ? .6 : 1}}
+        >
+          {resendIn > 0 ? `${copy.wait} ${resendIn}s` : copy.resend}
+        </button>
+        {error && <p style={{fontSize:12,color:"#B91C1C",lineHeight:1.45,marginTop:12,fontWeight:700}}>{error}</p>}
       </div>
     );
   }
@@ -15283,24 +16018,24 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
       <div style={{padding:"56px 20px 0"}}>
         <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:"0 0 16px",display:"flex",alignItems:"center",gap:6}}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          <span style={{fontSize:13,color:T.muted}}>Back</span>
+          <span style={{fontSize:13,color:T.muted}}>{AUTH_COPY[lang]?.back || AUTH_COPY.en.back}</span>
         </button>
         <div style={{width:56,height:56,borderRadius:16,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#854F0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
         </div>
-        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:24,fontWeight:800,color:T.text,letterSpacing:-0.8,margin:"0 0 8px"}}>Parental consent required</h1>
+        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:24,fontWeight:800,color:T.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{copy.consentTitle}</h1>
         <p style={{fontSize:14,color:T.muted,lineHeight:1.6,margin:"0 0 8px"}}>
-          Because you are <strong style={{color:T.text}}>{age} years old</strong>, we need your parent or guardian to authorise your DUBI account before you can start.
+          {copy.consentBody}
         </p>
         <p style={{fontSize:13,color:T.muted,lineHeight:1.5,margin:"0 0 28px"}}>
-          This is required by EU law (GDPR) and UAE PDPL to protect minors' health data. The process takes less than 2 minutes.
+          privacy@dubi.health
         </p>
       </div>
 
       <div style={{padding:"0 20px"}}>
-        <div style={{marginBottom:24}}>
+        <div style={{display:"none",marginBottom:24}}>
           {[
             {n:"1", title:"Enter your parent's email", desc:"We will send them a consent form with a secure link."},
             {n:"2", title:"Parent reviews and signs", desc:`They enter their name and sign digitally.${needsDocument ? " A copy of their ID is also required." : ""}`},
@@ -15319,13 +16054,13 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
         </div>
 
         <div style={{marginBottom:12}}>
-          <p style={{fontSize:10,fontWeight:700,color:T.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>Parent / Guardian full name</p>
+          <p style={{fontSize:10,fontWeight:700,color:T.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>{copy.guardianName}</p>
           <input type="text" placeholder="e.g. Mario Rossi" value={parentName} onChange={e=>setParentName(e.target.value)}
             style={{width:"100%",padding:"14px 16px",borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:14,outline:"none"}}/>
         </div>
 
         <div style={{marginBottom:12}}>
-          <p style={{fontSize:10,fontWeight:700,color:T.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>Parent / Guardian email address</p>
+          <p style={{fontSize:10,fontWeight:700,color:T.muted,letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>{copy.guardianEmail}</p>
           <input type="email" placeholder="parent@email.com" value={parentEmail} onChange={e=>setParentEmail(e.target.value)}
             style={{width:"100%",padding:"14px 16px",borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:14,outline:"none"}}/>
         </div>
@@ -15340,13 +16075,13 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
 
         {error && <p style={{fontSize:12,color:"#E24B4A",marginBottom:12}}>{error}</p>}
 
-        <button onClick={handleSubmit}
-          style={{width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#6B8A64,#4A6844)",color:"#fff",fontSize:15,fontWeight:700,marginBottom:12}}>
-          Send consent request →
+        <button onClick={handleSubmit} disabled={loading}
+          style={{width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:loading?"default":"pointer",background:"linear-gradient(135deg,#6B8A64,#4A6844)",color:"#fff",fontSize:15,fontWeight:700,marginBottom:12,opacity:loading ? .72 : 1}}>
+          <span>{loading ? copy.sending : copy.send}</span>
         </button>
 
         <p style={{fontSize:11,color:T.muted,textAlign:"center",lineHeight:1.5}}>
-          The consent form will be sent immediately. Your parent has 7 days to complete it before the request expires.
+          {copy.pendingNote}
         </p>
       </div>
     </div>
@@ -15385,6 +16120,14 @@ function DUBIApp() {
     }
 
     try {
+      const currentUser = await getCurrentUserFromBackend(token);
+      const currentConsentStatus = currentUser?.parental_consent_status || currentUser?.parentalConsentStatus || "not_required";
+      if (currentConsentStatus === "pending" || currentConsentStatus === "expired") {
+        setUserData(normalizeOnboarding({...currentUser, isMinor:true, parentalConsentStatus:currentConsentStatus}));
+        setPhase("minor");
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
         method: "GET",
         headers: {
@@ -15413,6 +16156,7 @@ function DUBIApp() {
       }
 
       setPhase("onboarding");
+      if (currentUser) setUserData(normalizeOnboarding(currentUser));
     } catch (error) {
       console.error("Session check failed:", error);
       setPhase("welcome");
@@ -15479,7 +16223,8 @@ const handleDeleteAccount = async () => {
       return;
     }
 
-    if (data.age && data.age < 18) {
+    const consentStatus = data.parentalConsentStatus || data.parental_consent_status || userData?.parentalConsentStatus || userData?.parental_consent_status || "not_required";
+    if (data.age && data.age < 18 && consentStatus !== "approved") {
       setPhase("minor");
       return;
     }
@@ -15556,7 +16301,7 @@ setPhase("free-beta");
   </div>
 )}
         {phase==="welcome" && <WelcomeScreen onStart={() => setPhase("auth")} />}
-{phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding) => {
+{phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding, authUser = null) => {
   if (existingOnboarding) {
    setUserData(existingOnboarding);
    await refreshSnapshot({ forceSync: true });
@@ -15567,10 +16312,19 @@ setPhase("free-beta");
    setActiveTab("today");
    setPhase("app");
 } else {
+  if (authUser) setUserData(normalizeOnboarding(authUser));
   setActiveTab("today");
   setPhase("onboarding");
 }
+}} onMinorRequired={(minorUser) => {
+  setUserData(normalizeOnboarding(minorUser));
+  setPhase("minor");
+}} onAgeBlocked={(blockedData) => {
+  setUserData(blockedData || null);
+  setPhase("rejected");
 }} onBack={() => setPhase("welcome")} />}
+
+        {phase==="rejected" && <RejectionScreen onBack={() => setPhase("auth")} />}
 
         {phase==="onboarding" && (
   <OnboardingScreen
@@ -15581,6 +16335,15 @@ setPhase("free-beta");
 }}
     initialData={userData}
     isEditing={localStorage.getItem("dubi_edit_onboarding") === "true"}
+    allowMinorOnboarding={(userData?.parentalConsentStatus || userData?.parental_consent_status) === "approved"}
+    onAgeRejected={(blockedData) => {
+      setUserData(blockedData || userData);
+      setPhase("rejected");
+    }}
+    onMinorDetected={(minorData) => {
+      setUserData({...userData, ...minorData, isMinor:true, parentalConsentStatus:userData?.parentalConsentStatus || "pending"});
+      setPhase("minor");
+    }}
     onComplete={handleComplete}
   />
 )}
@@ -15606,8 +16369,20 @@ setPhase("free-beta");
             userData={userData}
             onAccept={async (c)=>{
               setConsentData(c);
-              const dataToGenerate = pendingPlanData || userData;
+              const dataToGenerate = {
+                ...(pendingPlanData || userData),
+                termsAccepted: Boolean(c?.terms),
+                privacyAccepted: Boolean(c?.terms),
+                healthDataConsent: Boolean(c?.healthConsent || c?.gdpr),
+                privacyPolicyVersion: c?.privacyPolicyVersion || PRIVACY_POLICY_VERSION,
+                termsVersion: c?.termsVersion || TERMS_VERSION,
+                healthDisclaimerVersion: c?.healthDisclaimerVersion || HEALTH_DISCLAIMER_VERSION,
+                legalAcceptedAt: c?.legalAcceptedAt || c?.privacyAcceptedAt || new Date().toISOString(),
+                healthDataConsentAt: c?.healthDataConsentAt || c?.privacyAcceptedAt || new Date().toISOString()
+              };
+              await saveOnboardingToBackend(dataToGenerate);
               if (getOAuthWearableProvider(dataToGenerate) && dataToGenerate?.wearableConsent) {
+                setPendingPlanData(dataToGenerate);
                 setPhase("wearable-connect");
                 return;
               }
@@ -15630,7 +16405,10 @@ setPhase("free-beta");
         {phase==="minor" && (
           <MinorScreen
             userData={userData}
-            onComplete={()=>setPhase("consent")}
+            onComplete={(approvedUser)=>{
+              setUserData(normalizeOnboarding({...userData, ...approvedUser, parentalConsentStatus:"approved"}));
+              setPhase("onboarding");
+            }}
             onBack={()=>setPhase("onboarding")}
           />
         )}
