@@ -1101,6 +1101,11 @@ const getAuthToken = () => {
   return localStorage.getItem("dubi_token") || "";
 };
 
+const clearAuthSession = () => {
+  localStorage.removeItem("dubi_token");
+  localStorage.removeItem("dubi_email");
+};
+
 const calculateAgeFromBirthDate = (birthDate) => {
   if (!birthDate) return null;
   const dob = new Date(`${String(birthDate).slice(0, 10)}T00:00:00`);
@@ -1240,7 +1245,7 @@ const saveOnboardingToBackend = async (data) => {
 
   if (!token) {
     console.warn("No auth token found. Onboarding saved locally only.");
-    return { error: "missing_token" };
+    return { error: "missing_token", authError: true };
   }
 
   const payload = {
@@ -1300,7 +1305,7 @@ const saveOnboardingToBackend = async (data) => {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       console.error("Failed to save onboarding:", err);
-      return { error: err.error || "onboarding_save_failed" };
+      return { error: err.error || "onboarding_save_failed", authError: response.status === 401 || response.status === 403 };
     }
 
     return await response.json();
@@ -10446,6 +10451,11 @@ const RejectionScreen = ({ onBack }) => {
         localStorage.setItem("dubi_email", email);
 
         const user = data.user || await getCurrentUserFromBackend(data.token);
+        if (!user) {
+          clearAuthSession();
+          setError(copy.network);
+          return;
+        }
         const consentStatus = user?.parental_consent_status || user?.parentalConsentStatus || "not_required";
         if (consentStatus === "pending" || consentStatus === "expired") {
           onMinorRequired({
@@ -16478,6 +16488,13 @@ function DUBIApp() {
 
     try {
       const currentUser = await getCurrentUserFromBackend(token);
+      if (!currentUser) {
+        clearAuthSession();
+        setUserData(null);
+        setPlan(null);
+        setPhase("auth");
+        return;
+      }
       const currentConsentStatus = currentUser?.parental_consent_status || currentUser?.parentalConsentStatus || "not_required";
       if (currentConsentStatus === "pending" || currentConsentStatus === "expired") {
         setUserData(normalizeOnboarding({...currentUser, isMinor:true, parentalConsentStatus:currentConsentStatus}));
@@ -16508,8 +16525,14 @@ function DUBIApp() {
 
   setActiveTab("today");
   setPhase("app");
-  return;
+   return;
 }
+      } else if (response.status === 401 || response.status === 403) {
+        clearAuthSession();
+        setUserData(null);
+        setPlan(null);
+        setPhase("auth");
+        return;
       }
 
       setPhase("onboarding");
@@ -16668,8 +16691,15 @@ setPhase("free-beta");
    setSwaps(await fetchIngredientSwapsFromBackend());
    setActiveTab("today");
    setPhase("app");
-} else {
-  if (authUser) setUserData(normalizeOnboarding(authUser));
+ } else {
+  if (!authUser) {
+    clearAuthSession();
+    setUserData(null);
+    setPlan(null);
+    setPhase("auth");
+    return;
+  }
+  setUserData(normalizeOnboarding(authUser));
   setActiveTab("today");
   setPhase("onboarding");
 }
@@ -16737,7 +16767,15 @@ setPhase("free-beta");
                 legalAcceptedAt: c?.legalAcceptedAt || c?.privacyAcceptedAt || new Date().toISOString(),
                 healthDataConsentAt: c?.healthDataConsentAt || c?.privacyAcceptedAt || new Date().toISOString()
               };
-              await saveOnboardingToBackend(dataToGenerate);
+              const saveResult = await saveOnboardingToBackend(dataToGenerate);
+              if (saveResult?.authError) {
+                clearAuthSession();
+                setPendingPlanData(null);
+                setUserData(null);
+                setPlan(null);
+                setPhase("auth");
+                return;
+              }
               if (getOAuthWearableProvider(dataToGenerate) && dataToGenerate?.wearableConsent) {
                 setPendingPlanData(dataToGenerate);
                 setPhase("wearable-connect");
