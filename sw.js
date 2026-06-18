@@ -18,6 +18,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Password reset URLs contain a one-time secret and must never be cached.
+  if (url.searchParams.has("reset_token")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
