@@ -1631,6 +1631,39 @@ const logAiWeightToBackend = async (weight) => {
   }
 };
 
+const fetchWeightHistoryFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return [];
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/weight/history`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return [];
+    const rows = await response.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch (error) {
+    console.error("Weight history request failed:", error);
+    return [];
+  }
+};
+
+const fetchWeightChangeFromBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return {current:null, thirty_days_ago:null, change_last_30_days:null};
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/weight/change`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!response.ok) return {current:null, thirty_days_ago:null, change_last_30_days:null};
+    return await response.json();
+  } catch (error) {
+    console.error("Weight change request failed:", error);
+    return {current:null, thirty_days_ago:null, change_last_30_days:null};
+  }
+};
+
 const confirmAiAnomalyToBackend = async (payload) => {
   const token = getAuthToken();
 
@@ -7578,6 +7611,102 @@ const PASSWORD_RESET_TRANSLATIONS = {
   }
 };
 Object.entries(PASSWORD_RESET_TRANSLATIONS).forEach(([code, additions]) => {
+  TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...additions};
+});
+
+const TREND_SCREEN_TRANSLATIONS = {
+  it: {
+    "trend.weight.title":"Peso", "trend.weight.log":"Registra peso", "trend.weight.noData":"Registra il peso per vedere il tuo andamento",
+    "trend.weight.input":"Peso (kg)", "trend.weight.save":"Salva", "trend.weight.saving":"Salvataggio...",
+    "trend.goal.title":"Obiettivo", "trend.goal.noTarget":"Obiettivo: mantenimento", "trend.goal.onTrack":"In linea con l'obiettivo",
+    "trend.goal.plateau":"Andamento stabile, continua a monitorare", "trend.adherence.title":"Giorni tracciati",
+    "trend.stats.streak":"Giorni consecutivi", "trend.stats.avgChange":"Media/settimana", "trend.stats.bmi":"BMI",
+    "trend.bmi.underweight":"Sottopeso", "trend.bmi.normal":"Normopeso", "trend.bmi.overweight":"Sovrappeso",
+    "trend.bmi.obese":"Obesità", "trend.bmi.minor":"Consulta il tuo medico per la valutazione"
+  },
+  en: {
+    "trend.weight.title":"Weight", "trend.weight.log":"Log weight", "trend.weight.noData":"Log your weight to see your trend",
+    "trend.weight.input":"Weight (kg)", "trend.weight.save":"Save", "trend.weight.saving":"Saving...",
+    "trend.goal.title":"Goal", "trend.goal.noTarget":"Goal: maintenance", "trend.goal.onTrack":"On track",
+    "trend.goal.plateau":"Stable trend, keep tracking", "trend.adherence.title":"Days tracked",
+    "trend.stats.streak":"Day streak", "trend.stats.avgChange":"Avg/week", "trend.stats.bmi":"BMI",
+    "trend.bmi.underweight":"Underweight", "trend.bmi.normal":"Normal", "trend.bmi.overweight":"Overweight",
+    "trend.bmi.obese":"Obese", "trend.bmi.minor":"Consult your doctor for assessment"
+  },
+  fr: {
+    "trend.weight.title":"Poids", "trend.weight.log":"Enregistrer le poids", "trend.weight.noData":"Enregistrez votre poids pour voir votre évolution",
+    "trend.weight.input":"Poids (kg)", "trend.weight.save":"Enregistrer", "trend.weight.saving":"Enregistrement...",
+    "trend.goal.title":"Objectif", "trend.goal.noTarget":"Objectif : maintien", "trend.goal.onTrack":"Sur la bonne voie",
+    "trend.goal.plateau":"Tendance stable, continuez le suivi", "trend.adherence.title":"Jours suivis",
+    "trend.stats.streak":"Jours consécutifs", "trend.stats.avgChange":"Moyenne/semaine", "trend.stats.bmi":"IMC",
+    "trend.bmi.underweight":"Insuffisance pondérale", "trend.bmi.normal":"Corpulence normale", "trend.bmi.overweight":"Surpoids",
+    "trend.bmi.obese":"Obésité", "trend.bmi.minor":"Consultez votre médecin pour une évaluation"
+  },
+  es: {
+    "trend.weight.title":"Peso", "trend.weight.log":"Registrar peso", "trend.weight.noData":"Registra tu peso para ver la tendencia",
+    "trend.weight.input":"Peso (kg)", "trend.weight.save":"Guardar", "trend.weight.saving":"Guardando...",
+    "trend.goal.title":"Objetivo", "trend.goal.noTarget":"Objetivo: mantenimiento", "trend.goal.onTrack":"En buen camino",
+    "trend.goal.plateau":"Tendencia estable, sigue registrando", "trend.adherence.title":"Días registrados",
+    "trend.stats.streak":"Días consecutivos", "trend.stats.avgChange":"Media/semana", "trend.stats.bmi":"IMC",
+    "trend.bmi.underweight":"Bajo peso", "trend.bmi.normal":"Peso normal", "trend.bmi.overweight":"Sobrepeso",
+    "trend.bmi.obese":"Obesidad", "trend.bmi.minor":"Consulta a tu médico para una evaluación"
+  },
+  de: {
+    "trend.weight.title":"Gewicht", "trend.weight.log":"Gewicht eintragen", "trend.weight.noData":"Trage dein Gewicht ein, um den Verlauf zu sehen",
+    "trend.weight.input":"Gewicht (kg)", "trend.weight.save":"Speichern", "trend.weight.saving":"Wird gespeichert...",
+    "trend.goal.title":"Ziel", "trend.goal.noTarget":"Ziel: Gewicht halten", "trend.goal.onTrack":"Auf Kurs",
+    "trend.goal.plateau":"Stabiler Verlauf, weiter beobachten", "trend.adherence.title":"Erfasste Tage",
+    "trend.stats.streak":"Tage in Folge", "trend.stats.avgChange":"Durchschnitt/Woche", "trend.stats.bmi":"BMI",
+    "trend.bmi.underweight":"Untergewicht", "trend.bmi.normal":"Normalgewicht", "trend.bmi.overweight":"Übergewicht",
+    "trend.bmi.obese":"Adipositas", "trend.bmi.minor":"Bitte ärztlich beurteilen lassen"
+  },
+  ar: {
+    "trend.weight.title":"الوزن", "trend.weight.log":"تسجيل الوزن", "trend.weight.noData":"سجّل وزنك لرؤية اتجاهك",
+    "trend.weight.input":"الوزن (كغ)", "trend.weight.save":"حفظ", "trend.weight.saving":"جارٍ الحفظ...",
+    "trend.goal.title":"الهدف", "trend.goal.noTarget":"الهدف: الحفاظ على الوزن", "trend.goal.onTrack":"على المسار الصحيح",
+    "trend.goal.plateau":"الاتجاه مستقر، واصل المتابعة", "trend.adherence.title":"الأيام المسجّلة",
+    "trend.stats.streak":"أيام متتالية", "trend.stats.avgChange":"المتوسط/أسبوع", "trend.stats.bmi":"مؤشر كتلة الجسم",
+    "trend.bmi.underweight":"نقص الوزن", "trend.bmi.normal":"وزن طبيعي", "trend.bmi.overweight":"زيادة الوزن",
+    "trend.bmi.obese":"سمنة", "trend.bmi.minor":"استشر طبيبك لإجراء التقييم"
+  },
+  pt: {
+    "trend.weight.title":"Peso", "trend.weight.log":"Registar peso", "trend.weight.noData":"Registe o peso para ver a sua evolução",
+    "trend.weight.input":"Peso (kg)", "trend.weight.save":"Guardar", "trend.weight.saving":"A guardar...",
+    "trend.goal.title":"Objetivo", "trend.goal.noTarget":"Objetivo: manutenção", "trend.goal.onTrack":"No caminho certo",
+    "trend.goal.plateau":"Tendência estável, continue a acompanhar", "trend.adherence.title":"Dias registados",
+    "trend.stats.streak":"Dias consecutivos", "trend.stats.avgChange":"Média/semana", "trend.stats.bmi":"IMC",
+    "trend.bmi.underweight":"Baixo peso", "trend.bmi.normal":"Peso normal", "trend.bmi.overweight":"Excesso de peso",
+    "trend.bmi.obese":"Obesidade", "trend.bmi.minor":"Consulte o seu médico para avaliação"
+  },
+  zh: {
+    "trend.weight.title":"体重", "trend.weight.log":"记录体重", "trend.weight.noData":"记录体重以查看趋势",
+    "trend.weight.input":"体重（公斤）", "trend.weight.save":"保存", "trend.weight.saving":"正在保存...",
+    "trend.goal.title":"目标", "trend.goal.noTarget":"目标：维持体重", "trend.goal.onTrack":"进展正常",
+    "trend.goal.plateau":"趋势稳定，请继续记录", "trend.adherence.title":"已记录天数",
+    "trend.stats.streak":"连续天数", "trend.stats.avgChange":"每周平均", "trend.stats.bmi":"BMI",
+    "trend.bmi.underweight":"体重过轻", "trend.bmi.normal":"正常", "trend.bmi.overweight":"超重",
+    "trend.bmi.obese":"肥胖", "trend.bmi.minor":"请咨询医生进行评估"
+  },
+  ja: {
+    "trend.weight.title":"体重", "trend.weight.log":"体重を記録", "trend.weight.noData":"体重を記録すると推移を確認できます",
+    "trend.weight.input":"体重（kg）", "trend.weight.save":"保存", "trend.weight.saving":"保存中...",
+    "trend.goal.title":"目標", "trend.goal.noTarget":"目標：維持", "trend.goal.onTrack":"順調です",
+    "trend.goal.plateau":"安定した推移です。記録を続けましょう", "trend.adherence.title":"記録した日",
+    "trend.stats.streak":"連続日数", "trend.stats.avgChange":"週平均", "trend.stats.bmi":"BMI",
+    "trend.bmi.underweight":"低体重", "trend.bmi.normal":"普通体重", "trend.bmi.overweight":"過体重",
+    "trend.bmi.obese":"肥満", "trend.bmi.minor":"評価について医師に相談してください"
+  },
+  ru: {
+    "trend.weight.title":"Вес", "trend.weight.log":"Записать вес", "trend.weight.noData":"Записывайте вес, чтобы видеть динамику",
+    "trend.weight.input":"Вес (кг)", "trend.weight.save":"Сохранить", "trend.weight.saving":"Сохранение...",
+    "trend.goal.title":"Цель", "trend.goal.noTarget":"Цель: поддержание веса", "trend.goal.onTrack":"Движение к цели",
+    "trend.goal.plateau":"Динамика стабильна, продолжайте наблюдение", "trend.adherence.title":"Дни с записями",
+    "trend.stats.streak":"Дней подряд", "trend.stats.avgChange":"Среднее/неделю", "trend.stats.bmi":"ИМТ",
+    "trend.bmi.underweight":"Недостаточный вес", "trend.bmi.normal":"Нормальный вес", "trend.bmi.overweight":"Избыточный вес",
+    "trend.bmi.obese":"Ожирение", "trend.bmi.minor":"Обратитесь к врачу для оценки"
+  }
+};
+Object.entries(TREND_SCREEN_TRANSLATIONS).forEach(([code, additions]) => {
   TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...additions};
 });
 
@@ -16562,14 +16691,18 @@ function evaluateWeightPlanDecision(weightLog, nextWeight, plan, userData, lang)
   return {state:"slow", allowRegeneration:false, explanation:copy.slow};
 }
 
-const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
-  const { t, lang } = useT();
+const TrendScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh, lang: langProp}) => {
+  const { t, lang: contextLang } = useT();
+  const lang = langProp || contextLang;
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
 
-  const [weightLog, setWeightLog] = useState(MOCK_METRIC_DATA.peso.map(d=>({week:d.w,weight:d.v})));
+  const [weightHistory, setWeightHistory] = useState([]);
+  const [weightChange, setWeightChange] = useState({current:null, thirty_days_ago:null, change_last_30_days:null});
   const [newWeight, setNewWeight] = useState("");
   const [progressMessage, setProgressMessage] = useState("");
   const [savingProgress, setSavingProgress] = useState(false);
+  const [weightFormOpen, setWeightFormOpen] = useState(false);
+  const [selectedWeightPoint, setSelectedWeightPoint] = useState(null);
   const [activeMetric, setActiveMetric] = useState("peso");
   const [trendView, setTrendView] = useState("summary");
   const [progressHistory, setProgressHistory] = useState([]);
@@ -16579,22 +16712,46 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const [manualWorkoutDays, setManualWorkoutDays] = useState(userData?.workoutDays || "3-4");
   const [manualWorkoutIntensity, setManualWorkoutIntensity] = useState(userData?.workoutIntensity || "moderata");
   const [manualTdeeMessage, setManualTdeeMessage] = useState("");
-  
-  useEffect(() => {
-  const loadProgressHistory = async () => {
-    const history = await fetchProgressHistory();
-    setProgressHistory(history);
+
+  const refreshWeightData = async () => {
+    const [history, change] = await Promise.all([
+      fetchWeightHistoryFromBackend(),
+      fetchWeightChangeFromBackend()
+    ]);
+    setWeightHistory(history);
+    setWeightChange(change);
+    const latest = Number(history?.[0]?.weight ?? userData?.weight);
+    if (Number.isFinite(latest)) setNewWeight(value => value || String(latest));
+    return history;
   };
 
-  loadProgressHistory();
-}, []);
+  useEffect(() => {
+    Promise.all([refreshWeightData(), fetchProgressHistory()]).then(([, progress]) => {
+      setProgressHistory(progress);
+    });
+  }, []);
   useEffect(() => {
     refreshSnapshot();
   }, [refreshSnapshot]);
   const [showWeeklyReport, setShowWeeklyReport] = useState(false);
 
-  const startWeight = weightLog[0]?.weight || userData?.weight || 78;
-  const currentWeight = weightLog[weightLog.length-1]?.weight || startWeight;
+  const validWeightHistory = weightHistory
+    .map(entry => ({weight:Number(entry.weight), loggedAt:new Date(entry.logged_at)}))
+    .filter(entry => Number.isFinite(entry.weight) && !Number.isNaN(entry.loggedAt.getTime()))
+    .sort((a,b) => b.loggedAt - a.loggedAt);
+  const chartCutoff = Date.now() - 30 * 86400000;
+  const weightLog = validWeightHistory
+    .filter(entry => entry.loggedAt.getTime() >= chartCutoff)
+    .slice()
+    .sort((a,b) => a.loggedAt - b.loggedAt)
+    .map(entry => ({
+      week:entry.loggedAt.toLocaleDateString(lang,{day:"2-digit",month:"short"}),
+      weight:entry.weight,
+      loggedAt:entry.loggedAt
+    }));
+  const fallbackWeight = Number(userData?.weight) || 0;
+  const startWeight = validWeightHistory[validWeightHistory.length-1]?.weight || fallbackWeight;
+  const currentWeight = validWeightHistory[0]?.weight || fallbackWeight || startWeight;
   const totalLost = (startWeight - currentWeight).toFixed(1);
   const weeklyAvg = weightLog.length > 1 ? (totalLost / (weightLog.length-1)).toFixed(2) : "0.00";
 
@@ -16608,12 +16765,28 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const trendLabel = t(trend==="onTrack"?"prog.trend.onTrack.plain":(trend==="slowing"?"prog.trend.slowing.plain":"prog.trend.notYet.plain"));
   const trendIcon  = trend==="onTrack"?"trend":(trend==="slowing"?"balance":"leaf2");
 
-  const addWeight = () => {
+  const addWeight = async () => {
     const val = parseFloat(newWeight);
-    if (isNaN(val) || val < 30 || val > 300) return;
-    const week = "S."+(weightLog.length+1);
-    setWeightLog(prev=>[...prev,{week,weight:val}]);
-    setNewWeight("");
+    if (!Number.isFinite(val) || val < 30 || val > 300) {
+      setProgressMessage(t("prog.err.validWeight"));
+      return;
+    }
+
+    setSavingProgress(true);
+    setProgressMessage("");
+    const result = await logAiWeightToBackend(val);
+    if (result) {
+      await refreshWeightData();
+      setWeightFormOpen(false);
+      setNewWeight(String(val));
+      if (result?.regenerated && result?.plan && onAiPlanRefresh) {
+        onAiPlanRefresh(result.plan, val);
+      }
+      setProgressMessage(result?.regenerated ? t("prog.msg.regenerated") : t("prog.msg.saved"));
+    } else {
+      setProgressMessage(t("prog.msg.saveErr"));
+    }
+    setSavingProgress(false);
   };
 
   const wearableRecent = wearableSnapshot?.recent || [];
@@ -16645,11 +16818,8 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   const availableTrendMetrics = Object.values(wearableAvailability).filter(Boolean).length;
   const hasPartialTrendData = availableTrendMetrics > 0 && availableTrendMetrics < Object.keys(wearableAvailability).length;
   const hasWearableTrendData = availableTrendMetrics > 0;
-  const latestProgressDate = progressHistory
-    .map(entry => new Date(entry.created_at))
-    .filter(date => !Number.isNaN(date.getTime()))
-    .sort((a,b) => b - a)[0];
-  const daysSinceWeightCheck = latestProgressDate ? Math.floor((Date.now() - latestProgressDate.getTime()) / 86400000) : null;
+  const latestWeightDate = validWeightHistory[0]?.loggedAt || null;
+  const daysSinceWeightCheck = latestWeightDate ? Math.floor((Date.now() - latestWeightDate.getTime()) / 86400000) : null;
   const needsWeightCheckIn = daysSinceWeightCheck === null || daysSinceWeightCheck >= 5;
 
   // Build chart data for active metric
@@ -16685,7 +16855,6 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
     athletic: t("goal.athletic.t")
   }[userData?.goal || plan?.goal] || userData?.goal || "DUBI";
   const trendCards = [
-    {id:"weight", icon:"weight", label:t("trend.card.weight"), value:`${currentWeight} kg`, note:t("trend.explain.weight"), color:T.text, view:"weight", metric:"peso"},
     ...(wearableAvailability.hrv ? [{id:"recovery", icon:"heart", label:t("trend.card.recovery"), value:`HRV ${latestWearable.hrv} ms`, note:t("trend.explain.recovery"), color:"#C47B7B", view:"metrics", metric:"hrv"}] : []),
     ...(wearableAvailability.passi ? [{id:"activity", icon:"steps", label:trendWearableCopy.activity, value:Number(latestWearable.steps).toLocaleString("it-IT"), note:t("prog.metric.steps"), color:T.accentD, view:"metrics", metric:"passi"}] : []),
     {id:"energy", icon:"zap", label:t("trend.card.energy"), value:`${plan?.tdee || 2100} kcal`, note:t("trend.explain.energy"), color:"#C9A87C", view:"report", metric:"calorie"},
@@ -16723,9 +16892,8 @@ const ProgressScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh}) => {
   setSavingProgress(false);
 
   if (result) {
-    const week = "S."+(weightLog.length+1);
-    setWeightLog(prev=>[...prev,{week,weight:weightValue}]);
-    setNewWeight("");
+    await refreshWeightData();
+    setNewWeight(String(weightValue));
     refreshProgressHistory();
 
     if (aiWeightResult?.regenerated && aiWeightResult.plan && onAiPlanRefresh && localWeightDecision.allowRegeneration) {
@@ -16810,6 +16978,103 @@ const handleManualTdeeUpdate = () => {
   }));
 };
 
+  const toCalendarKey = (value) => {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2,"0");
+    const day = String(date.getDate()).padStart(2,"0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const currentFromChange = Number(weightChange?.current);
+  const thirtyDaysAgo = weightChange?.thirty_days_ago == null ? null : Number(weightChange.thirty_days_ago);
+  const changeLast30 = weightChange?.change_last_30_days == null ? null : Number(weightChange.change_last_30_days);
+  const displayCurrentWeight = Number.isFinite(currentWeight) && currentWeight > 0
+    ? currentWeight
+    : (Number.isFinite(currentFromChange) ? currentFromChange : 0);
+  const targetWeight = Number(userData?.targetWeight ?? userData?.target_weight);
+  const hasTargetWeight = Number.isFinite(targetWeight) && targetWeight > 0;
+  let goalProgress = 0;
+  if (hasTargetWeight && Number.isFinite(startWeight) && startWeight > 0) {
+    if (targetWeight < startWeight) {
+      goalProgress = ((startWeight - displayCurrentWeight) / Math.max(0.01, startWeight - targetWeight)) * 100;
+    } else if (targetWeight > startWeight) {
+      goalProgress = ((displayCurrentWeight - startWeight) / Math.max(0.01, targetWeight - startWeight)) * 100;
+    } else {
+      goalProgress = 100;
+    }
+  }
+  goalProgress = Math.max(0, Math.min(100, goalProgress));
+  const isPlateau = changeLast30 !== null && Number.isFinite(changeLast30) && Math.abs(changeLast30) < 0.5 && validWeightHistory.length >= 2;
+  const goalColor = isPlateau ? "#C9A87C" : (goalProgress > 0 ? T.accentD : T.muted);
+
+  const nowForWeek = new Date();
+  const monday = new Date(nowForWeek);
+  monday.setHours(0,0,0,0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const trackedDateKeys = new Set(progressHistory.map(entry => toCalendarKey(entry.created_at)).filter(Boolean));
+  const trackedWeek = Array.from({length:7}, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return {
+      key:toCalendarKey(date),
+      label:new Intl.DateTimeFormat(lang,{weekday:"short"}).format(date).replace(".",""),
+      tracked:trackedDateKeys.has(toCalendarKey(date))
+    };
+  });
+
+  const uniqueWeightDays = [...new Set(validWeightHistory.map(entry => toCalendarKey(entry.loggedAt)).filter(Boolean))];
+  let weightStreak = 0;
+  if (uniqueWeightDays.length) {
+    const latest = new Date(`${uniqueWeightDays[0]}T00:00:00`);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const ageInDays = Math.round((today - latest) / 86400000);
+    if (ageInDays <= 1) {
+      const daySet = new Set(uniqueWeightDays);
+      const cursor = new Date(latest);
+      while (daySet.has(toCalendarKey(cursor))) {
+        weightStreak += 1;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+    }
+  }
+
+  const avgWeeklyChange = changeLast30 !== null && Number.isFinite(changeLast30) ? changeLast30 / 4.3 : null;
+  const avgWeeklyLabel = avgWeeklyChange === null
+    ? "—"
+    : `${avgWeeklyChange > 0 ? "+" : avgWeeklyChange < 0 ? "−" : ""}${Math.abs(avgWeeklyChange).toFixed(1)} kg/w`;
+  const heightMeters = Number(userData?.height) / 100;
+  const bmi = displayCurrentWeight > 0 && heightMeters > 0 ? displayCurrentWeight / (heightMeters * heightMeters) : null;
+  const age = Number(userData?.age);
+  const isMinorUser = userData?.is_minor === true || userData?.isMinor === true || (Number.isFinite(age) && age < 18);
+  const isAdultUser = userData?.is_minor === false || userData?.isMinor === false || (Number.isFinite(age) && age >= 18);
+  const bmiCategory = !bmi ? "" : !isAdultUser || isMinorUser
+    ? t("trend.bmi.minor")
+    : bmi < 18.5 ? t("trend.bmi.underweight")
+    : bmi < 25 ? t("trend.bmi.normal")
+    : bmi < 30 ? t("trend.bmi.overweight")
+    : t("trend.bmi.obese");
+
+  const chartWidth = 320;
+  const chartHeight = 140;
+  const chartPadX = 18;
+  const chartPadY = 22;
+  const chartWeights = weightLog.map(point => point.weight);
+  const chartMin = chartWeights.length ? Math.min(...chartWeights) : 0;
+  const chartMax = chartWeights.length ? Math.max(...chartWeights) : 1;
+  const chartSpan = Math.max(1, chartMax - chartMin);
+  const chartPoints = weightLog.map((point,index) => ({
+    ...point,
+    x:chartPadX + (index / Math.max(1, weightLog.length - 1)) * (chartWidth - chartPadX * 2),
+    y:chartHeight - chartPadY - ((point.weight - chartMin) / chartSpan) * (chartHeight - chartPadY * 2)
+  }));
+  const selectedChartPoint = selectedWeightPoint === null ? null : chartPoints[selectedWeightPoint];
+  const displayedChange = Number.isFinite(changeLast30) ? changeLast30 : (thirtyDaysAgo === null ? null : displayCurrentWeight - thirtyDaysAgo);
+  const weightSummary = thirtyDaysAgo !== null && Number.isFinite(thirtyDaysAgo)
+    ? `${thirtyDaysAgo.toFixed(1)} kg → ${displayCurrentWeight.toFixed(1)} kg (${displayedChange > 0 ? "+" : displayedChange < 0 ? "−" : ""}${Math.abs(displayedChange || 0).toFixed(1)} kg)`
+    : `${displayCurrentWeight.toFixed(1)} kg`;
+
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
@@ -16819,30 +17084,113 @@ const handleManualTdeeUpdate = () => {
         <p style={{fontSize:14,color:T.muted,lineHeight:1.5,margin:0}}>{t("trend.summary.body")}</p>
       </div>
 
-      {/* Trend summary */}
-      <div style={{margin:"0 24px 14px",padding:"16px",background:T.sel,borderRadius:18,border:`1px solid ${T.border}`,display:"flex",alignItems:"flex-start",gap:12}}>
-        <div style={{width:36,height:36,borderRadius:11,background:`${trendColor}22`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <Ico n={trendIcon} size={18} c={trendColor}/>
+      {/* Real weight tracker */}
+      <section style={{margin:"0 24px 14px",padding:18,background:T.card,borderRadius:18,border:`1px solid ${T.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:14}}>
+          <div>
+            <p style={{fontSize:16,fontWeight:900,color:T.text,margin:"0 0 4px"}}>{t("trend.weight.title")}</p>
+            <p style={{fontSize:12,color:T.muted,margin:0}}>{weightSummary}</p>
+          </div>
+          <button onClick={()=>setWeightFormOpen(open=>!open)} aria-label={t("trend.weight.log")}
+            style={{width:34,height:34,borderRadius:11,border:`1px solid ${T.border}`,background:T.sel,color:T.accentD,fontSize:22,fontWeight:700,lineHeight:1,cursor:"pointer",flexShrink:0}}>+</button>
         </div>
-        <div style={{flex:1}}>
-          <p style={{fontSize:16,fontWeight:900,color:T.text,margin:"0 0 4px"}}>{t("trend.summary.title")}</p>
-          <p style={{fontSize:13,fontWeight:800,color:trendColor,margin:"0 0 5px"}}>{trendLabel} · {t("prog.trend.subtitle",{v:weeklyAvg})}</p>
-          <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>
-            {t("trend.personalized",{goal:goalLabelForTrend,kcal:plan?.calories || "—",meals:plan?.mealCount || plan?.meals?.length || "—"})}
-          </p>
-        </div>
-      </div>
 
-      {/* KPI row */}
-      <div style={{display:"flex",gap:8,padding:"0 24px",marginBottom:20}}>
+        {weightFormOpen && (
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <input type="number" min="30" max="300" step="0.1" value={newWeight}
+              onChange={event=>setNewWeight(event.target.value)} onKeyDown={event=>{if(event.key==="Enter") addWeight();}}
+              placeholder={t("trend.weight.input")} aria-label={t("trend.weight.input")}
+              style={{flex:1,minWidth:0,padding:"11px 13px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:14,outline:"none"}}/>
+            <button onClick={addWeight} disabled={savingProgress}
+              style={{padding:"11px 14px",borderRadius:12,border:"none",background:T.text,color:T.bg,fontSize:12,fontWeight:850,cursor:savingProgress?"default":"pointer",opacity:savingProgress ? .7 : 1}}>
+              {savingProgress ? t("trend.weight.saving") : t("trend.weight.save")}
+            </button>
+          </div>
+        )}
+
+        {weightLog.length < 2 ? (
+          <div style={{height:140,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"0 18px"}}>
+            <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{t("trend.weight.noData")}</p>
+          </div>
+        ) : (
+          <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{width:"100%",height:140,display:"block",overflow:"visible"}} role="img" aria-label={t("trend.weight.title")}>
+            {[0,1,2].map(index=>{
+              const y=chartPadY + index*((chartHeight-chartPadY*2)/2);
+              return <line key={index} x1={chartPadX} x2={chartWidth-chartPadX} y1={y} y2={y} stroke={T.border} strokeWidth="1" strokeDasharray="3 5"/>;
+            })}
+            <polyline points={chartPoints.map(point=>`${point.x},${point.y}`).join(" ")} fill="none" stroke={T.accentD} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            {chartPoints.map((point,index)=>(
+              <g key={`${point.loggedAt.toISOString()}-${index}`}>
+                <circle cx={point.x} cy={point.y} r="9" fill="transparent"
+                  onMouseEnter={()=>setSelectedWeightPoint(index)} onMouseLeave={()=>setSelectedWeightPoint(null)}
+                  onClick={()=>setSelectedWeightPoint(selectedWeightPoint===index?null:index)} style={{cursor:"pointer"}}/>
+                <circle cx={point.x} cy={point.y} r="3.5" fill={T.card} stroke={T.accentD} strokeWidth="2" pointerEvents="none"/>
+              </g>
+            ))}
+            {selectedChartPoint && (()=>{
+              const tipX=Math.max(60,Math.min(chartWidth-60,selectedChartPoint.x));
+              const tipY=Math.max(24,selectedChartPoint.y-28);
+              return <g pointerEvents="none">
+                <rect x={tipX-58} y={tipY-18} width="116" height="28" rx="9" fill={T.text}/>
+                <text x={tipX} y={tipY} textAnchor="middle" fill={T.bg} fontSize="9" fontWeight="700">
+                  {selectedChartPoint.loggedAt.toLocaleDateString(lang,{day:"2-digit",month:"short"})} · {selectedChartPoint.weight.toFixed(1)} kg
+                </text>
+              </g>;
+            })()}
+          </svg>
+        )}
+        {progressMessage && <p style={{fontSize:11,color:T.accentD,margin:"10px 0 0",fontWeight:700,lineHeight:1.45}}>{progressMessage}</p>}
+      </section>
+
+      {/* Goal progress */}
+      <section style={{margin:"0 24px 14px",padding:18,background:T.card,borderRadius:18,border:`1px solid ${T.border}`}}>
+        <p style={{fontSize:16,fontWeight:900,color:T.text,margin:"0 0 10px"}}>{t("trend.goal.title")}</p>
+        {!hasTargetWeight ? (
+          <p style={{fontSize:13,color:T.muted,margin:0}}>{t("trend.goal.noTarget")}</p>
+        ) : (
+          <>
+            <div style={{display:"flex",justifyContent:"space-between",gap:12,marginBottom:10}}>
+              <span style={{fontSize:13,fontWeight:800,color:T.text}}>{displayCurrentWeight.toFixed(1)} kg → {targetWeight.toFixed(1)} kg</span>
+              <span style={{fontSize:12,fontWeight:900,color:goalColor}}>{Math.round(goalProgress)}%</span>
+            </div>
+            <div style={{height:8,borderRadius:99,background:T.border,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${goalProgress}%`,borderRadius:99,background:goalColor,transition:"width .35s ease"}}/>
+            </div>
+            {(isPlateau || goalProgress > 0) && (
+              <p style={{fontSize:11,color:goalColor,margin:"9px 0 0",fontWeight:750}}>
+                {isPlateau ? t("trend.goal.plateau") : t("trend.goal.onTrack")}
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* Days tracked */}
+      <section style={{margin:"0 24px 14px",padding:18,background:T.card,borderRadius:18,border:`1px solid ${T.border}`}}>
+        <p style={{fontSize:16,fontWeight:900,color:T.text,margin:"0 0 14px"}}>{t("trend.adherence.title")}</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
+          {trackedWeek.map(day=>(
+            <div key={day.key} style={{textAlign:"center"}}>
+              <div style={{width:24,height:24,borderRadius:"50%",margin:"0 auto 6px",background:day.tracked?T.accentD:"transparent",border:`1.5px solid ${day.tracked?T.accentD:T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {day.tracked && <Ico n="check" size={11} c={T.white}/>}
+              </div>
+              <span style={{fontSize:9,color:T.muted,textTransform:"uppercase"}}>{day.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Key stats */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,padding:"0 24px",marginBottom:20}}>
         {[
-          {label:t("prog.kpi.start"),value:`${startWeight} kg`,color:T.muted},
-          {label:t("prog.kpi.current"),value:`${currentWeight} kg`,color:T.text},
-          {label:plan?.goal==="gain"?t("prog.kpi.gained"):t("prog.kpi.lost"),value:`${Math.abs(totalLost)} kg`,color:trendColor},
-        ].map(k=>(
-          <div key={k.label} style={{flex:1,background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:"12px 6px",textAlign:"center"}}>
-            <div style={{fontSize:17,fontWeight:700,color:k.color}}>{k.value}</div>
-            <div style={{fontSize:10,color:T.muted,marginTop:2,lineHeight:1.3}}>{k.label}</div>
+          {label:t("trend.stats.streak"),value:String(weightStreak),note:""},
+          {label:t("trend.stats.avgChange"),value:avgWeeklyLabel,note:""},
+          {label:t("trend.stats.bmi"),value:bmi?bmi.toFixed(1):"—",note:bmiCategory}
+        ].map(stat=>(
+          <div key={stat.label} style={{minWidth:0,background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:"13px 8px",textAlign:"center"}}>
+            <p style={{fontSize:9,color:T.muted,lineHeight:1.25,minHeight:23,margin:"0 0 5px"}}>{stat.label}</p>
+            <p style={{fontSize:15,fontWeight:900,color:T.text,margin:0,overflowWrap:"anywhere"}}>{stat.value}</p>
+            {stat.note && <p style={{fontSize:8,color:T.muted,lineHeight:1.25,margin:"4px 0 0"}}>{stat.note}</p>}
           </div>
         ))}
       </div>
@@ -16863,16 +17211,6 @@ const handleManualTdeeUpdate = () => {
               </p>
             </div>
           </div>
-          {needsWeightCheckIn && (
-            <div style={{display:"flex",gap:8,marginBottom:14}}>
-              <input type="number" value={newWeight} onChange={e=>setNewWeight(e.target.value)} placeholder={t("trend.manual.weightPlaceholder")}
-                style={{flex:1,padding:"11px 14px",borderRadius:12,border:`1.5px solid ${T.border}`,background:T.bg,fontSize:15,color:T.text,outline:"none",fontFamily:"inherit"}} />
-              <button onClick={handleSaveProgress} disabled={savingProgress}
-                style={{padding:"11px 14px",borderRadius:12,background:T.text,color:T.bg,border:"none",fontSize:12,fontWeight:800,cursor:"pointer",opacity:savingProgress ? .7 : 1}}>
-                {savingProgress ? t("prog.saving") : t("prog.save.short")}
-              </button>
-            </div>
-          )}
           {!hasWearableTrendData && (
             <div>
               <p style={{fontSize:11,fontWeight:900,color:T.muted,letterSpacing:.7,margin:"0 0 8px"}}>
@@ -19390,7 +19728,7 @@ setPhase("free-beta");
               {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
-              {activeTab==="progress" && <ProgressScreen userData={userData} plan={plan} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} />}
+              {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} />}
               {activeTab==="sources"  && <SourcesScreen />}
               {activeTab==="settings" && (
   <SettingsScreen
