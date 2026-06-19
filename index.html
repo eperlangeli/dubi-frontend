@@ -3487,6 +3487,9 @@ const TRANSLATIONS = {
     "shop.plan.both":"Piano per entrambi",
 
   }
+  "onb.cta.generate": "Crea il mio piano →",
+  "goal.warn.bmi.low": "Sotto soglia sottopeso (BMI < 18.5). Valuta con un medico o dietologo.",
+  "goal.warn.bmi.high": "Sopra soglia obesità (BMI > 30). Valuta con un medico o dietologo.",
 };
 
 /* ─── EN ─── */
@@ -3781,6 +3784,9 @@ TRANSLATIONS.en = {
   "wear.consent.body":"DUBI will use sleep, HRV, resting heart rate, activity and recovery data only to personalize your diet, meal timing and plan adaptations. You can withdraw consent in Settings.",
   "wear.primary.note":"You can connect multiple wearables. For now, DUBI saves {provider} as the primary source and prepares the others for synchronization.",
 
+  "onb.cta.generate": "Create my plan →",
+  "goal.warn.bmi.low": "Below underweight threshold (BMI < 18.5). Consult a doctor or dietitian.",
+  "goal.warn.bmi.high": "Above obesity threshold (BMI > 30). Consider a supervised plan.",
 };
 
 /* ─── FR ─── */
@@ -4135,6 +4141,9 @@ TRANSLATIONS.fr = {
   "shop.plan.solo":"Mon plan seulement",
   "shop.plan.both":"Planifiez pour les deux",
 
+  "onb.cta.generate": "Créer mon plan →",
+  "goal.warn.bmi.low": "En dessous du seuil de maigreur (IMC < 18,5). Consultez un médecin ou diététicien.",
+  "goal.warn.bmi.high": "Au-dessus du seuil d'obésité (IMC > 30). Envisagez un suivi médical.",
 };
 
 /* ─── ES ─── */
@@ -4489,6 +4498,9 @@ TRANSLATIONS.es = {
   "shop.plan.solo":"solo mi plan",
   "shop.plan.both":"Plan para ambos",
 
+  "onb.cta.generate": "Crear mi plan →",
+  "goal.warn.bmi.low": "Por debajo del umbral de bajo peso (IMC < 18,5). Consulta con un médico o dietista.",
+  "goal.warn.bmi.high": "Por encima del umbral de obesidad (IMC > 30). Considera un plan supervisado.",
 };
 
 /* ─── DE ─── */
@@ -4843,6 +4855,9 @@ TRANSLATIONS.de = {
   "shop.plan.solo":"Nur mein Plan",
   "shop.plan.both":"Planen Sie beides ein",
 
+  "onb.cta.generate": "Meinen Plan erstellen →",
+  "goal.warn.bmi.low": "Unterhalb der Untergewichtsgrenze (BMI < 18,5). Konsultiere einen Arzt oder Ernährungsberater.",
+  "goal.warn.bmi.high": "Oberhalb der Adipositasgrenze (BMI > 30). Erwäge einen betreuten Plan.",
 };
 
 /* ─── AR (RTL) ─── */
@@ -5197,6 +5212,9 @@ TRANSLATIONS.ar = {
   "shop.plan.solo":"خطتي فقط",
   "shop.plan.both":"خطط لكليهما",
 
+  "onb.cta.generate": "إنشاء خطتي ←",
+  "goal.warn.bmi.low": "أقل من حد نقص الوزن (مؤشر كتلة الجسم < 18.5). استشر طبيبًا أو اختصاصي تغذية.",
+  "goal.warn.bmi.high": "فوق حد السمنة (مؤشر كتلة الجسم > 30). فكر في خطة تحت إشراف متخصص.",
 };
 
 /* ─── PT ─── */
@@ -5551,6 +5569,9 @@ TRANSLATIONS.pt = {
   "shop.plan.solo":"Somente meu plano",
   "shop.plan.both":"Planeje para ambos",
 
+  "onb.cta.generate": "Criar meu plano →",
+  "goal.warn.bmi.low": "Abaixo do limiar de baixo peso (IMC < 18,5). Consulte um médico ou nutricionista.",
+  "goal.warn.bmi.high": "Acima do limiar de obesidade (IMC > 30). Considere um plano supervisionado.",
 };
 
 /* ─── ZH (Simplified Chinese) ─── */
@@ -5905,6 +5926,9 @@ TRANSLATIONS.zh = {
   "shop.plan.solo":"仅我的计划",
   "shop.plan.both":"为两者制定计划",
 
+  "onb.cta.generate": "创建我的计划 →",
+  "goal.warn.bmi.low": "低于低体重阈值（BMI < 18.5）。请咨询医生或营养师。",
+  "goal.warn.bmi.high": "超过肥胖阈值（BMI > 30）。考虑在专业人士监督下制定计划。",
 };
 
 /* ─── JA ─── */
@@ -6259,6 +6283,9 @@ TRANSLATIONS.ja = {
   "shop.plan.solo":"私の計画だけ",
   "shop.plan.both":"両方を計画する",
 
+  "onb.cta.generate": "プランを作成する →",
+  "goal.warn.bmi.low": "低体重のしきい値を下回っています（BMI < 18.5）。医師または栄養士に相談してください。",
+  "goal.warn.bmi.high": "肥満のしきい値を超えています（BMI > 30）。専門家の監督のもとでプランを検討してください。",
 };
 
 /* ─── RU ─── */
@@ -6613,6 +6640,9 @@ TRANSLATIONS.ru = {
   "shop.plan.solo":"Только мой план",
   "shop.plan.both":"Планируйте оба",
 
+  "onb.cta.generate": "Создать мой план →",
+  "goal.warn.bmi.low": "Ниже порога недостаточного веса (ИМТ < 18,5). Проконсультируйтесь с врачом или диетологом.",
+  "goal.warn.bmi.high": "Выше порога ожирения (ИМТ > 30). Рассмотрите план под наблюдением специалиста.",
 };
 
 
@@ -15033,7 +15063,7 @@ const RejectionScreen = ({ onBack }) => {
 // ═══════════════════════════════════════════════
 // ONBOARDING
 // ═══════════════════════════════════════════════
-const PhysicalStep = ({d,u}) => {
+const PhysicalStep = ({d,u,onAutoNext}) => {
   const { t, lang } = useT();
   return (
   <div>
@@ -15049,7 +15079,7 @@ const PhysicalStep = ({d,u}) => {
     <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:10}}>{t("phys.gender")}</p>
     <div style={{display:"flex",gap:10,marginBottom:22}}>
       {[["M",t("phys.male.short")],["F",t("phys.female.short")]].map(([g,l])=>(
-        <button key={g} onClick={()=>u("gender",g)}
+        <button key={g} onClick={()=>{ u("gender",g); setTimeout(onAutoNext, 180); }}
           style={{flex:1,padding:14,borderRadius:14,border:`1.5px solid ${d.gender===g?T.accent:T.border}`,background:d.gender===g?T.sel:T.card,fontSize:15,fontWeight:d.gender===g?600:400,color:T.text,cursor:"pointer"}}>
           {l}
         </button>
@@ -15113,13 +15143,9 @@ const GoalStep = ({d, u}) => {
   const twBmi = twNum && d.height ? (twNum / Math.pow(d.height/100, 2)).toFixed(1) : null;
   const twWarn = twNum && twBmi
     ? parseFloat(twBmi) < 18.5
-      ? (lang !== "it"
-          ? `Below underweight threshold (BMI < 18.5). Consult a doctor or dietitian.`
-          : `Sotto soglia sottopeso (BMI < 18.5). Valuta con un medico o dietologo.`)
+      ? (t("goal.warn.bmi.low"))
       : parseFloat(twBmi) > 30
-      ? (lang !== "it"
-          ? `Above the recommended range (BMI > 30). Consider a progressive target.`
-          : `Sopra il range raccomandato (BMI > 30). Considera un obiettivo progressivo.`)
+      ? (t("goal.warn.bmi.high"))
       : null : null;
 
 const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margine di sicurezza
@@ -15658,6 +15684,10 @@ const WearableStep = ({d,u,connectableWearables = VERIFIED_CONNECTABLE_WEARABLES
 
   return (
   <div>
+    <HealthDataConsentPrompt
+      accepted={Boolean(d.healthDataConsent)}
+      onChange={v => u("healthDataConsent", v)}
+    />
     <p style={{fontSize:15,color:T.muted,lineHeight:1.7,marginBottom:28,fontWeight:300}}>
       {t("wear.intro")}
     </p>
@@ -15845,23 +15875,16 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   }
 }, [isEditing]);
   const u = (k,v) => setData(p=>({...p,[k]:v}));
-  const healthConsentGate = (
-    <HealthDataConsentPrompt
-      accepted={Boolean(data.healthDataConsent)}
-      onChange={value=>u("healthDataConsent", value)}
-    />
-  );
   const content = [
-    <PhysicalStep d={data} u={u}/>,
-    data.healthDataConsent ? <GoalStep d={data} u={u}/> : healthConsentGate,
-<ActivityStep d={data} u={u}/>,
-    data.healthDataConsent ? <PreferencesStep d={data} u={u}/> : healthConsentGate,
+    <PhysicalStep d={data} u={u} onAutoNext={() => setStep(s => s + 1)}/>,
+    <GoalStep d={data} u={u}/>,
+    <ActivityStep d={data} u={u}/>,
+    <PreferencesStep d={data} u={u}/>,
     <WearableStep d={data} u={u} connectableWearables={connectableWearables}/>,
   ];
   const selectedWearables = getSelectedWearables(data).filter(id => id !== "none");
   const wearableConsentRequired = step === 4 && selectedWearables.length > 0;
-  const healthConsentRequired = (step === 1 || step === 3) && !data.healthDataConsent;
-  const canContinueStep = !wearableConsentRequired && !healthConsentRequired;
+  const canContinueStep = !wearableConsentRequired;
 
   
   return (
@@ -15888,9 +15911,9 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
     <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"56px 24px 0",position:"relative"}}>
         <div style={{display:"flex",gap:4,marginBottom:28}}>
-          {STEP_NAMES_KEYS.map((_,i)=>(<div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=step?T.accentD:T.border,transition:"background 0.3s"}} />))}
+          {STEP_NAMES_KEYS.map((_,i)=>(<div key={i} style={{flex:1,height:4,borderRadius:4,background:i<=step?T.accentD:T.border,transition:"background 0.3s"}} />))}
         </div>
-        <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:6}}>{t("onb.step",{a:step+1,b:STEP_NAMES_KEYS.length})}</p>
+        <p style={{fontSize:12,fontWeight:500,color:T.muted,letterSpacing:1,marginBottom:6}}>{t("onb.step",{a:step+1,b:STEP_NAMES_KEYS.length})}</p>
         <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:700,color:T.text,margin:0}}>{t(STEP_NAMES_KEYS[step])}</h2>
       </div>
       <div style={{flex:1,padding:"24px 24px 130px",overflowY:"auto"}}>{content[step]}</div>
@@ -15902,7 +15925,7 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
           </p>
         )}
         <div style={{display:"flex",gap:10}}>
-          {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:52,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:18,cursor:"pointer",flexShrink:0}}>←</button>}
+          {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:44,height:44,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>}
           <button disabled={!canContinueStep || savingOnboarding} onClick={async () => {
   if (!canContinueStep) return;
   if (step < 4) {
@@ -15935,7 +15958,7 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   }
 }}
             style={{flex:1,background:canContinueStep&&!savingOnboarding?T.text:T.border,color:T.bg,border:"none",borderRadius:50,padding:18,fontSize:15,fontWeight:600,cursor:canContinueStep&&!savingOnboarding?"pointer":"default",opacity:canContinueStep&&!savingOnboarding?1:.75}}>
-            {savingOnboarding ? t("onb.saving") : (step<4?t("onb.continue"):t("onb.generate"))}
+            {savingOnboarding ? t("onb.saving") : (step<4?t("onb.continue"):t("onb.cta.generate"))}
           </button>
         </div>
       </div>
@@ -19646,7 +19669,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
       {/* Progress bar top */}
       <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,padding:"14px 24px 0",display:"flex",gap:4,zIndex:10,background:T.bg}}>
         {Array.from({length:TOTAL}).map((_,i)=>(
-          <div key={i} style={{flex:1,height:3,borderRadius:2,background:i<=slide?T.accentD:T.border,transition:"background 0.4s"}}/>
+          <div key={i} style={{flex:1,height:4,borderRadius:4,background:i<=slide?T.accentD:T.border,transition:"background 0.4s"}}/>
         ))}
       </div>
       {/* Close */}
