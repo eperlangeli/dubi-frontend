@@ -7817,6 +7817,92 @@ Object.entries(TREND_CHECKIN_TRANSLATIONS).forEach(([code, additions]) => {
   TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...additions};
 });
 
+const SOURCES_SCREEN_TRANSLATIONS = {
+  it: {
+    "src.title":"Fonti Scientifiche",
+    "src.subtitle":"28 fonti scientifiche verificate alla base del motore DUBI.",
+    "src.inst.title":"Linee guida istituzionali",
+    "src.pillars.title":"Principi scientifici",
+    "src.studies.title":"Studi peer-reviewed",
+    "src.disclaimer":"Le fonti riportate supportano i principi scientifici del motore DUBI. Non attestano che DUBI come prodotto sia stato clinicamente testato."
+  },
+  en: {
+    "src.title":"Scientific Sources",
+    "src.subtitle":"28 verified scientific sources behind the DUBI engine.",
+    "src.inst.title":"Institutional guidelines",
+    "src.pillars.title":"Scientific principles",
+    "src.studies.title":"Peer-reviewed studies",
+    "src.disclaimer":"The sources listed support the scientific principles behind DUBI's engine. They do not imply that DUBI as a product has been clinically tested."
+  },
+  fr: {
+    "src.title":"Sources scientifiques",
+    "src.subtitle":"28 sources scientifiques vérifiées à la base du moteur DUBI.",
+    "src.inst.title":"Recommandations institutionnelles",
+    "src.pillars.title":"Principes scientifiques",
+    "src.studies.title":"Études évaluées par les pairs",
+    "src.disclaimer":"Les sources citées étayent les principes scientifiques du moteur DUBI. Elles ne signifient pas que DUBI, en tant que produit, a fait l'objet d'essais cliniques."
+  },
+  es: {
+    "src.title":"Fuentes científicas",
+    "src.subtitle":"28 fuentes científicas verificadas que respaldan el motor DUBI.",
+    "src.inst.title":"Directrices institucionales",
+    "src.pillars.title":"Principios científicos",
+    "src.studies.title":"Estudios revisados por pares",
+    "src.disclaimer":"Las fuentes citadas respaldan los principios científicos del motor DUBI. No implican que DUBI como producto haya sido probado clínicamente."
+  },
+  de: {
+    "src.title":"Wissenschaftliche Quellen",
+    "src.subtitle":"28 verifizierte wissenschaftliche Quellen bilden die Grundlage der DUBI-Engine.",
+    "src.inst.title":"Institutionelle Leitlinien",
+    "src.pillars.title":"Wissenschaftliche Prinzipien",
+    "src.studies.title":"Peer-Review-Studien",
+    "src.disclaimer":"Die aufgeführten Quellen stützen die wissenschaftlichen Prinzipien der DUBI-Engine. Sie bedeuten nicht, dass DUBI als Produkt klinisch getestet wurde."
+  },
+  ar: {
+    "src.title":"المصادر العلمية",
+    "src.subtitle":"28 مصدرًا علميًا موثوقًا تشكل أساس محرك DUBI.",
+    "src.inst.title":"الإرشادات المؤسسية",
+    "src.pillars.title":"المبادئ العلمية",
+    "src.studies.title":"دراسات محكّمة",
+    "src.disclaimer":"تدعم المصادر المذكورة المبادئ العلمية وراء محرك DUBI، ولا تعني أن منتج DUBI نفسه قد خضع لاختبارات سريرية."
+  },
+  pt: {
+    "src.title":"Fontes científicas",
+    "src.subtitle":"28 fontes científicas verificadas na base do motor DUBI.",
+    "src.inst.title":"Diretrizes institucionais",
+    "src.pillars.title":"Princípios científicos",
+    "src.studies.title":"Estudos revistos por pares",
+    "src.disclaimer":"As fontes apresentadas apoiam os princípios científicos do motor DUBI. Não significam que o DUBI, enquanto produto, tenha sido clinicamente testado."
+  },
+  zh: {
+    "src.title":"科学来源",
+    "src.subtitle":"DUBI 引擎以 28 项经验证的科学来源为基础。",
+    "src.inst.title":"机构指南",
+    "src.pillars.title":"科学原则",
+    "src.studies.title":"同行评审研究",
+    "src.disclaimer":"所列来源支持 DUBI 引擎背后的科学原则，但不代表 DUBI 产品本身已通过临床测试。"
+  },
+  ja: {
+    "src.title":"科学的根拠",
+    "src.subtitle":"DUBI エンジンは、検証済みの28件の科学的情報源に基づいています。",
+    "src.inst.title":"公的機関のガイドライン",
+    "src.pillars.title":"科学的原則",
+    "src.studies.title":"査読済み研究",
+    "src.disclaimer":"掲載された情報源はDUBIエンジンの科学的原則を裏付けるものです。DUBIという製品自体が臨床試験済みであることを意味しません。"
+  },
+  ru: {
+    "src.title":"Научные источники",
+    "src.subtitle":"В основе движка DUBI лежат 28 проверенных научных источников.",
+    "src.inst.title":"Институциональные рекомендации",
+    "src.pillars.title":"Научные принципы",
+    "src.studies.title":"Рецензируемые исследования",
+    "src.disclaimer":"Перечисленные источники подтверждают научные принципы движка DUBI. Они не означают, что продукт DUBI прошёл клинические испытания."
+  }
+};
+Object.entries(SOURCES_SCREEN_TRANSLATIONS).forEach(([code, additions]) => {
+  TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...additions};
+});
+
 
 
 
@@ -16538,178 +16624,124 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
 // ═══════════════════════════════════════════════
 // SOURCES
 // ═══════════════════════════════════════════════
-const SourcesScreen = () => {
-  const { t, lang } = useT();
+const SourcesScreen = ({userData, lang: langProp}) => {
+  const { t, lang: contextLang } = useT();
+  const lang = langProp || contextLang;
+  const [expandedStudy, setExpandedStudy] = useState(null);
+  const studies = React.useMemo(() => {
+    const seen = new Set();
+    return [...SRC_STUDI, ...SRC_SPORT].filter((study) => {
+      const key = String(study.org || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[,\u2013\u2014-]/g, " ")
+        .replace(/\s+/g, " ");
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, []);
+  const journals = ["ISSN","ACSM","The Lancet","NEJM","JAMA","Cell Metabolism","Nature","Cochrane","Circulation","JISSN"];
+  const sectionStyle = {background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:18};
+  const sectionTitleStyle = {fontFamily:"'Manrope','Inter',sans-serif",fontSize:17,fontWeight:800,color:T.text,margin:"0 0 14px"};
 
-  const [tab,setTab] = useState("principi");
-  const tabs = [
-    {id:"principi",  lk:"src.tab.principles"},
-    {id:"enti",      lk:"src.tab.orgs"},
-    {id:"studi",     lk:"src.tab.studies"},
-    {id:"agonismo",  lk:"src.tab.competition"},
-  ];
   return (
-    <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
-
-      {/* Header */}
-      <div style={{padding:"56px 24px 18px"}}>
-        <span style={{fontSize:11,color:T.accentD,letterSpacing:2,fontWeight:700}}>{t("src.header")}</span>
-        <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:28,fontWeight:700,color:T.text,margin:"8px 0 6px",letterSpacing:-0.5,lineHeight:1.2}}>
-          {t("src.title.full")}
+    <div style={{padding:"56px 24px calc(100px + env(safe-area-inset-bottom, 0px))"}}>
+      <header style={{marginBottom:20}}>
+        <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:28,fontWeight:800,color:T.text,margin:"0 0 7px",letterSpacing:-0.6,lineHeight:1.2}}>
+          {t("src.title")}
         </h2>
-        <p style={{fontSize:14,color:T.muted,lineHeight:1.55}}>
-          {t("src.subtitle.full")}
-        </p>
-      </div>
+        <p style={{fontSize:14,color:T.muted,lineHeight:1.55,margin:0}}>{t("src.subtitle")}</p>
+      </header>
 
-      {/* Stats */}
-      <div style={{padding:"0 24px",marginBottom:20}}>
-        <div style={{display:"flex",gap:10}}>
-          {[{n:"40",lk:"src.stat.studies"},{n:"5",lk:"src.stat.orgs"},{n:"5",lk:"src.stat.sports"}].map((s,i)=>(
-            <div key={i} style={{flex:1,padding:"16px 12px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16,textAlign:"center"}}>
-              <div style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:800,color:T.text,lineHeight:1}}>{s.n}</div>
-              <div style={{fontSize:11,color:T.muted,marginTop:4,letterSpacing:0.3}}>{t(s.lk)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Quote */}
-      <div style={{margin:"0 24px 22px",padding:"18px 20px",background:T.accentD+"10",borderLeft:`3px solid ${T.accentD}`,borderRadius:"4px 14px 14px 4px"}}>
-        <p style={{fontSize:14,color:T.text,lineHeight:1.6,margin:0,fontStyle:"italic",fontWeight:500}}>
-          {t("src.quote")}
-        </p>
-        <p style={{fontSize:11,color:T.muted,margin:"8px 0 0",letterSpacing:0.5}}>— {t("src.philosophy.label")}</p>
-      </div>
-
-      {/* Tabs */}
-      <div style={{padding:"0 24px",marginBottom:14}}>
-        <div style={{display:"flex",background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:4,gap:4}}>
-          {tabs.map(tb=>(
-            <button key={tb.id} onClick={()=>setTab(tb.id)}
-              style={{flex:1,padding:"10px 8px",border:"none",borderRadius:10,cursor:"pointer",
-                background: tab===tb.id ? T.bg : "transparent",
-                color: tab===tb.id ? T.text : T.muted,
-                fontWeight: tab===tb.id ? 700 : 500,
-                fontSize:12,
-                boxShadow: tab===tb.id ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
-                transition:"all 0.2s"}}>
-              {t(tb.lk)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* PRINCIPI */}
-      {tab==="principi" && (
-        <div style={{padding:"0 24px"}}>
-          {SRC_PILLARS.map((p,i)=>(
-            <div key={i} style={{marginBottom:12,padding:"16px 18px",background:T.card,border:`1px solid ${T.border}`,borderRadius:18}}>
-              <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
-                <div style={{width:42,height:42,borderRadius:13,background:T.accentD+"18",
-                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <Ico n={p.icon} size={20} c={T.accentD}/>
+      <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <section style={sectionStyle}>
+          <h3 style={sectionTitleStyle}>{t("src.inst.title")}</h3>
+          <div style={{display:"flex",flexDirection:"column",gap:9}}>
+            {SRC_INST.map((item) => (
+              <div key={item.code} style={{display:"flex",alignItems:"center",gap:11,padding:"11px 12px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:14}}>
+                <div style={{width:48,height:34,borderRadius:10,background:T.accentD,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:900,letterSpacing:.35,flexShrink:0}}>
+                  {item.code}
                 </div>
-                <div style={{flex:1}}>
-                  <h3 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:15,fontWeight:700,color:T.text,margin:"0 0 5px",lineHeight:1.3}}>{t(p.tk||p.t)}</h3>
-                  <p style={{fontSize:13,color:T.muted,lineHeight:1.55,margin:"0 0 8px"}}>{t(p.sk||p.s)}</p>
-                  <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",background:T.sel,borderRadius:20,border:`1px solid ${T.border}`}}>
-                    <Ico n="book" size={11} c={T.accentD}/>
-                    <span style={{fontSize:11,color:T.accentD,fontWeight:600}}>{p.src}</span>
-                  </div>
+                <div style={{flex:"1 1 38%",minWidth:0}}>
+                  <p style={{fontSize:13,fontWeight:850,color:T.text,margin:0}}>{item.org}</p>
+                  <p style={{fontSize:9,color:T.muted,lineHeight:1.35,margin:"2px 0 0"}}>{item.sub}</p>
                 </div>
+                <p style={{flex:"1 1 44%",fontSize:9,color:T.muted,lineHeight:1.4,margin:0,textAlign:"right"}}>
+                  {localizeSourceNote(item, lang)}
+                </p>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        </section>
 
-      {/* ENTI */}
-      {tab==="enti" && (
-        <div style={{padding:"0 24px"}}>
-          {SRC_INST.map((s,i)=>(
-            <div key={i} style={{marginBottom:10,padding:"16px 18px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{width:48,height:48,borderRadius:12,background:T.sel,
-                  border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  <span style={{fontSize:10,fontWeight:800,color:T.accentD,letterSpacing:0.5}}>{s.code}</span>
+        <section style={sectionStyle}>
+          <h3 style={sectionTitleStyle}>{t("src.pillars.title")}</h3>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {SRC_PILLARS.map((pillar) => (
+              <div key={pillar.tk} style={{display:"flex",gap:12,padding:"13px 14px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:14}}>
+                <div style={{width:38,height:38,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <Ico n={pillar.icon} size={18} c={T.accentD}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:15,fontWeight:700,color:T.text}}>{s.org}</div>
-                  <div style={{fontSize:11,color:T.muted,marginTop:1}}>{s.sub}</div>
-                  <div style={{fontSize:12,color:T.text,marginTop:6,lineHeight:1.45}}>{localizeSourceNote(s, lang)}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* STUDI */}
-      {tab==="studi" && (
-        <div style={{padding:"0 24px"}}>
-          <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,overflow:"hidden"}}>
-            {SRC_STUDI.map((s,i)=>(
-              <div key={i} style={{padding:"14px 18px",borderBottom:i<SRC_STUDI.length-1?`1px solid ${T.border}`:"none",display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{width:6,height:6,borderRadius:"50%",background:T.accentD,flexShrink:0,marginTop:8}}/>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:700,color:T.text}}>{s.org}</div>
-                  {s.sub && <div style={{fontSize:11,color:T.muted,fontStyle:"italic",marginTop:1}}>{s.sub}</div>}
-                  <div style={{fontSize:12,color:T.text,marginTop:4,lineHeight:1.5,opacity:0.85}}>{localizeSourceNote(s, lang)}</div>
+                  <p style={{fontSize:13,fontWeight:850,color:T.text,margin:"0 0 4px"}}>{t(pillar.tk)}</p>
+                  <p style={{fontSize:11,color:T.muted,lineHeight:1.5,margin:0}}>{t(pillar.sk)}</p>
+                  <p style={{fontSize:10,color:T.muted,fontStyle:"italic",textAlign:"right",margin:"8px 0 0"}}>{pillar.src}</p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        </section>
 
-      {/* AGONISMO */}
-      {tab==="agonismo" && (
-        <div style={{padding:"0 24px"}}>
-          {/* Banner intro */}
-          <div style={{marginBottom:16,padding:"14px 16px",background:"rgba(201,168,124,0.10)",
-            border:"1.5px solid rgba(201,168,124,0.4)",borderRadius:16,display:"flex",gap:10,alignItems:"flex-start"}}>
-            <Ico n="medal" size={16} c="#B8893A"/>
-            <div>
-              <p style={{fontSize:12,fontWeight:700,color:"#B8893A",margin:"0 0 3px",letterSpacing:0.3}}>{t("src.fonti.gara")}</p>
-              <p style={{fontSize:12,color:T.text,lineHeight:1.55,margin:0}}>
-                <span dangerouslySetInnerHTML={{__html: t("src.competition.intro").replace("<strong>","<strong style=\"color:#B8893A\">")}} />
-              </p>
-            </div>
+        <section style={{...sectionStyle,padding:"18px 0 16px"}}>
+          <h3 style={{...sectionTitleStyle,padding:"0 18px"}}>{t("src.studies.title")}</h3>
+          <div style={{borderTop:`1px solid ${T.border}`}}>
+            {studies.map((study, index) => {
+              const expanded = expandedStudy === study.org;
+              const sport = study.sport ? localizeSportTag(study, lang) : null;
+              return (
+                <div key={study.org} style={{borderBottom:index<studies.length-1?`1px solid ${T.border}`:"none"}}>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={()=>setExpandedStudy(expanded ? null : study.org)}
+                    style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"13px 18px",background:"transparent",border:"none",cursor:"pointer",textAlign:"left",fontFamily:"inherit"}}
+                  >
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                        <span style={{fontSize:12,fontWeight:850,color:T.text,lineHeight:1.35}}>{study.org}</span>
+                        {study.badge === "NEW" && <span style={{padding:"2px 6px",borderRadius:999,background:"#E2F2E5",color:"#2F855A",fontSize:8,fontWeight:900,letterSpacing:.5}}>NEW</span>}
+                        {sport && <span style={{padding:"2px 7px",borderRadius:999,background:T.sel,color:T.muted,fontSize:8,fontWeight:750}}>{sport}</span>}
+                      </div>
+                      {study.sub && <p style={{fontSize:10,color:T.muted,lineHeight:1.35,margin:"3px 0 0"}}>{study.sub}</p>}
+                    </div>
+                    <span style={{display:"flex",transform:expanded?"rotate(90deg)":"rotate(0deg)",transition:"transform .22s ease",flexShrink:0}}>
+                      <Ico n="chev" size={16} c={T.muted}/>
+                    </span>
+                  </button>
+                  <div aria-hidden={!expanded} style={{maxHeight:expanded?280:0,opacity:expanded?1:0,overflow:"hidden",transition:"max-height .3s ease, opacity .22s ease"}}>
+                    <p style={{fontSize:11,color:T.muted,lineHeight:1.6,margin:0,padding:"0 44px 14px 18px"}}>
+                      {localizeSourceNote(study, lang)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {SRC_SPORT.map((s,i)=>(
-            <div key={i} style={{marginBottom:12,padding:"16px 18px",background:T.card,
-              border:`1.5px solid ${s.badge==="NEW"?"rgba(201,168,124,0.5)":T.border}`,borderRadius:18}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8,gap:8}}>
-                <div style={{flex:1}}>
-                  <p style={{fontSize:13,fontWeight:700,color:T.text,margin:0,lineHeight:1.4}}>{s.org}</p>
-                  <p style={{fontSize:11,color:T.muted,fontStyle:"italic",margin:"2px 0 0"}}>{s.sub}</p>
-                </div>
-                <span style={{
-                  fontSize:9,fontWeight:800,padding:"3px 8px",borderRadius:6,flexShrink:0,letterSpacing:0.5,
-                  background: s.badge==="NEW" ? "rgba(201,168,124,0.2)" : T.sel,
-                  color: s.badge==="NEW" ? "#B8893A" : T.muted,
-                  border: s.badge==="NEW" ? "1px solid rgba(201,168,124,0.4)" : `1px solid ${T.border}`,
-                }}>{s.badge==="NEW" ? t("src.badge.new") : t("src.badge.present")}</span>
-              </div>
-              <p style={{fontSize:12,color:T.text,lineHeight:1.6,margin:"0 0 10px",opacity:0.9}}>{localizeSourceNote(s, lang)}</p>
-              <div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 10px",
-                background:"rgba(201,168,124,0.1)",borderRadius:20,border:"1px solid rgba(201,168,124,0.3)"}}>
-                <Ico n="steps" size={10} c="#B8893A"/>
-                <span style={{fontSize:10,color:"#B8893A",fontWeight:700}}>{localizeSportTag(s, lang)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+          <div style={{display:"flex",gap:7,overflowX:"auto",padding:"16px 18px 0",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            {journals.map((journal) => (
+              <span key={journal} style={{whiteSpace:"nowrap",padding:"6px 10px",borderRadius:999,background:T.sel,color:T.muted,fontSize:11,border:`1px solid ${T.border}`}}>
+                {journal}
+              </span>
+            ))}
+          </div>
+        </section>
 
-      {/* Footer disclaimer */}
-      <div style={{margin:"22px 24px 0",padding:"14px 16px",background:T.sel,borderRadius:14,border:`1px solid ${T.border}`,display:"flex",alignItems:"flex-start",gap:10}}>
-        <Ico n="info" size={15} c={T.muted}/>
-        <p style={{fontSize:12,color:T.muted,lineHeight:1.55,margin:0}}>
-          {t("src.disclaimer")}
-        </p>
+        <div style={{display:"flex",alignItems:"flex-start",gap:9,padding:"14px 16px",background:T.sel,border:`1px solid ${T.border}`,borderRadius:18}}>
+          <Ico n="info" size={15} c={T.muted}/>
+          <p style={{fontSize:11,color:T.muted,lineHeight:1.55,margin:0}}>{t("src.disclaimer")}</p>
+        </div>
       </div>
     </div>
   );
@@ -19917,7 +19949,7 @@ setPhase("free-beta");
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
-              {activeTab==="sources"  && <SourcesScreen />}
+              {activeTab==="sources"  && <SourcesScreen userData={userData} lang={lang} />}
               {activeTab==="settings" && (
   <SettingsScreen
     userData={userData}
@@ -19947,6 +19979,9 @@ function DUBIRoot() {
   const params = new URLSearchParams(window.location.search);
   if (window.location.hostname === "127.0.0.1" && params.get("_trend_preview") === "1") {
     return <TrendScreen userData={{weight:76.5,height:175,age:35,is_minor:false,targetWeight:72}} plan={{goal:"fatLoss",calories:2100,tdee:2500}} lang="en" />;
+  }
+  if (window.location.hostname === "127.0.0.1" && params.get("_sources_preview") === "1") {
+    return <SourcesScreen userData={{name:"DUBI Preview"}} lang={params.get("lang") || "en"} />;
   }
   const legal = params.get("legal") || params.get("page");
   if (legal === "privacy" || window.location.pathname === "/privacy") {
