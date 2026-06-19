@@ -1632,6 +1632,14 @@ const logAiWeightToBackend = async (weight) => {
 };
 
 const fetchWeightHistoryFromBackend = async () => {
+  if (window.location.hostname === "127.0.0.1" && new URLSearchParams(window.location.search).get("_trend_preview") === "1") {
+    return [
+      {weight:76.5,logged_at:new Date().toISOString()},
+      {weight:77.1,logged_at:new Date(Date.now()-7*86400000).toISOString()},
+      {weight:77.8,logged_at:new Date(Date.now()-14*86400000).toISOString()},
+      {weight:78.0,logged_at:new Date(Date.now()-21*86400000).toISOString()}
+    ];
+  }
   const token = getAuthToken();
   if (!token) return [];
 
@@ -1649,6 +1657,9 @@ const fetchWeightHistoryFromBackend = async () => {
 };
 
 const fetchWeightChangeFromBackend = async () => {
+  if (window.location.hostname === "127.0.0.1" && new URLSearchParams(window.location.search).get("_trend_preview") === "1") {
+    return {current:76.5,thirty_days_ago:78,change_last_30_days:-1.5};
+  }
   const token = getAuthToken();
   if (!token) return {current:null, thirty_days_ago:null, change_last_30_days:null};
 
@@ -7707,6 +7718,102 @@ const TREND_SCREEN_TRANSLATIONS = {
   }
 };
 Object.entries(TREND_SCREEN_TRANSLATIONS).forEach(([code, additions]) => {
+  TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...additions};
+});
+
+const TREND_CHECKIN_TRANSLATIONS = {
+  it: {
+    "trend.checkin.title":"Check-in attività giornaliera", "trend.checkin.subtitle":"Aiuta DUBI a stimare le calorie bruciate. Ci vogliono 10 secondi.",
+    "trend.checkin.steps":"Quanti passi fai in una giornata tipica?", "trend.checkin.stepsHint":"Controlla l'app Salute del tuo telefono per la media giornaliera.",
+    "trend.checkin.workouts":"Quante volte a settimana ti alleni?", "trend.checkin.effort":"Quanto sono intensi i tuoi allenamenti?",
+    "trend.checkin.effortLow":"Camminata, yoga, stretching leggero", "trend.checkin.effortModerate":"Ciclismo, nuoto, circuit training",
+    "trend.checkin.effortHigh":"Corsa, HIIT, pesi pesanti", "trend.checkin.submit":"Aggiorna il mio target calorico",
+    "trend.checkin.success":"✓ Target aggiornato a {kcal} kcal", "trend.checkin.wearableActive":"✓ Il tuo {provider} è connesso — DUBI legge la tua attività in automatico.",
+    "trend.checkin.manual":"Aggiorna manualmente"
+  },
+  en: {
+    "trend.checkin.title":"Daily activity check-in", "trend.checkin.subtitle":"Help DUBI estimate how many calories you burn. Takes 10 seconds.",
+    "trend.checkin.steps":"How many steps do you walk on a typical day?", "trend.checkin.stepsHint":"Check your phone's Health app for your daily average.",
+    "trend.checkin.workouts":"How many times per week do you train?", "trend.checkin.effort":"How intense are your workouts?",
+    "trend.checkin.effortLow":"Walking, yoga, light stretching", "trend.checkin.effortModerate":"Cycling, swimming, gym circuits",
+    "trend.checkin.effortHigh":"Running, HIIT, heavy lifting", "trend.checkin.submit":"Update my calorie target",
+    "trend.checkin.success":"✓ Calorie target updated to {kcal} kcal", "trend.checkin.wearableActive":"✓ Your {provider} is connected — DUBI is reading your activity automatically.",
+    "trend.checkin.manual":"Update manually"
+  },
+  fr: {
+    "trend.checkin.title":"Bilan d'activité quotidienne", "trend.checkin.subtitle":"Aidez DUBI à estimer les calories dépensées. Cela prend 10 secondes.",
+    "trend.checkin.steps":"Combien de pas faites-vous lors d'une journée type ?", "trend.checkin.stepsHint":"Consultez l'app Santé de votre téléphone pour votre moyenne quotidienne.",
+    "trend.checkin.workouts":"Combien de fois vous entraînez-vous par semaine ?", "trend.checkin.effort":"Quelle est l'intensité de vos entraînements ?",
+    "trend.checkin.effortLow":"Marche, yoga, étirements légers", "trend.checkin.effortModerate":"Vélo, natation, circuits en salle",
+    "trend.checkin.effortHigh":"Course, HIIT, charges lourdes", "trend.checkin.submit":"Mettre à jour mon objectif calorique",
+    "trend.checkin.success":"✓ Objectif mis à jour à {kcal} kcal", "trend.checkin.wearableActive":"✓ Votre {provider} est connecté — DUBI lit automatiquement votre activité.",
+    "trend.checkin.manual":"Mettre à jour manuellement"
+  },
+  es: {
+    "trend.checkin.title":"Registro de actividad diaria", "trend.checkin.subtitle":"Ayuda a DUBI a estimar las calorías que quemas. Solo tarda 10 segundos.",
+    "trend.checkin.steps":"¿Cuántos pasos das en un día normal?", "trend.checkin.stepsHint":"Consulta la app Salud de tu teléfono para ver tu media diaria.",
+    "trend.checkin.workouts":"¿Cuántas veces entrenas por semana?", "trend.checkin.effort":"¿Qué intensidad tienen tus entrenamientos?",
+    "trend.checkin.effortLow":"Caminar, yoga, estiramientos suaves", "trend.checkin.effortModerate":"Ciclismo, natación, circuitos de gimnasio",
+    "trend.checkin.effortHigh":"Correr, HIIT, levantamiento pesado", "trend.checkin.submit":"Actualizar mi objetivo calórico",
+    "trend.checkin.success":"✓ Objetivo actualizado a {kcal} kcal", "trend.checkin.wearableActive":"✓ Tu {provider} está conectado — DUBI lee tu actividad automáticamente.",
+    "trend.checkin.manual":"Actualizar manualmente"
+  },
+  de: {
+    "trend.checkin.title":"Täglicher Aktivitäts-Check-in", "trend.checkin.subtitle":"Hilf DUBI, deinen Kalorienverbrauch zu schätzen. Dauert 10 Sekunden.",
+    "trend.checkin.steps":"Wie viele Schritte gehst du an einem typischen Tag?", "trend.checkin.stepsHint":"Den Tagesdurchschnitt findest du in der Gesundheits-App deines Telefons.",
+    "trend.checkin.workouts":"Wie oft trainierst du pro Woche?", "trend.checkin.effort":"Wie intensiv sind deine Trainingseinheiten?",
+    "trend.checkin.effortLow":"Gehen, Yoga, leichtes Dehnen", "trend.checkin.effortModerate":"Radfahren, Schwimmen, Zirkeltraining",
+    "trend.checkin.effortHigh":"Laufen, HIIT, schweres Krafttraining", "trend.checkin.submit":"Kalorienziel aktualisieren",
+    "trend.checkin.success":"✓ Ziel auf {kcal} kcal aktualisiert", "trend.checkin.wearableActive":"✓ Dein {provider} ist verbunden — DUBI liest deine Aktivität automatisch.",
+    "trend.checkin.manual":"Manuell aktualisieren"
+  },
+  ar: {
+    "trend.checkin.title":"تسجيل النشاط اليومي", "trend.checkin.subtitle":"ساعد DUBI على تقدير السعرات التي تحرقها. يستغرق ذلك 10 ثوانٍ.",
+    "trend.checkin.steps":"كم خطوة تمشي في يوم عادي؟", "trend.checkin.stepsHint":"تحقق من تطبيق الصحة في هاتفك لمعرفة متوسطك اليومي.",
+    "trend.checkin.workouts":"كم مرة تتمرن في الأسبوع؟", "trend.checkin.effort":"ما مدى شدة تمارينك؟",
+    "trend.checkin.effortLow":"المشي، اليوغا، تمارين الإطالة الخفيفة", "trend.checkin.effortModerate":"ركوب الدراجة، السباحة، التمارين الدائرية",
+    "trend.checkin.effortHigh":"الجري، تمارين HIIT، رفع الأوزان الثقيلة", "trend.checkin.submit":"تحديث هدفي من السعرات",
+    "trend.checkin.success":"✓ تم تحديث الهدف إلى {kcal} سعرة", "trend.checkin.wearableActive":"✓ جهاز {provider} متصل — يقرأ DUBI نشاطك تلقائيًا.",
+    "trend.checkin.manual":"تحديث يدوي"
+  },
+  pt: {
+    "trend.checkin.title":"Registo diário de atividade", "trend.checkin.subtitle":"Ajude o DUBI a estimar as calorias gastas. Demora 10 segundos.",
+    "trend.checkin.steps":"Quantos passos dá num dia normal?", "trend.checkin.stepsHint":"Consulte a app Saúde do telemóvel para ver a média diária.",
+    "trend.checkin.workouts":"Quantas vezes treina por semana?", "trend.checkin.effort":"Qual é a intensidade dos seus treinos?",
+    "trend.checkin.effortLow":"Caminhada, ioga, alongamentos leves", "trend.checkin.effortModerate":"Ciclismo, natação, circuitos de ginásio",
+    "trend.checkin.effortHigh":"Corrida, HIIT, levantamento pesado", "trend.checkin.submit":"Atualizar o meu objetivo calórico",
+    "trend.checkin.success":"✓ Objetivo atualizado para {kcal} kcal", "trend.checkin.wearableActive":"✓ O seu {provider} está ligado — o DUBI lê a sua atividade automaticamente.",
+    "trend.checkin.manual":"Atualizar manualmente"
+  },
+  zh: {
+    "trend.checkin.title":"每日活动记录", "trend.checkin.subtitle":"帮助 DUBI 估算你的热量消耗，只需 10 秒。",
+    "trend.checkin.steps":"你通常每天走多少步？", "trend.checkin.stepsHint":"请在手机的健康应用中查看每日平均步数。",
+    "trend.checkin.workouts":"你每周训练几次？", "trend.checkin.effort":"你的训练强度如何？",
+    "trend.checkin.effortLow":"步行、瑜伽、轻度拉伸", "trend.checkin.effortModerate":"骑行、游泳、循环训练",
+    "trend.checkin.effortHigh":"跑步、HIIT、大重量训练", "trend.checkin.submit":"更新我的热量目标",
+    "trend.checkin.success":"✓ 热量目标已更新为 {kcal} 千卡", "trend.checkin.wearableActive":"✓ 你的 {provider} 已连接 — DUBI 正在自动读取活动数据。",
+    "trend.checkin.manual":"手动更新"
+  },
+  ja: {
+    "trend.checkin.title":"毎日のアクティビティチェック", "trend.checkin.subtitle":"消費カロリーの推定にご協力ください。10秒で完了します。",
+    "trend.checkin.steps":"普段は1日に何歩歩きますか？", "trend.checkin.stepsHint":"スマートフォンのヘルスケアアプリで1日の平均を確認できます。",
+    "trend.checkin.workouts":"週に何回トレーニングしますか？", "trend.checkin.effort":"トレーニングの強度はどの程度ですか？",
+    "trend.checkin.effortLow":"ウォーキング、ヨガ、軽いストレッチ", "trend.checkin.effortModerate":"サイクリング、水泳、サーキットトレーニング",
+    "trend.checkin.effortHigh":"ランニング、HIIT、高重量トレーニング", "trend.checkin.submit":"カロリー目標を更新",
+    "trend.checkin.success":"✓ 目標を {kcal} kcal に更新しました", "trend.checkin.wearableActive":"✓ {provider} が接続されています — DUBI が活動を自動で読み取ります。",
+    "trend.checkin.manual":"手動で更新"
+  },
+  ru: {
+    "trend.checkin.title":"Ежедневная проверка активности", "trend.checkin.subtitle":"Помогите DUBI оценить расход калорий. Это займёт 10 секунд.",
+    "trend.checkin.steps":"Сколько шагов вы проходите в обычный день?", "trend.checkin.stepsHint":"Посмотрите среднее значение за день в приложении здоровья телефона.",
+    "trend.checkin.workouts":"Сколько раз в неделю вы тренируетесь?", "trend.checkin.effort":"Насколько интенсивны ваши тренировки?",
+    "trend.checkin.effortLow":"Ходьба, йога, лёгкая растяжка", "trend.checkin.effortModerate":"Велосипед, плавание, круговые тренировки",
+    "trend.checkin.effortHigh":"Бег, HIIT, тяжёлая силовая тренировка", "trend.checkin.submit":"Обновить мою цель по калориям",
+    "trend.checkin.success":"✓ Цель обновлена до {kcal} ккал", "trend.checkin.wearableActive":"✓ Ваш {provider} подключён — DUBI автоматически считывает активность.",
+    "trend.checkin.manual":"Обновить вручную"
+  }
+};
+Object.entries(TREND_CHECKIN_TRANSLATIONS).forEach(([code, additions]) => {
   TRANSLATIONS[code] = {...(TRANSLATIONS[code] || {}), ...additions};
 });
 
@@ -16691,7 +16798,7 @@ function evaluateWeightPlanDecision(weightLog, nextWeight, plan, userData, lang)
   return {state:"slow", allowRegeneration:false, explanation:copy.slow};
 }
 
-const TrendScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh, lang: langProp}) => {
+const TrendScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh, onManualActivityUpdate, lang: langProp}) => {
   const { t, lang: contextLang } = useT();
   const lang = langProp || contextLang;
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
@@ -16712,6 +16819,9 @@ const TrendScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh, lang: langPro
   const [manualWorkoutDays, setManualWorkoutDays] = useState(userData?.workoutDays || "3-4");
   const [manualWorkoutIntensity, setManualWorkoutIntensity] = useState(userData?.workoutIntensity || "moderata");
   const [manualTdeeMessage, setManualTdeeMessage] = useState("");
+  const [manualCheckinOpen, setManualCheckinOpen] = useState(false);
+  const [savingManualCheckin, setSavingManualCheckin] = useState(false);
+  const [manualCheckinSuccess, setManualCheckinSuccess] = useState(false);
 
   const refreshWeightData = async () => {
     const [history, change] = await Promise.all([
@@ -16804,6 +16914,15 @@ const TrendScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh, lang: langPro
   const wearableProvider = wearableSnapshot?.connection?.provider && wearableSnapshot.connection.provider !== "demo"
     ? String(wearableSnapshot.connection.provider).toUpperCase()
     : null;
+  const wearableConnection = wearableSnapshot?.connection || null;
+  const wearableConnectionStatus = String(wearableConnection?.status || "").toLowerCase();
+  const wearableConnectionActive = Boolean(
+    wearableConnection?.provider &&
+    wearableConnection.provider !== "demo" &&
+    wearableConnectionStatus &&
+    !["created", "authorizing", "disconnected"].includes(wearableConnectionStatus)
+  );
+  const wearableConnectionLabel = getWearableProviderLabel(wearableConnection?.provider || wearableProvider || "Wearable");
   const trendWearableCopy = {
     noData:t("trend.wearable.noData"),
     partial:t("trend.wearable.partial",{provider:wearableProvider || "Wearable"}),
@@ -16962,7 +17081,7 @@ const handleUpdateProgress = async (id) => {
   }
 };
 
-const handleManualTdeeUpdate = () => {
+const handleManualTdeeUpdate = async () => {
   const updatedData = {
     ...userData,
     weight: Number(newWeight || currentWeight || userData?.weight),
@@ -16970,12 +17089,29 @@ const handleManualTdeeUpdate = () => {
     workoutDays: manualWorkoutDays,
     workoutIntensity: manualWorkoutIntensity,
   };
-  const updatedPlan = calcPlan(updatedData);
-  if (onAiPlanRefresh) onAiPlanRefresh(updatedPlan, updatedData.weight);
-  setManualTdeeMessage(t("trend.manual.estimateUpdated",{
-    tdee:updatedPlan.tdee,
-    calories:updatedPlan.calories
-  }));
+  setSavingManualCheckin(true);
+  setManualCheckinSuccess(false);
+  setManualTdeeMessage("");
+
+  let updatedPlan = null;
+  try {
+    updatedPlan = onManualActivityUpdate
+      ? await onManualActivityUpdate(updatedData)
+      : calcPlan(updatedData);
+  } catch (error) {
+    console.error("Manual activity check-in failed:", error);
+  } finally {
+    setSavingManualCheckin(false);
+  }
+
+  if (!updatedPlan) {
+    setManualTdeeMessage(t("set.edit.error"));
+    return;
+  }
+
+  const updatedCalories = Number(updatedPlan.calories || updatedPlan.kcal || 0);
+  setManualCheckinSuccess(true);
+  setManualTdeeMessage(t("trend.checkin.success",{kcal:updatedCalories || "—"}));
 };
 
   const toCalendarKey = (value) => {
@@ -17057,9 +17193,9 @@ const handleManualTdeeUpdate = () => {
     : t("trend.bmi.obese");
 
   const chartWidth = 320;
-  const chartHeight = 140;
-  const chartPadX = 18;
-  const chartPadY = 22;
+  const chartHeight = 160;
+  const chartPadX = 38;
+  const chartPadY = 26;
   const chartWeights = weightLog.map(point => point.weight);
   const chartMin = chartWeights.length ? Math.min(...chartWeights) : 0;
   const chartMax = chartWeights.length ? Math.max(...chartWeights) : 1;
@@ -17069,6 +17205,20 @@ const handleManualTdeeUpdate = () => {
     x:chartPadX + (index / Math.max(1, weightLog.length - 1)) * (chartWidth - chartPadX * 2),
     y:chartHeight - chartPadY - ((point.weight - chartMin) / chartSpan) * (chartHeight - chartPadY * 2)
   }));
+  const smoothChartPath = chartPoints.length ? chartPoints.slice(1).reduce((path, point, index) => {
+    const current = chartPoints[index];
+    const previous = chartPoints[index - 1] || current;
+    const next = chartPoints[index + 2] || point;
+    const control1X = current.x + (point.x - previous.x) / 6;
+    const control1Y = current.y + (point.y - previous.y) / 6;
+    const control2X = point.x - (next.x - current.x) / 6;
+    const control2Y = point.y - (next.y - current.y) / 6;
+    return `${path} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${point.x} ${point.y}`;
+  }, `M ${chartPoints[0].x} ${chartPoints[0].y}`) : "";
+  const chartBaseline = chartHeight - chartPadY;
+  const areaChartPath = chartPoints.length
+    ? `${smoothChartPath} L ${chartPoints[chartPoints.length-1].x} ${chartBaseline} L ${chartPoints[0].x} ${chartBaseline} Z`
+    : "";
   const selectedChartPoint = selectedWeightPoint === null ? null : chartPoints[selectedWeightPoint];
   const displayedChange = Number.isFinite(changeLast30) ? changeLast30 : (thirtyDaysAgo === null ? null : displayCurrentWeight - thirtyDaysAgo);
   const weightSummary = thirtyDaysAgo !== null && Number.isFinite(thirtyDaysAgo)
@@ -17109,27 +17259,38 @@ const handleManualTdeeUpdate = () => {
         )}
 
         {weightLog.length < 2 ? (
-          <div style={{height:140,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"0 18px"}}>
+          <div style={{height:160,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"0 18px",border:`1.5px dashed ${T.border}`,borderRadius:14,background:T.bg}}>
             <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{t("trend.weight.noData")}</p>
           </div>
         ) : (
-          <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{width:"100%",height:140,display:"block",overflow:"visible"}} role="img" aria-label={t("trend.weight.title")}>
-            {[0,1,2].map(index=>{
-              const y=chartPadY + index*((chartHeight-chartPadY*2)/2);
-              return <line key={index} x1={chartPadX} x2={chartWidth-chartPadX} y1={y} y2={y} stroke={T.border} strokeWidth="1" strokeDasharray="3 5"/>;
-            })}
-            <polyline points={chartPoints.map(point=>`${point.x},${point.y}`).join(" ")} fill="none" stroke={T.accentD} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} style={{width:"100%",height:160,display:"block",overflow:"visible"}} role="img" aria-label={t("trend.weight.title")}>
+            <defs>
+              <linearGradient id="trendWeightArea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={T.accentD} stopOpacity="0.3"/>
+                <stop offset="100%" stopColor={T.accentD} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <text x="2" y={chartPadY+3} fill={T.muted} fontSize="9">{chartMax.toFixed(1)}</text>
+            <text x="2" y={chartBaseline+3} fill={T.muted} fontSize="9">{chartMin.toFixed(1)}</text>
+            <path d={areaChartPath} fill="url(#trendWeightArea)" stroke="none"/>
+            <path d={smoothChartPath} fill="none" stroke={T.accentD} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
             {chartPoints.map((point,index)=>(
               <g key={`${point.loggedAt.toISOString()}-${index}`}>
                 <circle cx={point.x} cy={point.y} r="9" fill="transparent"
                   onMouseEnter={()=>setSelectedWeightPoint(index)} onMouseLeave={()=>setSelectedWeightPoint(null)}
                   onClick={()=>setSelectedWeightPoint(selectedWeightPoint===index?null:index)} style={{cursor:"pointer"}}/>
-                <circle cx={point.x} cy={point.y} r="3.5" fill={T.card} stroke={T.accentD} strokeWidth="2" pointerEvents="none"/>
+                <circle cx={point.x} cy={point.y} r="4" fill={T.accentD} stroke="#fff" strokeWidth="2" pointerEvents="none"/>
               </g>
             ))}
+            <text x={chartPoints[0].x} y={chartHeight-4} textAnchor="start" fill={T.muted} fontSize="9">
+              {chartPoints[0].loggedAt.toLocaleDateString(lang,{day:"2-digit",month:"short"})}
+            </text>
+            <text x={chartPoints[chartPoints.length-1].x} y={chartHeight-4} textAnchor="end" fill={T.muted} fontSize="9">
+              {chartPoints[chartPoints.length-1].loggedAt.toLocaleDateString(lang,{day:"2-digit",month:"short"})}
+            </text>
             {selectedChartPoint && (()=>{
               const tipX=Math.max(60,Math.min(chartWidth-60,selectedChartPoint.x));
-              const tipY=Math.max(24,selectedChartPoint.y-28);
+              const tipY=Math.max(22,selectedChartPoint.y-30);
               return <g pointerEvents="none">
                 <rect x={tipX-58} y={tipY-18} width="116" height="28" rx="9" fill={T.text}/>
                 <text x={tipX} y={tipY} textAnchor="middle" fill={T.bg} fontSize="9" fontWeight="700">
@@ -17196,67 +17357,76 @@ const handleManualTdeeUpdate = () => {
       </div>
 
       {/* ── METRIC SELECTOR TABS ── */}
-      {(needsWeightCheckIn || !hasWearableTrendData) && (
-        <div style={{margin:"0 24px 18px",padding:16,background:T.card,border:`1.5px solid ${needsWeightCheckIn ? T.accent : T.border}`,borderRadius:18}}>
-          <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-            <div style={{width:34,height:34,borderRadius:11,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <Ico n="weight" size={17} c={T.accentD}/>
-            </div>
-            <div style={{flex:1}}>
-              <p style={{fontSize:14,fontWeight:900,color:T.text,margin:"0 0 4px"}}>
-                {t("trend.manual.title")}
-              </p>
-              <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>
-                {needsWeightCheckIn ? t("trend.manual.weightReminder") : t("trend.manual.noWearable")}
-              </p>
-            </div>
+      <section style={{margin:"0 24px 18px",padding:18,background:T.card,border:`1px solid ${T.border}`,borderRadius:18}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:11,marginBottom:wearableConnectionActive?10:16}}>
+          <span aria-hidden="true" style={{fontSize:20,lineHeight:1}}>📊</span>
+          <div style={{flex:1}}>
+            <p style={{fontSize:15,fontWeight:900,color:T.text,margin:"0 0 4px"}}>{t("trend.checkin.title")}</p>
+            {!wearableConnectionActive && <p style={{fontSize:11,color:T.muted,lineHeight:1.5,margin:0}}>{t("trend.checkin.subtitle")}</p>}
           </div>
-          {!hasWearableTrendData && (
-            <div>
-              <p style={{fontSize:11,fontWeight:900,color:T.muted,letterSpacing:.7,margin:"0 0 8px"}}>
-                {t("trend.manual.tdee")}
-              </p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                <select value={manualDailySteps} onChange={e=>setManualDailySteps(e.target.value)}
-                  style={{padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12}}>
-                  <option value="unknown">{t("trend.manual.stepsUnknown")}</option>
-                  <option value="<3000">&lt; 3.000</option>
-                  <option value="3000-6000">3.000 - 6.000</option>
-                  <option value="6000-8000">6.000 - 8.000</option>
-                  <option value="8000-10000">8.000 - 10.000</option>
-                  <option value="10000+">10.000+</option>
-                </select>
-                <select value={manualWorkoutDays} onChange={e=>setManualWorkoutDays(e.target.value)}
-                  style={{padding:"10px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12}}>
-                  <option value="0">{t("trend.manual.workouts",{n:0})}</option>
-                  <option value="1-2">{t("trend.manual.workouts",{n:"1-2"})}</option>
-                  <option value="3-4">{t("trend.manual.workouts",{n:"3-4"})}</option>
-                  <option value="5-6">{t("trend.manual.workouts",{n:"5-6"})}</option>
-                  <option value="7">{t("trend.manual.workouts",{n:7})}</option>
-                </select>
-              </div>
-              <div style={{display:"flex",gap:8,marginBottom:10}}>
-                {[
-                  ["leggera", t("intensity.low")],
-                  ["moderata", t("intensity.moderate")],
-                  ["alta", t("intensity.high")],
-                ].map(([id,label])=>(
-                  <button key={id} onClick={()=>setManualWorkoutIntensity(id)}
-                    style={{flex:1,padding:"10px 8px",borderRadius:12,border:`1.5px solid ${manualWorkoutIntensity===id?T.accent:T.border}`,background:manualWorkoutIntensity===id?T.sel:T.bg,color:T.text,fontSize:12,fontWeight:800,cursor:"pointer"}}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <button onClick={handleManualTdeeUpdate}
-                style={{width:"100%",padding:"12px 14px",borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontWeight:900,fontSize:13,cursor:"pointer"}}>
-                {t("trend.manual.update")}
-              </button>
-              {manualTdeeMessage && <p style={{fontSize:11,color:T.accentD,margin:"10px 0 0",fontWeight:700}}>{manualTdeeMessage}</p>}
-            </div>
-          )}
-          {progressMessage && <p style={{fontSize:11,color:T.accentD,margin:"10px 0 0",fontWeight:700,lineHeight:1.45}}>{progressMessage}</p>}
         </div>
-      )}
+
+        {wearableConnectionActive && (
+          <div style={{padding:"11px 12px",borderRadius:12,background:T.sel,border:`1px solid ${T.accent}55`,marginBottom:manualCheckinOpen?14:0}}>
+            <p style={{fontSize:11,color:T.accentD,fontWeight:750,lineHeight:1.45,margin:0}}>
+              {t("trend.checkin.wearableActive",{provider:wearableConnectionLabel})}
+            </p>
+            <button onClick={()=>setManualCheckinOpen(open=>!open)}
+              style={{padding:0,marginTop:7,border:"none",background:"transparent",color:T.text,fontSize:11,fontWeight:850,textDecoration:"underline",cursor:"pointer"}}>
+              {t("trend.checkin.manual")}
+            </button>
+          </div>
+        )}
+
+        {(!wearableConnectionActive || manualCheckinOpen) && (
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:850,color:T.text,marginBottom:7}}>{t("trend.checkin.steps")}</label>
+            <select value={manualDailySteps} onChange={e=>setManualDailySteps(e.target.value)}
+              style={{width:"100%",padding:"11px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12}}>
+              <option value="unknown">{t("trend.manual.stepsUnknown")}</option>
+              <option value="<3000">&lt; 3.000</option>
+              <option value="3000-6000">3.000 - 6.000</option>
+              <option value="6000-8000">6.000 - 8.000</option>
+              <option value="8000-10000">8.000 - 10.000</option>
+              <option value="10000+">10.000+</option>
+            </select>
+            <p style={{fontSize:10,color:T.muted,lineHeight:1.4,margin:"6px 0 16px"}}>{t("trend.checkin.stepsHint")}</p>
+
+            <label style={{display:"block",fontSize:12,fontWeight:850,color:T.text,marginBottom:7}}>{t("trend.checkin.workouts")}</label>
+            <select value={manualWorkoutDays} onChange={e=>setManualWorkoutDays(e.target.value)}
+              style={{width:"100%",padding:"11px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12,marginBottom:16}}>
+              <option value="0">{t("trend.manual.workouts",{n:0})}</option>
+              <option value="1-2">{t("trend.manual.workouts",{n:"1-2"})}</option>
+              <option value="3-4">{t("trend.manual.workouts",{n:"3-4"})}</option>
+              <option value="5-6">{t("trend.manual.workouts",{n:"5-6"})}</option>
+              <option value="7">{t("trend.manual.workouts",{n:7})}</option>
+            </select>
+
+            <p style={{fontSize:12,fontWeight:850,color:T.text,margin:"0 0 8px"}}>{t("trend.checkin.effort")}</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:7,marginBottom:14}}>
+              {[
+                ["leggera",t("intensity.low"),t("trend.checkin.effortLow")],
+                ["moderata",t("intensity.moderate"),t("trend.checkin.effortModerate")],
+                ["alta",t("intensity.high"),t("trend.checkin.effortHigh")]
+              ].map(([id,label,description])=>(
+                <button key={id} onClick={()=>setManualWorkoutIntensity(id)}
+                  style={{minWidth:0,padding:"10px 7px",borderRadius:12,border:`1.5px solid ${manualWorkoutIntensity===id?T.accentD:T.border}`,background:manualWorkoutIntensity===id?T.sel:T.bg,color:T.text,cursor:"pointer",textAlign:"left"}}>
+                  <span style={{display:"block",fontSize:11,fontWeight:900,marginBottom:4}}>{label}</span>
+                  <span style={{display:"block",fontSize:8,color:T.muted,lineHeight:1.3}}>{description}</span>
+                </button>
+              ))}
+            </div>
+
+            <button onClick={handleManualTdeeUpdate} disabled={savingManualCheckin}
+              style={{width:"100%",padding:"13px 14px",borderRadius:14,border:"none",background:T.accentD,color:"#fff",fontWeight:900,fontSize:13,cursor:savingManualCheckin?"default":"pointer",opacity:savingManualCheckin ? .7 : 1}}>
+              {savingManualCheckin ? t("trend.weight.saving") : t("trend.checkin.submit")}
+            </button>
+            {manualTdeeMessage && (
+              <p style={{fontSize:11,color:manualCheckinSuccess?"#2F855A":"#B91C1C",margin:"10px 0 0",fontWeight:800,lineHeight:1.45}}>{manualTdeeMessage}</p>
+            )}
+          </div>
+        )}
+      </section>
 
       <div style={{margin:"0 24px 14px",padding:"12px 14px",background:T.card,border:`1px solid ${T.border}`,borderRadius:16}}>
         <div style={{display:"flex",alignItems:"center",gap:9}}>
@@ -19507,6 +19677,24 @@ const handleDeleteAccount = async () => {
     saveDubiProfile(nextUserData);
   };
 
+  const handleManualActivityUpdate = async (updatedData) => {
+    const saved = await saveOnboardingToBackend(updatedData);
+    if (!saved || saved.error) return null;
+
+    const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+      force: true,
+      reason: "manual_activity_checkin"
+    });
+    if (!updatedPlan) return null;
+    if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+
+    setUserData(updatedData);
+    setPlan(updatedPlan);
+    setSwaps({});
+    saveDubiProfile(updatedData);
+    return updatedPlan;
+  };
+
   const requestConsentBeforePlan = data => {
     if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
     saveDubiProfile(data);
@@ -19728,7 +19916,7 @@ setPhase("free-beta");
               {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
               {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
-              {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} />}
+              {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
               {activeTab==="sources"  && <SourcesScreen />}
               {activeTab==="settings" && (
   <SettingsScreen
@@ -19757,6 +19945,9 @@ setPhase("free-beta");
 
 function DUBIRoot() {
   const params = new URLSearchParams(window.location.search);
+  if (window.location.hostname === "127.0.0.1" && params.get("_trend_preview") === "1") {
+    return <TrendScreen userData={{weight:76.5,height:175,age:35,is_minor:false,targetWeight:72}} plan={{goal:"fatLoss",calories:2100,tdee:2500}} lang="en" />;
+  }
   const legal = params.get("legal") || params.get("page");
   if (legal === "privacy" || window.location.pathname === "/privacy") {
     return <PrivacyPolicyPage />;
