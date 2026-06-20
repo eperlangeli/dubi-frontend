@@ -308,6 +308,18 @@
       padding: 18px 16px;
       margin-bottom: 12px;
     }
+    @keyframes dubiSlideInRight {
+      from { transform: translateX(36px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    @keyframes dubiSlideInLeft {
+      from { transform: translateX(-36px); opacity: 0; }
+      to   { transform: translateX(0);     opacity: 1; }
+    }
+    @keyframes dubiConfettiFall {
+      0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
   </style>
 </head>
 <body>
@@ -799,7 +811,7 @@ const getCurrentUserFromBackend = async (token = getAuthToken()) => {
   }
 };
 
-const requestParentalConsentEmail = async ({ guardianName, guardianEmail, language }) => {
+const requestParentalConsentEmail = async ({ guardianName, guardianEmail, language, minorName }) => {
   const token = getAuthToken();
   if (!token) return { success:false, error:"missing_token" };
   try {
@@ -809,7 +821,7 @@ const requestParentalConsentEmail = async ({ guardianName, guardianEmail, langua
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       },
-      body: JSON.stringify({ guardianName, guardianEmail, language })
+      body: JSON.stringify({ guardianName, guardianEmail, language, minorName })
     });
     const data = await response.json().catch(() => ({}));
     return response.ok ? { success:true, ...data } : { success:false, error:data.error || "request_failed" };
@@ -832,6 +844,44 @@ const deleteAccountFromBackend = async () => {
     return response.ok ? { success:true } : { success:false, error:data.error || "delete_failed" };
   } catch (error) {
     console.error("Account delete request failed:", error);
+    return { success:false, error:"network_error" };
+  }
+};
+
+const updateProfileConsentInBackend = async (field, value) => {
+  const token = getAuthToken();
+  if (!token) return { success:false, error:"missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ [field]: Boolean(value) })
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? { success:true, ...data } : { success:false, error:data.error || "consent_update_failed" };
+  } catch (error) {
+    console.error("Consent update failed:", error);
+    return { success:false, error:"network_error" };
+  }
+};
+
+const anonymiseHealthDataInBackend = async () => {
+  const token = getAuthToken();
+  if (!token) return { success:false, error:"missing_token" };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/anonymise-health-data`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? { success:true, ...data } : { success:false, error:data.error || "health_data_anonymisation_failed" };
+  } catch (error) {
+    console.error("Health data anonymisation failed:", error);
     return { success:false, error:"network_error" };
   }
 };
@@ -8874,6 +8924,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"Alternativa generata da DUBI mantenendo lo stesso blocco nutrizionale: circa {kcal} kcal, {p} g di proteine, {c} g di carboidrati e {f} g di grassi.",
     "consent.health.title":"Consenso ai dati sulla salute ai sensi dell’Art. 9 GDPR",
     "consent.health.beforeCollection":"DUBI richiede questo consenso prima di raccogliere obiettivi fisici, allergie, intolleranze o condizioni legate all’alimentazione.",
+    "consent.gate.title":"Consenso ai dati salute",
+    "consent.gate.subtitle":"Prima di iniziare, DUBI ha bisogno del tuo consenso esplicito per trattare i dati fisici e nutrizionali necessari a personalizzare il piano.",
+    "consent.revoke.warning.title":"Revocare il consenso?",
+    "consent.revoke.warning.body":"Se revochi il consenso ai dati salute, DUBI non potrà generare o aggiornare il tuo piano nutrizionale finché non riautorizzi il trattamento. I tuoi dati storici saranno anonimizzati e non più associati al tuo profilo.",
+    "consent.revoke.warning.confirm":"Revoca",
+    "settings.privacy.section":"Privacy e consensi",
+    "settings.privacy.health.label":"Consenso dati salute (Art. 9 GDPR)",
+    "settings.privacy.health.desc":"Hai autorizzato DUBI a trattare i tuoi dati fisici e nutrizionali. Puoi revocare il consenso in qualsiasi momento.",
+    "settings.privacy.wearable.label":"Consenso dati wearable",
+    "settings.privacy.wearable.desc":"DUBI usa i dati del tuo wearable per personalizzare il piano. Puoi revocare il consenso in qualsiasi momento.",
     "trend.manual.estimateUpdated":"Stima aggiornata: TDEE {tdee} kcal, piano {calories} kcal.",
     "trend.manual.update":"Aggiorna stima e piano",
     "profile.targetWeight.required":"Prima di aggiornare il piano, inserisci il peso target: DUBI potrà così comprendere la direzione reale del tuo obiettivo.",
@@ -8892,6 +8952,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI generated a replacement while keeping the same nutritional block: about {kcal} kcal, {p} g protein, {c} g carbohydrates and {f} g fat.",
     "consent.health.title":"Health data consent under GDPR Article 9",
     "consent.health.beforeCollection":"DUBI requests this consent before collecting physical goals, allergies, intolerances or nutrition-related conditions.",
+    "consent.gate.title":"Health data consent",
+    "consent.gate.subtitle":"Before you begin, DUBI needs your explicit consent to process the physical and nutritional data required to personalise your plan.",
+    "consent.revoke.warning.title":"Withdraw consent?",
+    "consent.revoke.warning.body":"If you withdraw health data consent, DUBI will not be able to generate or update your nutrition plan until you re-grant consent. Your historical data will be anonymised and no longer linked to your profile.",
+    "consent.revoke.warning.confirm":"Withdraw",
+    "settings.privacy.section":"Privacy & Consent",
+    "settings.privacy.health.label":"Health data consent (GDPR Art. 9)",
+    "settings.privacy.health.desc":"You have authorised DUBI to process your physical and nutritional data. You can withdraw consent at any time.",
+    "settings.privacy.wearable.label":"Wearable data consent",
+    "settings.privacy.wearable.desc":"DUBI uses your wearable data to personalise your plan. You can withdraw consent at any time.",
     "trend.manual.estimateUpdated":"Estimate updated: TDEE {tdee} kcal, plan {calories} kcal.",
     "trend.manual.update":"Update estimate and plan",
     "profile.targetWeight.required":"Before updating the plan, enter your target weight so DUBI can understand the true direction of your goal.",
@@ -8910,6 +8980,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI a généré un remplacement tout en gardant le même bloc nutritionnel : environ {kcal} kcal, {p} g de protéines, {c} g de glucides et {f} g de graisses.",
     "consent.health.title":"Consentement aux données de santé en vertu de l'article 9 du RGPD",
     "consent.health.beforeCollection":"DUBI demande ce consentement avant de collecter des objectifs physiques, des allergies, des intolérances ou des conditions liées à la nutrition.",
+    "consent.gate.title":"Consentement aux données de santé",
+    "consent.gate.subtitle":"Avant de commencer, DUBI a besoin de votre consentement explicite pour traiter les données physiques et nutritionnelles nécessaires à la personnalisation de votre plan.",
+    "consent.revoke.warning.title":"Retirer le consentement ?",
+    "consent.revoke.warning.body":"Si vous retirez votre consentement aux données de santé, DUBI ne pourra plus générer ni mettre à jour votre plan nutritionnel jusqu'à ce que vous donniez à nouveau votre consentement. Vos données historiques seront anonymisées et ne seront plus associées à votre profil.",
+    "consent.revoke.warning.confirm":"Retirer",
+    "settings.privacy.section":"Confidentialité et consentements",
+    "settings.privacy.health.label":"Consentement aux données de santé (art. 9 RGPD)",
+    "settings.privacy.health.desc":"Vous avez autorisé DUBI à traiter vos données physiques et nutritionnelles. Vous pouvez retirer votre consentement à tout moment.",
+    "settings.privacy.wearable.label":"Consentement aux données du wearable",
+    "settings.privacy.wearable.desc":"DUBI utilise les données de votre wearable pour personnaliser votre plan. Vous pouvez retirer votre consentement à tout moment.",
     "trend.manual.estimateUpdated":"Estimation mise à jour : TDEE {tdee} kcal, plan {calories} kcal.",
     "trend.manual.update":"Mettre à jour le devis et le plan",
     "profile.targetWeight.required":"Avant de mettre à jour le plan, entrez votre poids cible afin que DUBI puisse comprendre la véritable direction de votre objectif.",
@@ -8928,6 +9008,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI generó un reemplazo manteniendo el mismo bloque nutricional: alrededor de {kcal} kcal, {p} g de proteína, {c} g de carbohidratos y {f} g de grasa.",
     "consent.health.title":"Consentimiento de datos de salud según el artículo 9 del RGPD",
     "consent.health.beforeCollection":"DUBI solicita este consentimiento antes de recoger objetivos físicos, alergias, intolerancias o afecciones relacionadas con la nutrición.",
+    "consent.gate.title":"Consentimiento de datos de salud",
+    "consent.gate.subtitle":"Antes de comenzar, DUBI necesita tu consentimiento explícito para tratar los datos físicos y nutricionales necesarios para personalizar tu plan.",
+    "consent.revoke.warning.title":"¿Retirar el consentimiento?",
+    "consent.revoke.warning.body":"Si retiras el consentimiento para los datos de salud, DUBI no podrá generar ni actualizar tu plan nutricional hasta que vuelvas a autorizar el tratamiento. Tus datos históricos se anonimizarán y dejarán de estar vinculados a tu perfil.",
+    "consent.revoke.warning.confirm":"Retirar",
+    "settings.privacy.section":"Privacidad y consentimientos",
+    "settings.privacy.health.label":"Consentimiento de datos de salud (art. 9 RGPD)",
+    "settings.privacy.health.desc":"Has autorizado a DUBI a tratar tus datos físicos y nutricionales. Puedes retirar el consentimiento en cualquier momento.",
+    "settings.privacy.wearable.label":"Consentimiento de datos wearable",
+    "settings.privacy.wearable.desc":"DUBI utiliza los datos de tu wearable para personalizar el plan. Puedes retirar el consentimiento en cualquier momento.",
     "trend.manual.estimateUpdated":"Estimación actualizada: TDEE {tdee} kcal, plan {calories} kcal.",
     "trend.manual.update":"Actualizar estimación y plan",
     "profile.targetWeight.required":"Antes de actualizar el plan, ingrese su peso objetivo para que DUBI pueda comprender la verdadera dirección de su objetivo.",
@@ -8946,6 +9036,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI hat einen Ersatz generiert und dabei den gleichen Nährstoffblock beibehalten: etwa {kcal} kcal, {p} g Protein, {c} g Kohlenhydrate und {f} g Fett.",
     "consent.health.title":"Einwilligung zu Gesundheitsdaten gemäß Artikel 9 DSGVO",
     "consent.health.beforeCollection":"DUBI bittet um diese Einwilligung, bevor körperliche Ziele, Allergien, Unverträglichkeiten oder ernährungsbedingte Erkrankungen erhoben werden.",
+    "consent.gate.title":"Einwilligung zu Gesundheitsdaten",
+    "consent.gate.subtitle":"Bevor du beginnst, benötigt DUBI deine ausdrückliche Einwilligung zur Verarbeitung der körperlichen und ernährungsbezogenen Daten, die für deinen persönlichen Plan erforderlich sind.",
+    "consent.revoke.warning.title":"Einwilligung widerrufen?",
+    "consent.revoke.warning.body":"Wenn du die Einwilligung zu Gesundheitsdaten widerrufst, kann DUBI deinen Ernährungsplan erst wieder erstellen oder aktualisieren, wenn du erneut einwilligst. Deine bisherigen Daten werden anonymisiert und nicht mehr mit deinem Profil verknüpft.",
+    "consent.revoke.warning.confirm":"Widerrufen",
+    "settings.privacy.section":"Datenschutz und Einwilligungen",
+    "settings.privacy.health.label":"Einwilligung zu Gesundheitsdaten (Art. 9 DSGVO)",
+    "settings.privacy.health.desc":"Du hast DUBI die Verarbeitung deiner körperlichen und ernährungsbezogenen Daten erlaubt. Du kannst die Einwilligung jederzeit widerrufen.",
+    "settings.privacy.wearable.label":"Einwilligung zu Wearable-Daten",
+    "settings.privacy.wearable.desc":"DUBI nutzt die Daten deines Wearables, um deinen Plan zu personalisieren. Du kannst die Einwilligung jederzeit widerrufen.",
     "trend.manual.estimateUpdated":"Schätzung aktualisiert: TDEE {tdee} kcal, Plan {calories} kcal.",
     "trend.manual.update":"Kostenvoranschlag und Plan aktualisieren",
     "profile.targetWeight.required":"Geben Sie vor der Aktualisierung des Plans Ihr Zielgewicht ein, damit DUBI die wahre Richtung Ihres Ziels erkennen kann.",
@@ -8964,6 +9064,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"أنتج DUBI بديلاً مع الحفاظ على نفس الكتلة الغذائية: حوالي __دوبيتوكين0__ سعرة حرارية، __دوبيتوكين1__ جرام بروتين، __دوبيتوكين2__ جرام كربوهيدرات و__دوبيتوكين3__ جرام دهون.",
     "consent.health.title":"الموافقة على البيانات الصحية بموجب المادة 9 من اللائحة العامة لحماية البيانات",
     "consent.health.beforeCollection":"تطلب DUBI هذه الموافقة قبل جمع الأهداف الجسدية أو الحساسية أو عدم التحمل أو الحالات المتعلقة بالتغذية.",
+    "consent.gate.title":"الموافقة على البيانات الصحية",
+    "consent.gate.subtitle":"قبل البدء، تحتاج DUBI إلى موافقتك الصريحة لمعالجة البيانات الجسدية والغذائية اللازمة لتخصيص خطتك.",
+    "consent.revoke.warning.title":"سحب الموافقة؟",
+    "consent.revoke.warning.body":"إذا سحبت موافقتك على البيانات الصحية، فلن تتمكن DUBI من إنشاء خطتك الغذائية أو تحديثها حتى تمنح الموافقة مجددًا. ستُخفى هوية بياناتك السابقة ولن تبقى مرتبطة بملفك الشخصي.",
+    "consent.revoke.warning.confirm":"سحب الموافقة",
+    "settings.privacy.section":"الخصوصية والموافقات",
+    "settings.privacy.health.label":"الموافقة على البيانات الصحية (المادة 9 من GDPR)",
+    "settings.privacy.health.desc":"لقد سمحت لـ DUBI بمعالجة بياناتك الجسدية والغذائية. يمكنك سحب الموافقة في أي وقت.",
+    "settings.privacy.wearable.label":"الموافقة على بيانات الأجهزة القابلة للارتداء",
+    "settings.privacy.wearable.desc":"تستخدم DUBI بيانات جهازك القابل للارتداء لتخصيص الخطة. يمكنك سحب الموافقة في أي وقت.",
     "trend.manual.estimateUpdated":"تم تحديث التقدير: TDEE {tdee} سعر حراري، خطة {calories} سعر حراري.",
     "trend.manual.update":"تحديث التقدير والخطة",
     "profile.targetWeight.required":"قبل تحديث الخطة، أدخل وزنك المستهدف حتى تتمكن DUBI من فهم الاتجاه الحقيقي لهدفك.",
@@ -8982,6 +9092,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI gerou uma reposição mantendo o mesmo bloco nutricional: cerca de {kcal} kcal, {p} g de proteína, {c} g de carboidratos e {f} g de gordura.",
     "consent.health.title":"Consentimento de dados de saúde sob o Artigo 9 do GDPR",
     "consent.health.beforeCollection":"A DUBI solicita esse consentimento antes de coletar objetivos físicos, alergias, intolerâncias ou condições relacionadas à nutrição.",
+    "consent.gate.title":"Consentimento de dados de saúde",
+    "consent.gate.subtitle":"Antes de começar, a DUBI precisa do seu consentimento explícito para tratar os dados físicos e nutricionais necessários para personalizar o seu plano.",
+    "consent.revoke.warning.title":"Retirar o consentimento?",
+    "consent.revoke.warning.body":"Se retirar o consentimento para os dados de saúde, a DUBI não poderá gerar ou atualizar o seu plano nutricional até voltar a autorizar o tratamento. Os seus dados históricos serão anonimizados e deixarão de estar associados ao seu perfil.",
+    "consent.revoke.warning.confirm":"Retirar",
+    "settings.privacy.section":"Privacidade e consentimentos",
+    "settings.privacy.health.label":"Consentimento de dados de saúde (Art. 9 RGPD)",
+    "settings.privacy.health.desc":"Autorizou a DUBI a tratar os seus dados físicos e nutricionais. Pode retirar o consentimento a qualquer momento.",
+    "settings.privacy.wearable.label":"Consentimento de dados wearable",
+    "settings.privacy.wearable.desc":"A DUBI utiliza os dados do seu wearable para personalizar o plano. Pode retirar o consentimento a qualquer momento.",
     "trend.manual.estimateUpdated":"Estimativa atualizada: TDEE {tdee} kcal, plano {calories} kcal.",
     "trend.manual.update":"Atualizar estimativa e plano",
     "profile.targetWeight.required":"Antes de atualizar o plano, insira seu peso alvo para que o DUBI possa entender a verdadeira direção do seu objetivo.",
@@ -9000,6 +9120,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI 在保持相同营养块的同时生成了替代品：约 {kcal} kcal、{p} g 蛋白质、{c} g 碳水化合物和 {f} g 脂肪。",
     "consent.health.title":"GDPR 第 9 条规定的健康数据同意",
     "consent.health.beforeCollection":"DUBI 在收集身体目标、过敏、不耐受或营养相关状况之前请求此同意。",
+    "consent.gate.title":"健康数据同意",
+    "consent.gate.subtitle":"开始之前，DUBI 需要获得您的明确同意，才能处理个性化计划所需的身体和营养数据。",
+    "consent.revoke.warning.title":"撤回同意？",
+    "consent.revoke.warning.body":"如果您撤回健康数据同意，在您重新授权之前，DUBI 将无法生成或更新您的营养计划。您的历史数据将被匿名化，并不再与您的个人资料关联。",
+    "consent.revoke.warning.confirm":"撤回",
+    "settings.privacy.section":"隐私与同意",
+    "settings.privacy.health.label":"健康数据同意（GDPR 第 9 条）",
+    "settings.privacy.health.desc":"您已授权 DUBI 处理您的身体和营养数据。您可以随时撤回同意。",
+    "settings.privacy.wearable.label":"可穿戴设备数据同意",
+    "settings.privacy.wearable.desc":"DUBI 使用您的可穿戴设备数据来个性化计划。您可以随时撤回同意。",
     "trend.manual.estimateUpdated":"更新估算：TDEE {tdee} kcal，计划 {calories} kcal。",
     "trend.manual.update":"更新估算和计划",
     "profile.targetWeight.required":"在更新计划之前，输入您的目标体重，以便DUBI了解您目标的真实方向。",
@@ -9018,6 +9148,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI は、同じ栄養ブロックを維持しながら代替品を生成しました: 約 {kcal} kcal、{p} g タンパク質、{c} g 炭水化物、{f} g 脂肪。",
     "consent.health.title":"GDPR 第 9 条に基づく健康データの同意",
     "consent.health.beforeCollection":"DUBI は、身体的目標、アレルギー、不耐症、または栄養関連の症状を収集する前に、この同意を要求します。",
+    "consent.gate.title":"健康データへの同意",
+    "consent.gate.subtitle":"開始する前に、DUBI はプランの個別化に必要な身体・栄養データを処理するための明示的な同意を必要とします。",
+    "consent.revoke.warning.title":"同意を撤回しますか？",
+    "consent.revoke.warning.body":"健康データへの同意を撤回すると、再度同意するまで DUBI は栄養プランを生成または更新できません。過去のデータは匿名化され、プロフィールとの関連付けが解除されます。",
+    "consent.revoke.warning.confirm":"撤回する",
+    "settings.privacy.section":"プライバシーと同意",
+    "settings.privacy.health.label":"健康データへの同意（GDPR 第9条）",
+    "settings.privacy.health.desc":"DUBI による身体・栄養データの処理を許可しています。同意はいつでも撤回できます。",
+    "settings.privacy.wearable.label":"ウェアラブルデータへの同意",
+    "settings.privacy.wearable.desc":"DUBI はウェアラブルデータを使用してプランを個別化します。同意はいつでも撤回できます。",
     "trend.manual.estimateUpdated":"更新された見積もり: TDEE {tdee} kcal、計画 {calories} kcal。",
     "trend.manual.update":"見積もりと計画を更新する",
     "profile.targetWeight.required":"計画を更新する前に、DUBI が目標の真の方向性を理解できるように、目標体重を入力してください。",
@@ -9036,6 +9176,16 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "askdubi.replacementWhy":"DUBI произвел замену, сохранив при этом тот же блок питания: около {kcal} ккал, {p} г белков, {c} г углеводов и {f} г жиров.",
     "consent.health.title":"Согласие на данные о состоянии здоровья в соответствии со статьей 9 GDPR",
     "consent.health.beforeCollection":"DUBI запрашивает это согласие, прежде чем собирать сведения о физических целях, аллергиях, непереносимости или состояниях, связанных с питанием.",
+    "consent.gate.title":"Согласие на обработку данных о здоровье",
+    "consent.gate.subtitle":"Перед началом DUBI требуется ваше явное согласие на обработку физических данных и данных о питании, необходимых для персонализации плана.",
+    "consent.revoke.warning.title":"Отозвать согласие?",
+    "consent.revoke.warning.body":"Если вы отзовёте согласие на обработку данных о здоровье, DUBI не сможет создавать или обновлять ваш план питания, пока вы не дадите согласие повторно. Ваши исторические данные будут обезличены и больше не будут связаны с профилем.",
+    "consent.revoke.warning.confirm":"Отозвать",
+    "settings.privacy.section":"Конфиденциальность и согласия",
+    "settings.privacy.health.label":"Согласие на данные о здоровье (ст. 9 GDPR)",
+    "settings.privacy.health.desc":"Вы разрешили DUBI обрабатывать ваши физические данные и данные о питании. Согласие можно отозвать в любое время.",
+    "settings.privacy.wearable.label":"Согласие на данные носимого устройства",
+    "settings.privacy.wearable.desc":"DUBI использует данные носимого устройства для персонализации плана. Согласие можно отозвать в любое время.",
     "trend.manual.estimateUpdated":"Оценка обновлена: TDEE {tdee} ккал, план {calories} ккал.",
     "trend.manual.update":"Обновить смету и план",
     "profile.targetWeight.required":"Прежде чем обновлять план, введите целевой вес, чтобы DUBI мог понять истинное направление вашей цели.",
@@ -15055,18 +15205,22 @@ const RejectionScreen = ({ onBack }) => {
       )}
 
       {mode === "register" && (
-        <input
-          value={birthDate}
-          onChange={(e) => setBirthDate(e.target.value)}
-          placeholder={copy.birthDate}
-          type="date"
-          autoComplete="bday"
-          style={{
-            width:"100%", padding:"16px", borderRadius:18,
-            border:`1px solid ${T.border}`, background:T.card,
-            color:T.text, fontSize:15, marginBottom:8, boxSizing:"border-box"
-          }}
-        />
+        <>
+          <p style={{fontSize:11,fontWeight:700,color:T.muted,letterSpacing:0.8,textTransform:"uppercase",margin:"4px 0 6px",paddingLeft:2}}>
+            {copy.birthDate}
+          </p>
+          <input
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            type="date"
+            autoComplete="bday"
+            style={{
+              width:"100%", padding:"16px", borderRadius:18,
+              border:`1px solid ${T.border}`, background:T.card,
+              color:T.text, fontSize:15, marginBottom:8, boxSizing:"border-box"
+            }}
+          />
+        </>
       )}
 
       {mode === "register" && (
@@ -15103,33 +15257,71 @@ const RejectionScreen = ({ onBack }) => {
 // ═══════════════════════════════════════════════
 // ONBOARDING
 // ═══════════════════════════════════════════════
-const PhysicalStep = ({d,u,onAutoNext}) => {
-  const { t, lang } = useT();
-  return (
-  <div>
-    {/* Nome utente */}
-    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("phys.name")}</p>
-    <input type="text" value={d.name||""}
-      onChange={e=>u("name", e.target.value.slice(0,24))}
-      placeholder={t("phys.name.ph")}
-      style={{width:"100%",padding:"15px 16px",marginBottom:22,borderRadius:14,
-        border:`1.5px solid ${T.border}`,background:T.card,fontSize:16,color:T.text,
-        outline:"none",fontFamily:"inherit",letterSpacing:-0.2}}/>
+const ConfettiEffect = () => {
+  const COLORS = ['#2D6A4F','#6B8A64','#C9A87C','#B7DFC9','#fff','#F5A623','#9B59B6'];
+  const pieces = React.useMemo(() => Array.from({length: 72}, (_, i) => ({
+    id: i,
+    color: COLORS[i % COLORS.length],
+    left: `${Math.random() * 100}%`,
+    delay: `${Math.random() * 0.6}s`,
+    duration: `${1.8 + Math.random() * 1.4}s`,
+    size: `${6 + Math.floor(Math.random() * 7)}px`,
+    rotate: `${Math.random() * 360}deg`,
+  })), []);
 
-    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:10}}>{t("phys.gender")}</p>
-    <div style={{display:"flex",gap:10,marginBottom:22}}>
-      {[["M",t("phys.male.short")],["F",t("phys.female.short")]].map(([g,l])=>(
-        <button key={g} onClick={()=>{ u("gender",g); setTimeout(onAutoNext, 180); }}
-          style={{flex:1,padding:14,borderRadius:14,border:`1.5px solid ${d.gender===g?T.accent:T.border}`,background:d.gender===g?T.sel:T.card,fontSize:15,fontWeight:d.gender===g?600:400,color:T.text,cursor:"pointer"}}>
-          {l}
-        </button>
+  return (
+    <div style={{position:'fixed',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:9999,overflow:'hidden'}}>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position:'absolute',
+          top:'-20px',
+          left: p.left,
+          width: p.size,
+          height: p.size,
+          background: p.color,
+          borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+          animation: `dubiConfettiFall ${p.duration} ${p.delay} ease-in forwards`,
+          transform: `rotate(${p.rotate})`,
+        }} />
       ))}
     </div>
-    <NumInput label={t("phys.age")} unit={t("phys.age.unit")} value={d.age} onChange={v=>u("age",v)} min={14} max={85} />
-    <NumInput label={t("phys.height")} unit={t("phys.height.unit")} value={d.height} onChange={v=>u("height",v)} min={140} max={220} />
-    <NumInput label={t("phys.weight")} unit={t("phys.weight.unit")} value={d.weight} onChange={v=>u("weight",v)} min={35} max={250} />
-  </div>
-);};
+  );
+};
+
+const PhysicalStep = ({d, u, onAutoNext, page}) => {
+  const { t } = useT();
+
+  if (page === 0) {
+    return (
+      <div>
+        <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("phys.name")}</p>
+        <input type="text" value={d.name||""}
+          onChange={e=>u("name", e.target.value.slice(0,24))}
+          placeholder={t("phys.name.ph")}
+          style={{width:"100%",padding:"15px 16px",marginBottom:28,borderRadius:14,
+            border:`1.5px solid ${T.border}`,background:T.card,fontSize:16,color:T.text,
+            outline:"none",fontFamily:"inherit",letterSpacing:-0.2}}/>
+        <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:10}}>{t("phys.gender")}</p>
+        <div style={{display:"flex",gap:10}}>
+          {[["M",t("phys.male.short")],["F",t("phys.female.short")]].map(([g,l])=>(
+            <button key={g} onClick={()=>{ u("gender",g); setTimeout(onAutoNext, 180); }}
+              style={{flex:1,padding:18,borderRadius:14,border:`1.5px solid ${d.gender===g?T.accent:T.border}`,background:d.gender===g?T.sel:T.card,fontSize:16,fontWeight:d.gender===g?600:400,color:T.text,cursor:"pointer"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <NumInput label={t("phys.age")} unit={t("phys.age.unit")} value={d.age} onChange={v=>u("age",v)} min={14} max={85} />
+      <NumInput label={t("phys.height")} unit={t("phys.height.unit")} value={d.height} onChange={v=>u("height",v)} min={140} max={220} />
+      <NumInput label={t("phys.weight")} unit={t("phys.weight.unit")} value={d.weight} onChange={v=>u("weight",v)} min={35} max={250} />
+    </div>
+  );
+};
 
 // ── Calcola la fase nutrizionale in base alle settimane alla gara ──
 function calcRacePhase(competitionDate) {
@@ -15162,7 +15354,7 @@ const COMPETITION_SPORTS = [
   {id:"combat",    ic:"flame",   tk:"comp.sport.combat.t",    dk:"comp.sport.combat.d",     macro:"42% C · 33% P · 25% G"},
 ];
 
-const GoalStep = ({d, u}) => {
+const GoalStep = ({d, u, page}) => {
   const { t, lang } = useT();
 
   const racePhase = d.goal==="competition" && d.competitionDate ? calcRacePhase(d.competitionDate) : null;
@@ -15205,6 +15397,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
 
   return (
     <div>
+      {page === 0 ? (<>
       {GOALS.map(g=>{
         const sel    = d.goal===g.id;
         const isComp = g.id==="competition";
@@ -15239,6 +15432,8 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
           </button>
         );
       })}
+
+      </>) : (<>
 
       {/* ── Target peso / BF — per fatLoss, gain, definition, competition ── */}
       {["fatLoss","gain","definition","competition"].includes(d.goal) && (
@@ -15407,14 +15602,31 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
         </div>
       )}
 
+      {d.goal === "maintain" && (
+        <div style={{padding:"24px 20px",background:T.sel,borderRadius:16,border:`1px solid ${T.border}`,textAlign:"center"}}>
+          <div style={{fontSize:36,marginBottom:12}}>✓</div>
+          <p style={{fontSize:16,fontWeight:700,color:T.accentD,margin:"0 0 8px"}}>
+            {t("goal.maintain.ready") === "goal.maintain.ready" ? "Ottima scelta" : t("goal.maintain.ready")}
+          </p>
+          <p style={{fontSize:14,color:T.muted,lineHeight:1.6,margin:0}}>
+            {t("goal.maintain.ready.note") === "goal.maintain.ready.note"
+              ? "DUBI costruirà un piano bilanciato per mantenere il tuo peso attuale in modo sano e sostenibile."
+              : t("goal.maintain.ready.note")}
+          </p>
+        </div>
+      )}
+
+      </>)}
+
     </div>
   );
 };
 
-const ActivityStep = ({d,u}) => {
+const ActivityStep = ({d, u, page}) => {
   const { t, lang } = useT();
   return (
   <div>
+    {page === 0 ? (<>
     <p style={{fontSize:13,color:T.muted,lineHeight:1.6,marginBottom:20,fontWeight:300,fontStyle:"italic"}}>
       {t("act.intro")}
     </p>
@@ -15435,6 +15647,8 @@ const ActivityStep = ({d,u}) => {
         </button>
       ))}
     </div>
+
+    </>) : (<>
     <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q3")}</p>
     <OptBtn value={d.workoutDuration} onChange={v=>u("workoutDuration",v)} small options={[
       {id:"<30",label:t("act.dur.short")},{id:"30-45",label:t("act.dur.mid1")},{id:"45-60",label:t("act.dur.mid2")},{id:"60-90",label:t("act.dur.long")},{id:">90",label:t("act.dur.xlong")},
@@ -15458,6 +15672,7 @@ const ActivityStep = ({d,u}) => {
         </button>
       ))}
     </div>
+    </>)}
   </div>
 );};
 
@@ -15574,7 +15789,7 @@ const HealthDataConsentPrompt = ({accepted, onChange}) => {
   );
 };
 
-const PreferencesStep = ({d,u}) => {
+const PreferencesStep = ({d, u, page}) => {
   const { t, lang } = useT();
   const tx = (key, fallback) => {
     const value = t(key);
@@ -15584,6 +15799,7 @@ const PreferencesStep = ({d,u}) => {
   const hours = Array.from({length:19},(_,i)=>i+5); // 5..23
   return (
     <div>
+      {page === 0 ? (<>
       {/* Stile alimentare */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:10}}>{t("pref.diet")}</p>
       {[{id:"omnivore",l:t("pref.diet.omni"),ds:t("pref.diet.omni.d")},{id:"pescatarian",l:tx("pref.diet.pesc","Pescetariano"),ds:tx("pref.diet.pesc.d","Pesce, uova e latticini, senza carne")},{id:"vegetarian",l:t("pref.diet.veg"),ds:t("pref.diet.veg.d")},{id:"vegan",l:t("pref.diet.vegan"),ds:t("pref.diet.vegan.d")}].map(x=>(
@@ -15619,6 +15835,8 @@ const PreferencesStep = ({d,u}) => {
       {/* Allergie */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.allergies")}</p>
       <AllergyChipPicker value={d.allergies} onChange={v=>u("allergies",v)} />
+
+      </>) : (<>
 
       {/* Sport */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.sport")}</p>
@@ -15688,6 +15906,7 @@ const PreferencesStep = ({d,u}) => {
           </p>
         </div>
       )}
+      </>)}
     </div>
   );
 };
@@ -15724,10 +15943,6 @@ const WearableStep = ({d,u,connectableWearables = VERIFIED_CONNECTABLE_WEARABLES
 
   return (
   <div>
-    <HealthDataConsentPrompt
-      accepted={Boolean(d.healthDataConsent)}
-      onChange={v => u("healthDataConsent", v)}
-    />
     <p style={{fontSize:15,color:T.muted,lineHeight:1.7,marginBottom:28,fontWeight:300}}>
       {t("wear.intro")}
     </p>
@@ -15783,15 +15998,21 @@ const WearableStep = ({d,u,connectableWearables = VERIFIED_CONNECTABLE_WEARABLES
   </div>
 );};
 
-const STEP_NAMES_KEYS = ["onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
+const STEP_NAMES_KEYS = ["consent.gate.title","onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
 const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, onCancelEdit = () => {}, onMinorDetected = () => {}, onAgeRejected = () => {}, allowMinorOnboarding = false }) => {
   const { t, lang } = useT();
 
   const [step,setStep] = useState(0);
+  const [subStep, setSubStep] = useState(0);
+  const [slideDir, setSlideDir] = useState('right');
+  const [showConfetti, setShowConfetti] = useState(false);
+  const PAGES_PER_STEP = [1, 2, 2, 2, 2, 1];
+  const TOTAL_PAGES = 10;
+  const currentAbsPage = [0,1,3,5,7,9][step] + subStep;
   const [betaAccessMessage,setBetaAccessMessage] = useState("");
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [step]);
+  }, [step, subStep]);
   const defaultOnboardingData = {
   gender:"M",
   age:30,
@@ -15916,15 +16137,23 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
 }, [isEditing]);
   const u = (k,v) => setData(p=>({...p,[k]:v}));
   const content = [
-    <PhysicalStep d={data} u={u} onAutoNext={() => setStep(s => s + 1)}/>,
-    <GoalStep d={data} u={u}/>,
-    <ActivityStep d={data} u={u}/>,
-    <PreferencesStep d={data} u={u}/>,
+    <div>
+      <p style={{fontSize:14,color:T.muted,lineHeight:1.65,margin:"0 0 20px"}}>{t("consent.gate.subtitle")}</p>
+      <HealthDataConsentPrompt
+        accepted={Boolean(data.healthDataConsent)}
+        onChange={value=>u("healthDataConsent", value)}
+      />
+    </div>,
+    <PhysicalStep d={data} u={u} onAutoNext={() => { setSlideDir('right'); setSubStep(1); }} page={subStep}/>,
+    <GoalStep d={data} u={u} page={subStep}/>,
+    <ActivityStep d={data} u={u} page={subStep}/>,
+    <PreferencesStep d={data} u={u} page={subStep}/>,
     <WearableStep d={data} u={u} connectableWearables={connectableWearables}/>,
   ];
   const selectedWearables = getSelectedWearables(data).filter(id => id !== "none");
-  const wearableConsentRequired = step === 4 && selectedWearables.length > 0;
-  const canContinueStep = !wearableConsentRequired;
+  const healthConsentRequired = step === 0 && !data.healthDataConsent;
+  const wearableConsentRequired = step === 5 && selectedWearables.length > 0;
+  const canContinueStep = !healthConsentRequired && !wearableConsentRequired;
 
   
   return (
@@ -15950,26 +16179,59 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
 )}
     <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"56px 24px 0",position:"relative"}}>
-        <div style={{display:"flex",gap:4,marginBottom:28}}>
-          {STEP_NAMES_KEYS.map((_,i)=>(<div key={i} style={{flex:1,height:4,borderRadius:4,background:i<=step?T.accentD:T.border,transition:"background 0.3s"}} />))}
+        <div style={{display:"flex",gap:3,marginBottom:28}}>
+          {Array.from({length: TOTAL_PAGES}, (_,i) => (
+            <div key={i} style={{flex:1,height:4,borderRadius:4,background:i<=currentAbsPage?T.accentD:T.border,transition:"background 0.4s"}} />
+          ))}
         </div>
-        <p style={{fontSize:12,fontWeight:500,color:T.muted,letterSpacing:1,marginBottom:6}}>{t("onb.step",{a:step+1,b:STEP_NAMES_KEYS.length})}</p>
+        <p style={{fontSize:12,fontWeight:500,color:T.muted,letterSpacing:1,marginBottom:6}}>{currentAbsPage + 1} / {TOTAL_PAGES}</p>
         <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:700,color:T.text,margin:0}}>{t(STEP_NAMES_KEYS[step])}</h2>
       </div>
-      <div style={{flex:1,padding:"24px 24px 130px",overflowY:"auto"}}>{content[step]}</div>
+      <div style={{flex:1,padding:"24px 24px 130px",overflowY:"auto",overflowX:"hidden"}}>
+        <div
+          key={`${step}-${subStep}`}
+          style={{animation:`${slideDir==='right'?'dubiSlideInRight':'dubiSlideInLeft'} 0.28s cubic-bezier(0.4,0,0.2,1)`}}
+        >
+          {content[step]}
+        </div>
+      </div>
       <div style={{padding:"16px 24px 40px",background:T.bg,borderTop:`1px solid ${T.border}`,position:"sticky",bottom:0}}>
         {betaAccessMessage && <p style={{fontSize:12,color:"#B91C1C",lineHeight:1.45,margin:"0 0 10px",fontWeight:700}}>{betaAccessMessage}</p>}
-        {step===4 && (
+        {step===5 && (
           <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"0 0 10px"}}>
             {t("onb.health.notice")}
           </p>
         )}
         <div style={{display:"flex",gap:10}}>
-          {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{width:44,height:44,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>}
+          {(step>0||subStep>0)&&<button onClick={()=>{
+            setSlideDir('left');
+            if(subStep>0){
+              setSubStep(s=>s-1);
+            } else {
+              const prev=step-1;
+              setStep(prev);
+              setSubStep(PAGES_PER_STEP[prev]-1);
+            }
+          }} style={{width:44,height:44,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>}
           <button disabled={!canContinueStep || savingOnboarding} onClick={async () => {
   if (!canContinueStep) return;
-  if (step < 4) {
-    if (step === 0 && !isEditing) {
+
+  const isLastSubStep = subStep >= PAGES_PER_STEP[step] - 1;
+
+  if (!isLastSubStep) {
+    if (step === 2 && subStep === 0 && data.goal === 'maintain') {
+      setSlideDir('right');
+      setStep(3);
+      setSubStep(0);
+      return;
+    }
+    setSlideDir('right');
+    setSubStep(s => s + 1);
+    return;
+  }
+
+  if (step < 5) {
+    if (step === 1 && !isEditing) {
       const ageValue = Number(data.age);
       if (Number.isFinite(ageValue) && ageValue < 13) {
         onAgeRejected(data);
@@ -15980,12 +16242,16 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
         return;
       }
     }
+    setSlideDir('right');
     setStep(s => s + 1);
+    setSubStep(0);
   } else {
     if (Number(data.age) < 18 && !allowMinorOnboarding) {
       setBetaAccessMessage(t("onb.minor.authorizationRequired"));
       return;
     }
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 3200);
     setSavingOnboarding(true);
     setBetaAccessMessage("");
     const saved = await saveOnboardingToBackend(data);
@@ -15998,11 +16264,12 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   }
 }}
             style={{flex:1,background:canContinueStep&&!savingOnboarding?T.text:T.border,color:T.bg,border:"none",borderRadius:50,padding:18,fontSize:15,fontWeight:600,cursor:canContinueStep&&!savingOnboarding?"pointer":"default",opacity:canContinueStep&&!savingOnboarding?1:.75}}>
-            {savingOnboarding ? t("onb.saving") : (step<4?t("onb.continue"):t("onb.cta.generate"))}
+            {savingOnboarding ? t("onb.saving") : (step<5?t("onb.continue"):t("onb.cta.generate"))}
           </button>
         </div>
       </div>
     </div>
+    {showConfetti && <ConfettiEffect />}
   </>
     );
 };
@@ -19754,6 +20021,9 @@ const [feedbackSending, setFeedbackSending] = useState(false);
 const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
 const [showTerms, setShowTerms] = useState(false);
 const [showHealthDisclaimer, setShowHealthDisclaimer] = useState(false);
+const [showHealthRevokeConfirm, setShowHealthRevokeConfirm] = useState(false);
+const [consentBusy, setConsentBusy] = useState(false);
+const [consentMessage, setConsentMessage] = useState("");
 
 useEffect(() => {
   let cancelled = false;
@@ -19927,6 +20197,100 @@ const handleSubmitBetaFeedback = async () => {
   }
   setFeedbackComment("");
   setFeedbackMessage(sx.feedbackThanks);
+};
+
+const healthConsentActive = Boolean(userData?.health_data_consent ?? userData?.healthDataConsent);
+const wearableConsentActive = Boolean(userData?.wearable_consent ?? userData?.wearableConsent);
+
+const updateLocalConsent = (field, value) => {
+  const camelField = field === "health_data_consent" ? "healthDataConsent" : "wearableConsent";
+  const updatedData = {...userData, [field]: Boolean(value), [camelField]: Boolean(value)};
+  setUserData(updatedData);
+  saveDubiProfile(updatedData);
+};
+
+const handleHealthConsentToggle = async () => {
+  setConsentMessage("");
+  if (healthConsentActive) {
+    setShowHealthRevokeConfirm(true);
+    return;
+  }
+
+  setConsentBusy(true);
+  const result = await updateProfileConsentInBackend("health_data_consent", true);
+  setConsentBusy(false);
+  if (!result.success) {
+    setConsentMessage(t("set.edit.error"));
+    return;
+  }
+  updateLocalConsent("health_data_consent", true);
+  setConsentMessage(t("set.edit.success"));
+};
+
+const handleWearableConsentToggle = async () => {
+  setConsentBusy(true);
+  setConsentMessage("");
+  const nextValue = !wearableConsentActive;
+  const result = await updateProfileConsentInBackend("wearable_consent", nextValue);
+  setConsentBusy(false);
+  if (!result.success) {
+    setConsentMessage(t("set.edit.error"));
+    return;
+  }
+  updateLocalConsent("wearable_consent", nextValue);
+  setConsentMessage(t("set.edit.success"));
+};
+
+const handleConfirmHealthRevocation = async () => {
+  setConsentBusy(true);
+  setConsentMessage("");
+  const result = await anonymiseHealthDataInBackend();
+  setConsentBusy(false);
+  if (!result.success) {
+    setConsentMessage(t("set.edit.error"));
+    return;
+  }
+
+  const updatedData = {
+    ...userData,
+    health_data_consent:false,
+    healthDataConsent:false,
+    age:null,
+    date_of_birth:null,
+    birthDate:null,
+    height:null,
+    weight:null,
+    target_weight:null,
+    targetWeight:null,
+    target_body_fat:null,
+    targetBf:null,
+    allergies:"",
+    intolerances:null,
+    health_conditions:null,
+    healthConditions:null,
+    dietary_restrictions:null,
+    dietaryRestrictions:null,
+    goal:null,
+    diet:null,
+    sport:null,
+    workout_days:null,
+    workoutDays:null,
+    workout_duration:null,
+    workoutDuration:null,
+    workout_intensity:null,
+    workoutIntensity:null,
+    daily_steps:null,
+    dailySteps:null,
+    sedentary_days:null,
+    sedentaryDays:null,
+    training_time:null,
+    trainingTime:null
+  };
+  setUserData(updatedData);
+  setPlan(null);
+  saveDubiProfile(updatedData);
+  setShowHealthRevokeConfirm(false);
+  setConsentMessage(t("set.edit.success"));
 };
 
 
@@ -20144,6 +20508,25 @@ const handleSaveProfile = async () => {
       <span style={{fontSize:13,color:T.muted}}>{label}</span>
       <span style={{fontSize:13,color:T.text,fontWeight:600}}>{value}</span>
     </div>
+  );
+
+  const ConsentToggle = ({label, description, active, onToggle}) => (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={active}
+      onClick={onToggle}
+      disabled={consentBusy}
+      style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"16px",border:"none",background:"transparent",cursor:consentBusy?"default":"pointer",textAlign:"left",opacity:consentBusy?.7:1}}
+    >
+      <div style={{flex:1}}>
+        <p style={{margin:0,fontSize:13,fontWeight:900,color:T.text}}>{label}</p>
+        <p style={{margin:"4px 0 0",fontSize:11,color:T.muted,lineHeight:1.5}}>{description}</p>
+      </div>
+      <div style={{width:46,height:26,borderRadius:999,background:active?T.accentD:T.border,padding:3,transition:"background .2s",flexShrink:0}}>
+        <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",transform:`translateX(${active?20:0}px)`,transition:"transform .2s",boxShadow:"0 1px 3px rgba(0,0,0,.18)"}} />
+      </div>
+    </button>
   );
 
   return (
@@ -20421,6 +20804,29 @@ const handleSaveProfile = async () => {
     )}
   </Card>
 
+  <SectionLabel lk="settings.privacy.section" />
+  <Card>
+    <ConsentToggle
+      label={t("settings.privacy.health.label")}
+      description={t("settings.privacy.health.desc")}
+      active={healthConsentActive}
+      onToggle={handleHealthConsentToggle}
+    />
+    <div style={{borderTop:`1px solid ${T.border}`}}>
+      <ConsentToggle
+        label={t("settings.privacy.wearable.label")}
+        description={t("settings.privacy.wearable.desc")}
+        active={wearableConsentActive}
+        onToggle={handleWearableConsentToggle}
+      />
+    </div>
+  </Card>
+  {consentMessage && (
+    <p style={{margin:"10px 2px 0",fontSize:11,fontWeight:700,color:consentMessage===t("set.edit.success")?T.accentD:"#B91C1C",lineHeight:1.45}}>
+      {consentMessage}
+    </p>
+  )}
+
         <p style={{fontSize:11,color:T.muted,letterSpacing:1.2,fontWeight:800,margin:"22px 0 10px"}}>
           {sx.privacySection}
         </p>
@@ -20606,6 +21012,33 @@ const handleSaveProfile = async () => {
         </div>
 
       </div>
+      {showHealthRevokeConfirm && (
+        <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(25,25,25,.48)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div role="dialog" aria-modal="true" aria-labelledby="health-revoke-title"
+            style={{width:"100%",maxWidth:390,background:T.card,borderRadius:22,border:`1px solid ${T.border}`,padding:22,boxShadow:"0 24px 70px rgba(0,0,0,.22)"}}>
+            <div style={{width:48,height:48,borderRadius:15,background:"#FEE2E2",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
+              <Ico n="info" size={22} c="#B91C1C"/>
+            </div>
+            <h2 id="health-revoke-title" style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:20,fontWeight:900,color:T.text,margin:"0 0 10px"}}>
+              {t("consent.revoke.warning.title")}
+            </h2>
+            <p style={{fontSize:13,color:T.muted,lineHeight:1.6,margin:"0 0 18px"}}>
+              {t("consent.revoke.warning.body")}
+            </p>
+            {consentMessage && <p style={{fontSize:12,color:"#B91C1C",fontWeight:700,lineHeight:1.45,margin:"0 0 12px"}}>{consentMessage}</p>}
+            <div style={{display:"flex",gap:10}}>
+              <button type="button" onClick={()=>{setShowHealthRevokeConfirm(false);setConsentMessage("");}} disabled={consentBusy}
+                style={{flex:1,padding:"13px",borderRadius:14,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:13,fontWeight:800,cursor:consentBusy?"default":"pointer"}}>
+                {t("set.edit.cancel")}
+              </button>
+              <button type="button" onClick={handleConfirmHealthRevocation} disabled={consentBusy}
+                style={{flex:1,padding:"13px",borderRadius:14,border:"none",background:"#B91C1C",color:"#fff",fontSize:13,fontWeight:900,cursor:consentBusy?"default":"pointer",opacity:consentBusy?.7:1}}>
+                {t("consent.revoke.warning.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPrivacyPolicy && <PrivacyPolicyModal lang={lang} onClose={()=>setShowPrivacyPolicy(false)} />}
       {showTerms && <TermsModal lang={lang} onClose={()=>setShowTerms(false)} />}
       {showHealthDisclaimer && <HealthDisclaimerModal lang={lang} onClose={()=>setShowHealthDisclaimer(false)} />}
@@ -20989,7 +21422,8 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
     const result = await requestParentalConsentEmail({
       guardianName: parentName,
       guardianEmail: parentEmail,
-      language: lang
+      language: lang,
+      minorName: userData?.name || userData?.displayName || ""
     });
     setLoading(false);
     if (!result.success) {
