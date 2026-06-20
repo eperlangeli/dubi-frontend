@@ -9205,6 +9205,82 @@ Object.entries(PROMPT14_UI_TRANSLATIONS_2).forEach(([code, additions]) => {
   Object.entries(additions).forEach(([key, value]) => { if (current[key] === undefined) current[key] = value; });
 });
 
+const PROMPT27C_TRANSLATIONS = {
+  it: {
+    "consent.revoked.title":"Piano disattivato",
+    "consent.revoked.body":"Hai revocato il consenso al trattamento dei dati salute. DUBI non può mostrare o generare il tuo piano nutrizionale finché non riautorizzi il trattamento.",
+    "consent.revoked.cta":"Riattiva consenso",
+    "consent.revoked.note":"I tuoi dati precedenti sono stati anonimizzati. Dovrai completare nuovamente l'onboarding per generare un nuovo piano.",
+    "consent.reconsent.redirect":"Consenso riattivato. Completa l'onboarding per generare il tuo nuovo piano."
+  },
+  en: {
+    "consent.revoked.title":"Plan deactivated",
+    "consent.revoked.body":"You have withdrawn consent for health data processing. DUBI cannot show or generate your nutrition plan until you re-grant consent.",
+    "consent.revoked.cta":"Reactivate consent",
+    "consent.revoked.note":"Your previous data has been anonymised. You will need to complete onboarding again to generate a new plan.",
+    "consent.reconsent.redirect":"Consent reactivated. Complete onboarding to generate your new plan."
+  },
+  fr: {
+    "consent.revoked.title":"Plan désactivé",
+    "consent.revoked.body":"Vous avez retiré votre consentement au traitement des données de santé. DUBI ne peut pas afficher ni générer votre plan nutritionnel tant que vous n'avez pas donné à nouveau votre consentement.",
+    "consent.revoked.cta":"Réactiver le consentement",
+    "consent.revoked.note":"Vos données précédentes ont été anonymisées. Vous devrez effectuer à nouveau l'onboarding pour générer un nouveau plan.",
+    "consent.reconsent.redirect":"Consentement réactivé. Complétez l'onboarding pour générer votre nouveau plan."
+  },
+  es: {
+    "consent.revoked.title":"Plan desactivado",
+    "consent.revoked.body":"Has retirado el consentimiento para el tratamiento de datos de salud. DUBI no puede mostrar ni generar tu plan nutricional hasta que vuelvas a dar tu consentimiento.",
+    "consent.revoked.cta":"Reactivar consentimiento",
+    "consent.revoked.note":"Tus datos anteriores han sido anonimizados. Deberás completar el proceso de incorporación de nuevo para generar un nuevo plan.",
+    "consent.reconsent.redirect":"Consentimiento reactivado. Completa el proceso de incorporación para generar tu nuevo plan."
+  },
+  de: {
+    "consent.revoked.title":"Plan deaktiviert",
+    "consent.revoked.body":"Du hast die Einwilligung zur Verarbeitung von Gesundheitsdaten widerrufen. DUBI kann deinen Ernährungsplan erst wieder anzeigen oder erstellen, wenn du erneut einwilligst.",
+    "consent.revoked.cta":"Einwilligung reaktivieren",
+    "consent.revoked.note":"Deine bisherigen Daten wurden anonymisiert. Du musst das Onboarding erneut durchlaufen, um einen neuen Plan zu erstellen.",
+    "consent.reconsent.redirect":"Einwilligung reaktiviert. Schließe das Onboarding ab, um deinen neuen Plan zu erstellen."
+  },
+  ar: {
+    "consent.revoked.title":"الخطة معطّلة",
+    "consent.revoked.body":"لقد سحبت موافقتك على معالجة البيانات الصحية. لا تستطيع DUBI عرض خطتك الغذائية أو إنشاؤها حتى تمنح موافقتك مجددًا.",
+    "consent.revoked.cta":"إعادة تفعيل الموافقة",
+    "consent.revoked.note":"تم إخفاء هوية بياناتك السابقة. ستحتاج إلى إكمال عملية الإعداد مرة أخرى لإنشاء خطة جديدة.",
+    "consent.reconsent.redirect":"تمت إعادة تفعيل الموافقة. أكمل عملية الإعداد لإنشاء خطتك الجديدة."
+  },
+  pt: {
+    "consent.revoked.title":"Plano desativado",
+    "consent.revoked.body":"Retirou o consentimento para o tratamento de dados de saúde. A DUBI não pode mostrar ou gerar o seu plano nutricional até voltar a dar o seu consentimento.",
+    "consent.revoked.cta":"Reativar consentimento",
+    "consent.revoked.note":"Os seus dados anteriores foram anonimizados. Terá de completar o onboarding novamente para gerar um novo plano.",
+    "consent.reconsent.redirect":"Consentimento reativado. Complete o onboarding para gerar o seu novo plano."
+  },
+  zh: {
+    "consent.revoked.title":"计划已停用",
+    "consent.revoked.body":"您已撤回健康数据处理的同意。在您重新授权之前，DUBI 无法显示或生成您的营养计划。",
+    "consent.revoked.cta":"重新激活同意",
+    "consent.revoked.note":"您之前的数据已被匿名化。您需要重新完成引导流程以生成新计划。",
+    "consent.reconsent.redirect":"同意已重新激活。完成引导流程以生成您的新计划。"
+  },
+  ja: {
+    "consent.revoked.title":"プランが無効です",
+    "consent.revoked.body":"健康データの処理に関する同意を撤回しました。再度同意するまで、DUBI は栄養プランを表示または生成できません。",
+    "consent.revoked.cta":"同意を再有効化",
+    "consent.revoked.note":"以前のデータは匿名化されました。新しいプランを生成するには、再度オンボーディングを完了する必要があります。",
+    "consent.reconsent.redirect":"同意が再有効化されました。新しいプランを生成するにはオンボーディングを完了してください。"
+  },
+  ru: {
+    "consent.revoked.title":"План деактивирован",
+    "consent.revoked.body":"Вы отозвали согласие на обработку данных о здоровье. DUBI не может отображать или создавать ваш план питания до тех пор, пока вы не дадите согласие повторно.",
+    "consent.revoked.cta":"Повторно активировать согласие",
+    "consent.revoked.note":"Ваши предыдущие данные были обезличены. Для создания нового плана необходимо повторно пройти онбординг.",
+    "consent.reconsent.redirect":"Согласие повторно активировано. Завершите онбординг, чтобы создать новый план."
+  }
+};
+Object.entries(PROMPT27C_TRANSLATIONS).forEach(([code, additions]) => {
+  Object.assign(TRANSLATIONS[code] || (TRANSLATIONS[code] = {}), additions);
+});
+
 const PASSWORD_RESET_TRANSLATIONS = {
   it: {
     "auth.forgot.title":"Password dimenticata?",
@@ -15999,7 +16075,7 @@ const WearableStep = ({d,u,connectableWearables = VERIFIED_CONNECTABLE_WEARABLES
 );};
 
 const STEP_NAMES_KEYS = ["consent.gate.title","onb.steps.physical","onb.steps.goal","onb.steps.activity","onb.steps.preferences","onb.steps.wearable"];
-const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, onCancelEdit = () => {}, onMinorDetected = () => {}, onAgeRejected = () => {}, allowMinorOnboarding = false }) => {
+const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, onCancelEdit = () => {}, onMinorDetected = () => {}, onAgeRejected = () => {}, allowMinorOnboarding = false, notice = "" }) => {
   const { t, lang } = useT();
 
   const [step,setStep] = useState(0);
@@ -16186,6 +16262,12 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
         </div>
         <p style={{fontSize:12,fontWeight:500,color:T.muted,letterSpacing:1,marginBottom:6}}>{currentAbsPage + 1} / {TOTAL_PAGES}</p>
         <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:700,color:T.text,margin:0}}>{t(STEP_NAMES_KEYS[step])}</h2>
+        {notice && (
+          <div role="status" style={{marginTop:16,padding:"12px 14px",borderRadius:14,background:T.sel,border:`1px solid ${T.accent}`,display:"flex",alignItems:"flex-start",gap:9}}>
+            <Ico n="check" size={16} c={T.accentD}/>
+            <p style={{fontSize:12,fontWeight:700,color:T.accentD,lineHeight:1.5,margin:0}}>{notice}</p>
+          </div>
+        )}
       </div>
       <div style={{flex:1,padding:"24px 24px 130px",overflowY:"auto",overflowX:"hidden"}}>
         <div
@@ -16701,6 +16783,30 @@ const ANOMALY_CAUSE_OPTIONS = [
   { id: "menstrual_cycle", label: "Ciclo", detail: "Fase mestruale/ormonale" },
   { id: "none_reported", label: "Nulla di evidente", detail: "DUBI monitora 48-72 ore" },
 ];
+
+const ConsentRevokedPlanScreen = ({onOpenConsentSettings}) => {
+  const { t } = useT();
+  return (
+    <div style={{minHeight:"calc(100vh - 82px)",padding:"64px 24px 120px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{width:"100%",padding:"30px 24px",background:T.card,border:`1.5px solid ${T.border}`,borderRadius:24,boxShadow:"0 12px 34px rgba(43,43,43,.08)",textAlign:"center"}}>
+        <div style={{width:62,height:62,borderRadius:20,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px"}}>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={T.accentD} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <rect x="8.5" y="10.5" width="7" height="5.5" rx="1.3"/>
+            <path d="M10 10.5V9a2 2 0 014 0v1.5"/>
+          </svg>
+        </div>
+        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:25,fontWeight:800,color:T.text,margin:"0 0 12px"}}>{t("consent.revoked.title")}</h1>
+        <p style={{fontSize:14,color:T.muted,lineHeight:1.65,margin:"0 auto 22px",maxWidth:340}}>{t("consent.revoked.body")}</p>
+        <button onClick={onOpenConsentSettings}
+          style={{width:"100%",padding:"15px 18px",borderRadius:50,border:"none",background:T.accentD,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+          {t("consent.revoked.cta")}
+        </button>
+        <p style={{fontSize:11,color:T.muted,lineHeight:1.55,margin:"18px 4px 0"}}>{t("consent.revoked.note")}</p>
+      </div>
+    </div>
+  );
+};
 
 const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
@@ -19997,7 +20103,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
 // ═══════════════════════════════════════════════
 // SETTINGS SCREEN
 // ═══════════════════════════════════════════════
-const SettingsScreen = ({userData, setUserData, plan, setPlan, onLogout, onDeleteAccount, onEditOnboarding}) => {
+const SettingsScreen = ({userData, setUserData, plan, setPlan, onLogout, onDeleteAccount, onEditOnboarding, onHealthConsentReactivated}) => {
   const { t, lang, setLang } = useT();
   const { snapshot: wearableSnapshot, connection: wearableStatus, refreshSnapshot, clearSnapshot } = useWearable();
   const sx = getSettingsScreenCopy(lang);
@@ -20207,6 +20313,7 @@ const updateLocalConsent = (field, value) => {
   const updatedData = {...userData, [field]: Boolean(value), [camelField]: Boolean(value)};
   setUserData(updatedData);
   saveDubiProfile(updatedData);
+  return updatedData;
 };
 
 const handleHealthConsentToggle = async () => {
@@ -20223,8 +20330,9 @@ const handleHealthConsentToggle = async () => {
     setConsentMessage(t("set.edit.error"));
     return;
   }
-  updateLocalConsent("health_data_consent", true);
-  setConsentMessage(t("set.edit.success"));
+  const updatedData = updateLocalConsent("health_data_consent", true);
+  setConsentMessage(t("consent.reconsent.redirect"));
+  onHealthConsentReactivated?.(updatedData, t("consent.reconsent.redirect"));
 };
 
 const handleWearableConsentToggle = async () => {
@@ -20804,25 +20912,27 @@ const handleSaveProfile = async () => {
     )}
   </Card>
 
-  <SectionLabel lk="settings.privacy.section" />
-  <Card>
-    <ConsentToggle
-      label={t("settings.privacy.health.label")}
-      description={t("settings.privacy.health.desc")}
-      active={healthConsentActive}
-      onToggle={handleHealthConsentToggle}
-    />
-    <div style={{borderTop:`1px solid ${T.border}`}}>
+  <div id="settings-privacy-consents" style={{scrollMarginTop:24}}>
+    <SectionLabel lk="settings.privacy.section" />
+    <Card>
       <ConsentToggle
-        label={t("settings.privacy.wearable.label")}
-        description={t("settings.privacy.wearable.desc")}
-        active={wearableConsentActive}
-        onToggle={handleWearableConsentToggle}
+        label={t("settings.privacy.health.label")}
+        description={t("settings.privacy.health.desc")}
+        active={healthConsentActive}
+        onToggle={handleHealthConsentToggle}
       />
-    </div>
-  </Card>
+      <div style={{borderTop:`1px solid ${T.border}`}}>
+        <ConsentToggle
+          label={t("settings.privacy.wearable.label")}
+          description={t("settings.privacy.wearable.desc")}
+          active={wearableConsentActive}
+          onToggle={handleWearableConsentToggle}
+        />
+      </div>
+    </Card>
+  </div>
   {consentMessage && (
-    <p style={{margin:"10px 2px 0",fontSize:11,fontWeight:700,color:consentMessage===t("set.edit.success")?T.accentD:"#B91C1C",lineHeight:1.45}}>
+    <p style={{margin:"10px 2px 0",fontSize:11,fontWeight:700,color:[t("set.edit.success"),t("consent.reconsent.redirect")].includes(consentMessage)?T.accentD:"#B91C1C",lineHeight:1.45}}>
       {consentMessage}
     </p>
   )}
@@ -21697,6 +21807,28 @@ function DUBIApp() {
   const [userData,setUserData] = useState(null);
   const [plan,setPlan] = useState(null);
   const [activeTab,setActiveTab] = useState("today");
+  const [onboardingNotice,setOnboardingNotice] = useState("");
+  const healthDataConsentGranted = Boolean(userData?.health_data_consent ?? userData?.healthDataConsent);
+
+  const openConsentSettings = () => {
+    setActiveTab("settings");
+    window.setTimeout(() => {
+      document.getElementById("settings-privacy-consents")?.scrollIntoView({behavior:"smooth",block:"start"});
+    }, 100);
+  };
+
+  const handleHealthConsentReactivated = (updatedData, message) => {
+    setUserData(updatedData);
+    setOnboardingNotice(message);
+    setActiveTab("today");
+    setPhase("onboarding");
+  };
+
+  useEffect(() => {
+    if (!onboardingNotice) return undefined;
+    const timer = window.setTimeout(() => setOnboardingNotice(""), 8000);
+    return () => window.clearTimeout(timer);
+  }, [onboardingNotice]);
   useEffect(() => {
     if (resetToken) {
       window.history.replaceState({}, "", window.location.pathname || "/");
@@ -21975,6 +22107,7 @@ setPhase("free-beta");
 
         {phase==="onboarding" && (
   <OnboardingScreen
+    notice={onboardingNotice}
     onCancelEdit={() => {
   localStorage.removeItem("dubi_edit_onboarding");
   setPhase("app");
@@ -22068,8 +22201,12 @@ setPhase("free-beta");
           <>
             <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
             <div className="dubi-screen-motion" style={{height:"100vh",overflowY:"auto",position:"relative"}}>
-              {activeTab==="today"    && <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />}
-              {activeTab==="weekly"   && <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />}
+              {activeTab==="today"    && (healthDataConsentGranted
+                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />
+                : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
+              {activeTab==="weekly"   && (healthDataConsentGranted
+                ? <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />
+                : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
               {activeTab==="sources"  && <SourcesScreen userData={userData} lang={lang} />}
@@ -22081,6 +22218,7 @@ setPhase("free-beta");
     setPlan={setPlan}
     onLogout={handleLogout}
     onDeleteAccount={handleDeleteAccount}
+    onHealthConsentReactivated={handleHealthConsentReactivated}
     onEditOnboarding={() => {
   setActiveTab("today");
   setPhase("onboarding");
