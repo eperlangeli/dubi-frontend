@@ -21429,7 +21429,7 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [showTerms, setShowTerms] = React.useState(false);
   const [showHealthDisclaimer, setShowHealthDisclaimer] = React.useState(false);
   const [acceptingConsent, setAcceptingConsent] = React.useState(false);
-  const { lang } = useT();
+  const { t, lang } = useT();
   const privacyCopy = getPrivacyCopy(lang);
   const termsConsentText = getLegalConsent("terms", lang);
   const healthConsentText = getLegalConsent("healthData", lang);
