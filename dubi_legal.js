@@ -38,7 +38,7 @@
         + '<td>Dati account (nome, email); dati profilo e onboarding (et&agrave;, altezza, peso, obiettivi, allergie);'
         + ' dati sanitari (Art.&nbsp;9 GDPR &mdash; solo con consenso esplicito);'
         + ' dati wearable (solo se connessi dall&rsquo;utente);'
-        + ' dati tecnici (indirizzo IP, tipo dispositivo, sistema operativo);'
+        + ' dati tecnici (indirizzo IP, tipo dispositivo, sistema operativo, versione del browser);'
         + ' conversazioni &ldquo;Chiedi a DUBI&rdquo; (non conservate sui server DUBI)</td></tr>' +
         '<tr><td><strong>Perch&eacute; trattiamo i tuoi dati?</strong></td>'
         + '<td>Fornitura del servizio (esecuzione contratto);'
@@ -72,6 +72,7 @@
         '<p><strong>Dati di profilo e onboarding:</strong> data di nascita, sesso biologico, altezza, peso, obiettivo nutrizionale, tipo di sport, frequenza e timing degli allenamenti, preferenze alimentari, tipo di dieta, allergie e intolleranze.</p>' +
         '<p><strong>Dati sanitari (Art. 9 GDPR):</strong> i dati relativi ad allergie, intolleranze, obiettivi fisici e preferenze alimentari sono considerati dati relativi alla salute ai sensi dell&rsquo;Art. 9 GDPR. Se connetti un dispositivo wearable: frequenza cardiaca, HRV, qualità del sonno, calorie attive, passi, score di recupero.</p>' +
         '<p><strong>Dati di utilizzo:</strong> pasti registrati, aderenza al piano, feedback NPS, log di accesso.</p>' +
+        '<p><strong>Dati tecnici:</strong> indirizzo IP, tipo di dispositivo (smartphone/tablet/desktop), sistema operativo, versione del browser. Questi dati vengono registrati automaticamente dai nostri provider di infrastruttura (Supabase, Render) per garantire il corretto funzionamento e la sicurezza del servizio. Non raccogliamo dati di geolocalizzazione.</p>' +
         '<p><strong>Dati AI:</strong> se usi &ldquo;Chiedi a DUBI&rdquo;, il testo delle conversazioni è trasmesso a un provider AI terzo per generare la risposta. <strong>Lo storico non è conservato sui nostri server</strong>; può essere presente solo localmente sul tuo dispositivo (memoria del browser).</p>' +
 
         '<h3>3. Finalità e base giuridica</h3>' +
@@ -155,7 +156,7 @@
         + '<td>Account data (name, email); profile and onboarding data (age, height, weight, goals, allergies);'
         + ' health data (GDPR Art.&nbsp;9 &mdash; explicit consent only);'
         + ' wearable data (only if connected by you);'
-        + ' technical data (IP address, device type, OS);'
+        + ' technical data (IP address, device type, OS, browser version);'
         + ' &ldquo;Ask DUBI&rdquo; conversations (not stored on DUBI servers)</td></tr>' +
         '<tr><td><strong>Why do we process your data?</strong></td>'
         + '<td>Service delivery (performance of contract);'
@@ -189,6 +190,7 @@
         '<p><strong>Profile and onboarding data:</strong> date of birth, biological sex, height, weight, nutritional goal, sport type, training frequency and timing, dietary preferences, diet type, food allergies and intolerances.</p>' +
         '<p><strong>Health data (Art. 9 GDPR):</strong> data relating to allergies, intolerances, physical goals and dietary preferences are considered health-related data under GDPR Art. 9. If you connect a wearable: heart rate, HRV, sleep quality, active calories, steps, recovery scores.</p>' +
         '<p><strong>Usage data:</strong> logged meals, plan adherence, NPS feedback, access logs.</p>' +
+        '<p><strong>Technical data:</strong> IP address, device type (smartphone/tablet/desktop), operating system, browser version. This data is automatically logged by our infrastructure providers (Supabase, Render) to ensure proper service operation and security. We do not collect geolocation data.</p>' +
         '<p><strong>AI data:</strong> if you use &ldquo;Ask DUBI&rdquo;, conversation text is transmitted to a third-party AI provider to generate a response. <strong>History is not stored on our servers</strong>; it may exist only locally on your device (browser storage).</p>' +
 
         '<h3>3. Purposes and legal basis</h3>' +
