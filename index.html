@@ -614,29 +614,61 @@ const BREAKFAST_APP_MAP = { sweet: "dolce", savory: "salata", both: "entrambi", 
 const toCanonicalBreakfast = (value) => canonicalFromMap(value, BREAKFAST_CANONICAL_MAP, "both");
 const toAppBreakfast = (value) => BREAKFAST_APP_MAP[toCanonicalBreakfast(value)] || "entrambi";
 
-const SPORT_KEYS = ["gym", "running", "cycling", "swimming", "yoga", "crossfit", "football", "tennis", "other"];
+const SPORT_KEYS = [
+  // endurance
+  "running","cycling","swimming","triathlon","rowing","kayak","nordic_ski",
+  // team sport
+  "football","basketball","volleyball","tennis","padel","rugby","hockey","handball","baseball","alpine_ski","surf","fencing",
+  // strength
+  "gym","crossfit","powerlifting","climbing","boxing","martial_arts","wrestling","judo","mma","gymnastics","sprint",
+  // low intensity
+  "yoga","pilates","golf","archery","equestrian","dance",
+  // other
+  "other"
+];
 const SPORT_CANONICAL_MAP = {
-  palestra: "gym",
-  gym: "gym",
-  "weight training": "gym",
-  bodybuilding: "gym",
-  corsa: "running",
-  running: "running",
-  run: "running",
-  ciclismo: "cycling",
-  bici: "cycling",
-  cycling: "cycling",
-  bike: "cycling",
-  nuoto: "swimming",
-  swimming: "swimming",
-  yoga: "yoga",
-  crossfit: "crossfit",
-  calcio: "football",
-  football: "football",
-  soccer: "football",
-  tennis: "tennis",
-  altro: "other",
-  other: "other"
+  // endurance
+  corsa:"running", running:"running", run:"running", maratona:"running", marathon:"running", mezzofondo:"running",
+  ciclismo:"cycling", bici:"cycling", cycling:"cycling", bike:"cycling",
+  nuoto:"swimming", swimming:"swimming",
+  triathlon:"triathlon",
+  canottaggio:"rowing", rowing:"rowing",
+  canoa:"kayak", kayak:"kayak",
+  "sci di fondo":"nordic_ski", "nordic ski":"nordic_ski",
+  // team sport
+  calcio:"football", football:"football", soccer:"football",
+  basket:"basketball", basketball:"basketball",
+  pallavolo:"volleyball", volleyball:"volleyball",
+  tennis:"tennis",
+  padel:"padel",
+  rugby:"rugby",
+  hockey:"hockey",
+  handball:"handball", pallamano:"handball",
+  baseball:"baseball",
+  "sci alpino":"alpine_ski", "alpine skiing":"alpine_ski", sci:"alpine_ski",
+  surf:"surf", kitesurf:"surf",
+  scherma:"fencing", fencing:"fencing",
+  // strength
+  palestra:"gym", gym:"gym", "weight training":"gym", bodybuilding:"gym",
+  crossfit:"crossfit",
+  powerlifting:"powerlifting",
+  arrampicata:"climbing", climbing:"climbing", bouldering:"climbing",
+  boxe:"boxing", boxing:"boxing", pugilato:"boxing",
+  "arti marziali":"martial_arts", karate:"martial_arts", taekwondo:"martial_arts", "martial arts":"martial_arts",
+  lotta:"wrestling", wrestling:"wrestling",
+  judo:"judo",
+  mma:"mma",
+  ginnastica:"gymnastics", gymnastics:"gymnastics", "ginnastica artistica":"gymnastics",
+  sprint:"sprint",
+  // low intensity
+  yoga:"yoga",
+  pilates:"pilates",
+  golf:"golf",
+  "tiro con larco":"archery", "tiro con l arco":"archery", archery:"archery",
+  equitazione:"equestrian", "horse riding":"equestrian", equestrian:"equestrian",
+  danza:"dance", dance:"dance", "danza classica":"dance", balletto:"dance", ballet:"dance",
+  // other
+  altro:"other", other:"other"
 };
 const toCanonicalSport = (value) => {
   const normalized = canonicalFromMap(value, SPORT_CANONICAL_MAP, "");
@@ -7068,15 +7100,7 @@ const FINAL_AUDIT_TRANSLATIONS = {
     "diet.pescatarian":"Pescatarian",
     "diet.vegetarian":"Vegetarian",
     "diet.vegan":"Vegan",
-    "sport.gym":"Gym",
-    "sport.running":"Running",
-    "sport.cycling":"Cycling",
-    "sport.swimming":"Swimming",
-    "sport.yoga":"Yoga",
-    "sport.crossfit":"CrossFit",
-    "sport.football":"Football",
-    "sport.tennis":"Tennis",
-    "sport.other":"Other",
+    "sport.running":"Running","sport.cycling":"Cycling","sport.swimming":"Swimming","sport.triathlon":"Triathlon","sport.rowing":"Rowing","sport.kayak":"Canoe/Kayak","sport.nordic_ski":"Nordic Ski","sport.football":"Soccer","sport.basketball":"Basketball","sport.volleyball":"Volleyball","sport.tennis":"Tennis","sport.padel":"Padel","sport.rugby":"Rugby","sport.hockey":"Hockey","sport.handball":"Handball","sport.baseball":"Baseball","sport.alpine_ski":"Alpine Ski","sport.surf":"Surf","sport.fencing":"Fencing","sport.gym":"Gym","sport.crossfit":"CrossFit","sport.powerlifting":"Powerlifting","sport.climbing":"Climbing","sport.boxing":"Boxing","sport.martial_arts":"Martial Arts","sport.wrestling":"Wrestling","sport.judo":"Judo","sport.mma":"MMA","sport.gymnastics":"Gymnastics","sport.sprint":"Sprint","sport.yoga":"Yoga","sport.pilates":"Pilates","sport.golf":"Golf","sport.archery":"Archery","sport.equestrian":"Equestrian","sport.dance":"Dance","sport.other":"Other",
     "allergy.egg":"Egg",
     "allergy.gluten":"Gluten",
     "allergy.dairy":"Dairy",
@@ -7131,15 +7155,7 @@ const FINAL_AUDIT_TRANSLATIONS = {
     "diet.pescatarian":"Pescetariano",
     "diet.vegetarian":"Vegetariano",
     "diet.vegan":"Vegano",
-    "sport.gym":"Palestra",
-    "sport.running":"Corsa",
-    "sport.cycling":"Ciclismo",
-    "sport.swimming":"Nuoto",
-    "sport.yoga":"Yoga",
-    "sport.crossfit":"CrossFit",
-    "sport.football":"Calcio",
-    "sport.tennis":"Tennis",
-    "sport.other":"Altro",
+    "sport.running":"Corsa","sport.cycling":"Ciclismo","sport.swimming":"Nuoto","sport.triathlon":"Triathlon","sport.rowing":"Canottaggio","sport.kayak":"Canoa/Kayak","sport.nordic_ski":"Sci di Fondo","sport.football":"Calcio","sport.basketball":"Basket","sport.volleyball":"Pallavolo","sport.tennis":"Tennis","sport.padel":"Padel","sport.rugby":"Rugby","sport.hockey":"Hockey","sport.handball":"Handball","sport.baseball":"Baseball","sport.alpine_ski":"Sci Alpino","sport.surf":"Surf","sport.fencing":"Scherma","sport.gym":"Palestra","sport.crossfit":"CrossFit","sport.powerlifting":"Powerlifting","sport.climbing":"Arrampicata","sport.boxing":"Boxe","sport.martial_arts":"Arti Marziali","sport.wrestling":"Lotta","sport.judo":"Judo","sport.mma":"MMA","sport.gymnastics":"Ginnastica","sport.sprint":"Sprint","sport.yoga":"Yoga","sport.pilates":"Pilates","sport.golf":"Golf","sport.archery":"Tiro con l'Arco","sport.equestrian":"Equitazione","sport.dance":"Danza","sport.other":"Altro",
     "allergy.egg":"Uovo",
     "allergy.gluten":"Glutine",
     "allergy.dairy":"Latte/lattosio",
@@ -7165,7 +7181,7 @@ const FINAL_AUDIT_TRANSLATIONS = {
     "intensity.high":"Alta"
   },
   fr: {
-    "sidebar.tagline":"Plan, suivi et support","home.training.title":"Entrainement du jour","home.training.timingMessage":"Confirme l'horaire : DUBI utilise {timing} pour placer glucides et repas.","home.training.updating":"Mise a jour du plan autour de l'entrainement...","wearable.connected.message":"{provider} connecte. Des que le fournisseur envoie les donnees, DUBI les utilise ici et dans le plan.","wearable.notConnected.message":"Ton plan fonctionne aussi sans wearable : connecte-en un pour des adaptations automatiques.","wearable.partialData.message":"Donnees partielles recues. DUBI affiche et utilise seulement les signaux fournis.","wearable.unavailable.message":"Non fourni par {provider}","wearable.status.none":"Non connecte","wearable.status.partial":"Donnees partielles","wearable.connect.prompt":"Connecte un wearable pour activer","home.calories.lossEstimate":"~{rate} kg/semaine de perte · plage ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semaine de gain · plage ACSM 0,1-0,5 kg","nav.today.subtitle":"Suivi","nav.weekly.subtitle":"Plan complet","nav.shopping.subtitle":"Courses","nav.progress.subtitle":"Progres","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Perte de gras","goal.muscleGain":"Prise musculaire","goal.maintenance":"Maintien","goal.definition":"Definition","meal.macroAnomaly":"Anomalie macro","meal.eaten":"Mange","diet.omnivore":"Omnivore","diet.pescatarian":"Pescetarien","diet.vegetarian":"Vegetarien","diet.vegan":"Vegan","sport.gym":"Salle","sport.running":"Course","sport.cycling":"Cyclisme","sport.swimming":"Natation","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Football","sport.tennis":"Tennis","sport.other":"Autre","allergy.egg":"Oeuf","allergy.gluten":"Gluten","allergy.dairy":"Lait/lactose","allergy.nuts":"Fruits a coque","allergy.shellfish":"Crustaces","allergy.soy":"Soja","allergy.sesame":"Sesame","allergy.fish":"Poisson","allergy.addCustom":"Ajouter custom","allergy.customPlaceholder":"Allergie ou condition","allergy.noneSelected":"Aucune allergie selectionnee","breakfast.both":"Les deux","breakfast.sweet":"Sucre","breakfast.savory":"Sale","breakfast.none":"Aucun","training.timing.morning":"Matin","training.timing.lunch":"Dejeuner","training.timing.afternoon":"Apres-midi","training.timing.evening":"Soir","training.timing.varies":"Variable","intensity.low":"Basse","intensity.moderate":"Moderee","intensity.high":"Elevee"
+    "sidebar.tagline":"Plan, suivi et support","home.training.title":"Entrainement du jour","home.training.timingMessage":"Confirme l'horaire : DUBI utilise {timing} pour placer glucides et repas.","home.training.updating":"Mise a jour du plan autour de l'entrainement...","wearable.connected.message":"{provider} connecte. Des que le fournisseur envoie les donnees, DUBI les utilise ici et dans le plan.","wearable.notConnected.message":"Ton plan fonctionne aussi sans wearable : connecte-en un pour des adaptations automatiques.","wearable.partialData.message":"Donnees partielles recues. DUBI affiche et utilise seulement les signaux fournis.","wearable.unavailable.message":"Non fourni par {provider}","wearable.status.none":"Non connecte","wearable.status.partial":"Donnees partielles","wearable.connect.prompt":"Connecte un wearable pour activer","home.calories.lossEstimate":"~{rate} kg/semaine de perte · plage ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semaine de gain · plage ACSM 0,1-0,5 kg","nav.today.subtitle":"Suivi","nav.weekly.subtitle":"Plan complet","nav.shopping.subtitle":"Courses","nav.progress.subtitle":"Progres","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Perte de gras","goal.muscleGain":"Prise musculaire","goal.maintenance":"Maintien","goal.definition":"Definition","meal.macroAnomaly":"Anomalie macro","meal.eaten":"Mange","diet.omnivore":"Omnivore","diet.pescatarian":"Pescetarien","diet.vegetarian":"Vegetarien","diet.vegan":"Vegan","sport.running":"Course","sport.cycling":"Cyclisme","sport.swimming":"Natation","sport.triathlon":"Triathlon","sport.rowing":"Aviron","sport.kayak":"Canoë/Kayak","sport.nordic_ski":"Ski de Fond","sport.football":"Football","sport.basketball":"Basketball","sport.volleyball":"Volleyball","sport.tennis":"Tennis","sport.padel":"Padel","sport.rugby":"Rugby","sport.hockey":"Hockey","sport.handball":"Handball","sport.baseball":"Baseball","sport.alpine_ski":"Ski Alpin","sport.surf":"Surf","sport.fencing":"Escrime","sport.gym":"Salle","sport.crossfit":"CrossFit","sport.powerlifting":"Powerlifting","sport.climbing":"Escalade","sport.boxing":"Boxe","sport.martial_arts":"Arts Martiaux","sport.wrestling":"Lutte","sport.judo":"Judo","sport.mma":"MMA","sport.gymnastics":"Gymnastique","sport.sprint":"Sprint","sport.yoga":"Yoga","sport.pilates":"Pilates","sport.golf":"Golf","sport.archery":"Tir à l'Arc","sport.equestrian":"Équitation","sport.dance":"Danse","sport.other":"Autre","allergy.egg":"Oeuf","allergy.gluten":"Gluten","allergy.dairy":"Lait/lactose","allergy.nuts":"Fruits a coque","allergy.shellfish":"Crustaces","allergy.soy":"Soja","allergy.sesame":"Sesame","allergy.fish":"Poisson","allergy.addCustom":"Ajouter custom","allergy.customPlaceholder":"Allergie ou condition","allergy.noneSelected":"Aucune allergie selectionnee","breakfast.both":"Les deux","breakfast.sweet":"Sucre","breakfast.savory":"Sale","breakfast.none":"Aucun","training.timing.morning":"Matin","training.timing.lunch":"Dejeuner","training.timing.afternoon":"Apres-midi","training.timing.evening":"Soir","training.timing.varies":"Variable","intensity.low":"Basse","intensity.moderate":"Moderee","intensity.high":"Elevee"
   },
   es: {
     "sidebar.tagline":"Plan, seguimiento y soporte","home.training.title":"Entrenamiento de hoy","home.training.timingMessage":"Confirma la hora: DUBI usa {timing} para colocar carbohidratos y comidas.","home.training.updating":"Actualizando el plan alrededor del entrenamiento...","wearable.connected.message":"{provider} conectado. Cuando el proveedor envie datos, DUBI los usara aqui y en el plan.","wearable.notConnected.message":"Tu plan tambien funciona sin wearable: conecta uno para adaptaciones automaticas.","wearable.partialData.message":"Datos parciales recibidos. DUBI solo muestra y usa senales suministradas.","wearable.unavailable.message":"No proporcionado por {provider}","wearable.status.none":"No conectado","wearable.status.partial":"Datos parciales","wearable.connect.prompt":"Conecta un wearable para activar","home.calories.lossEstimate":"~{rate} kg/semana de perdida · rango ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganancia · rango ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plan completo","nav.shopping.subtitle":"Compra","nav.progress.subtitle":"Progreso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perdida de grasa","goal.muscleGain":"Ganancia muscular","goal.maintenance":"Mantenimiento","goal.definition":"Definicion","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Gimnasio","sport.running":"Correr","sport.cycling":"Ciclismo","sport.swimming":"Natacion","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futbol","sport.tennis":"Tenis","sport.other":"Otro","allergy.egg":"Huevo","allergy.gluten":"Gluten","allergy.dairy":"Leche/lactosa","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.fish":"Pescado","allergy.addCustom":"Anadir custom","allergy.customPlaceholder":"Alergia o condicion","allergy.noneSelected":"Ninguna alergia seleccionada","breakfast.both":"Ambos","breakfast.sweet":"Dulce","breakfast.savory":"Salado","breakfast.none":"Ninguno","training.timing.morning":"Manana","training.timing.lunch":"Almuerzo","training.timing.afternoon":"Tarde","training.timing.evening":"Noche","training.timing.varies":"Variable","intensity.low":"Baja","intensity.moderate":"Moderada","intensity.high":"Alta"
@@ -16017,7 +16033,7 @@ const AllergyChipPicker = ({ value, onChange, compact = false }) => {
 };
 
 const SportChipPicker = ({ value, onChange, compact = false }) => {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [custom, setCustom] = React.useState("");
   const selected = toCanonicalSport(value);
   const addCustom = () => {
@@ -16026,23 +16042,48 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
     onChange(clean);
     setCustom("");
   };
+  const SPORT_GROUPS_UI = [
+    { label:{it:"ENDURANCE",en:"ENDURANCE",fr:"ENDURANCE"}, keys:["running","cycling","swimming","triathlon","rowing","kayak","nordic_ski"] },
+    { label:{it:"SPORT DI SQUADRA",en:"TEAM SPORT",fr:"SPORT D'ÉQUIPE"}, keys:["football","basketball","volleyball","tennis","padel","rugby","hockey","handball","baseball","alpine_ski","surf","fencing"] },
+    { label:{it:"FORZA / COMBATTIMENTO",en:"STRENGTH / COMBAT",fr:"FORCE / COMBAT"}, keys:["gym","crossfit","powerlifting","climbing","boxing","martial_arts","wrestling","judo","mma","gymnastics","sprint"] },
+    { label:{it:"BENESSERE",en:"WELLNESS",fr:"BIEN-ÊTRE"}, keys:["yoga","pilates","golf","archery","equestrian","dance"] },
+  ];
   return (
     <div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-        {SPORT_KEYS.map(key => {
-          const active = selected === key;
-          return (
-            <button key={key} onClick={() => onChange(key)}
-              style={{padding:compact ? "8px 10px" : "10px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:12,fontWeight:800,cursor:"pointer"}}>
-              {getSportLabel(key, t)}
-            </button>
-          );
-        })}
+      {SPORT_GROUPS_UI.map(group => (
+        <div key={group.label.en} style={{marginBottom:compact?8:12}}>
+          <p style={{fontSize:9,fontWeight:900,color:T.muted,letterSpacing:1,margin:"0 0 6px 2px"}}>
+            {group.label[lang] || group.label.en}
+          </p>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {group.keys.map(key => {
+              const active = selected === key;
+              return (
+                <button key={key} onClick={() => onChange(key)}
+                  style={{padding:compact?"6px 10px":"9px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:11,fontWeight:800,cursor:"pointer"}}>
+                  {t(`sport.${key}`)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {/* Chip Altro */}
+      <div style={{marginBottom:compact?8:12}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {["other"].map(key => {
+            const active = selected === key;
+            return (
+              <button key={key} onClick={() => onChange(key)}
+                style={{padding:compact?"6px 10px":"9px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:11,fontWeight:800,cursor:"pointer"}}>
+                {t(`sport.${key}`)}
+              </button>
+            );
+          })}
+        </div>
       </div>
       {!SPORT_KEYS.includes(selected) && selected && (
-        <p style={{fontSize:11,color:T.accentD,margin:"8px 2px 0",fontWeight:800}}>
-          {selected}
-        </p>
+        <p style={{fontSize:11,color:T.accentD,margin:"8px 2px 0",fontWeight:800}}>{selected}</p>
       )}
       <div style={{display:"flex",gap:8,marginTop:10}}>
         <input value={custom} onChange={e=>setCustom(e.target.value)} placeholder={t("pref.sport.ph")}
@@ -16056,7 +16097,6 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
     </div>
   );
 };
-
 const HealthDataConsentPrompt = ({accepted, onChange}) => {
   const { lang, t } = useT();
   return (
