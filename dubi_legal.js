@@ -102,6 +102,7 @@
         '<h3>5. Conservazione</h3>' +
         '<ul>' +
         '<li><strong>Dati sanitari e biometrici:</strong> anonimizzati immediatamente su revoca del consenso</li>' +
+        '<li>Storico peso, progressi e piani nutrizionali: cancellati entro 30 giorni dalla revoca del consenso salute, se il consenso non &egrave; riattivato entro tale periodo &mdash; in linea con le tempistiche GDPR per la gestione post-revoca del trattamento</li>' +
         '<li>Dati di account (email, nome): fino alla cancellazione account + 24 mesi</li>' +
         '<li>Dati wearable: fino alla disconnessione + 30 giorni</li>' +
         '<li>Log di accesso: 90 giorni</li>' +
@@ -221,6 +222,7 @@
         '<h3>5. Retention</h3>' +
         '<ul>' +
         '<li><strong>Health and biometric data:</strong> anonymised immediately upon consent withdrawal</li>' +
+        '<li>Weight history, progress and nutrition plans: deleted within 30 days of health consent withdrawal, if consent is not re-granted within that period &mdash; in line with GDPR timelines for post-revocation processing</li>' +
         '<li>Account data (email, name): until account deletion + 24 months</li>' +
         '<li>Wearable data: until disconnection + 30 days</li>' +
         '<li>Access logs: 90 days</li>' +
