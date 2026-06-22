@@ -46,7 +46,8 @@
         '<li>Adattamento piano con dati wearable &rarr; consenso esplicito (GDPR Art. 6.1.a + Art. 9.2.a | UAE PDPL Art. 6)</li>' +
         '<li>Dati sanitari &rarr; consenso esplicito (GDPR Art. 9.2.a | UAE PDPL Art. 6 | CCPA &sect;1798.121)</li>' +
         '<li>Sicurezza &rarr; legittimo interesse (GDPR Art. 6.1.f)</li>' +
-        '<li>Ricerca e sviluppo &rarr; dati aggregati e anonimizzati (GDPR Art. 9.2.j + Considerando 26 | CCPA &sect;1798.145(a)(5))</li>' +
+        '<li>Ricerca e sviluppo (aggregati anonimi) &rarr; legittimo interesse (GDPR Art. 6.1.f + Considerando 26 &mdash; fuori scope GDPR | CCPA &sect;1798.145(a)(5))</li>' +
+        '<li>Ricerca longitudinale su dati pseudonimizzati &rarr; consenso esplicito separato e facoltativo (<em>research_consent</em>, GDPR Art. 9.2.a) &mdash; opzionale, non condiziona l&rsquo;accesso al servizio</li>' +
         '</ul>' +
         '<p><strong>Non utilizziamo i tuoi dati personali per finalità pubblicitarie e non li vendiamo.</strong> Dati aggregati e anonimizzati &mdash; non riconducibili a nessun individuo &mdash; possono essere utilizzati a fini statistici e di ricerca interna.</p>' +
 
@@ -55,6 +56,7 @@
         '<ul>' +
         '<li><strong>Supabase Inc.</strong> (USA) &mdash; database e storage</li>' +
         '<li><strong>Render Inc.</strong> (USA) &mdash; hosting server backend</li>' +
+        '<li><strong>Resend Inc.</strong> (USA) &mdash; invio email transazionali (conferma account, notifiche di servizio)</li>' +
         '<li><strong>Provider AI</strong> &mdash; elaborazione linguistica per &ldquo;Chiedi a DUBI&rdquo; (solo se attiva; il provider specifico è indicato nell&rsquo;informativa aggiornata)</li>' +
         '<li><strong>USDA FoodData Central</strong> (USA) &mdash; database nutrizionale pubblico, nessun dato personale</li>' +
         '<li><strong>WHOOP / Garmin / Strava</strong> &mdash; dati wearable (solo se connessi dall&rsquo;utente)</li>' +
@@ -69,6 +71,8 @@
         '<li>Log di accesso: 90 giorni</li>' +
         '<li>Storico &ldquo;Chiedi a DUBI&rdquo;: non conservato sui server DUBI</li>' +
         '<li>Dati aderenza e feedback: fino alla cancellazione account</li>' +
+        '<li>Dati di ricerca aggregati anonimi (<em>research_aggregates</em>): conservati indefinitamente &mdash; sono dati anonimi fuori scope GDPR (Considerando 26); nessun individuo è identificabile</li>' +
+        '<li>Dati di ricerca pseudonimizzati (<em>research_data_snapshots</em>, <em>research_longitudinal</em>): conservati per la durata del <em>research_consent</em>; cancellati entro 30 giorni dalla revoca del consenso o dalla cancellazione dell&rsquo;account</li>' +
         '</ul>' +
 
         '<h3>6. I tuoi diritti</h3>' +
@@ -76,7 +80,7 @@
         '<ul>' +
         '<li><strong>Accesso (Art. 15 GDPR)</strong> &mdash; richiedere copia di tutti i dati che conserviamo su di te</li>' +
         '<li><strong>Rettifica (Art. 16)</strong> &mdash; correggere dati inesatti o incompleti</li>' +
-        '<li><strong>Cancellazione / diritto all&rsquo;oblio (Art. 17)</strong> &mdash; richiedere l&rsquo;eliminazione completa</li>' +
+        '<li><strong>Cancellazione / diritto all&rsquo;oblio (Art. 17)</strong> &mdash; richiedere l&rsquo;eliminazione completa. <em>Eccezione (Art. 17.3.d GDPR)</em>: i dati pseudonimizzati trattati con <em>research_consent</em> possono essere conservati in forma ulteriormente anonimizzata per finalità di ricerca scientifica nei limiti strettamente necessari (Art. 89 GDPR); revocare il <em>research_consent</em> dalle impostazioni produce l&rsquo;eliminazione completa entro 30 giorni</li>' +
         '<li><strong>Limitazione (Art. 18)</strong> &mdash; sospendere il trattamento senza cancellare i dati</li>' +
         '<li><strong>Portabilità (Art. 20)</strong> &mdash; ricevere i tuoi dati in formato leggibile da macchina</li>' +
         '<li><strong>Opposizione (Art. 21)</strong> &mdash; opporti al trattamento basato su legittimo interesse</li>' +
@@ -91,6 +95,7 @@
         '<li>Comunicazioni cifrate via HTTPS/TLS</li>' +
         '<li>Token di accesso wearable non esposti al frontend; ove conservati da DUBI saranno cifrati, altrimenti gestiti direttamente dal provider wearable</li>' +
         '<li>Database protetto tramite Row-Level Security (Supabase RLS)</li>' +
+        '<li>Dati di ricerca pseudonimizzati tramite <strong>HMAC-SHA-256</strong> con salt separato (<em>RESEARCH_SALT</em>), conservato esclusivamente in variabile d&rsquo;ambiente sul server &mdash; mai nel database; la re-identificazione è tecnicamente impossibile senza il salt</li>' +
         '</ul>' +
 
         '<h3>8. Minori</h3>' +
@@ -123,7 +128,8 @@
         '<li>Plan adaptation with wearable data &rarr; explicit consent (GDPR Art. 6.1.a + Art. 9.2.a | UAE PDPL Art. 6)</li>' +
         '<li>Health data &rarr; explicit consent (GDPR Art. 9.2.a | UAE PDPL Art. 6 | CCPA &sect;1798.121)</li>' +
         '<li>Security &rarr; legitimate interest (GDPR Art. 6.1.f)</li>' +
-        '<li>Research &amp; development &rarr; anonymised aggregate data (GDPR Art. 9.2.j + Recital 26 | CCPA &sect;1798.145(a)(5))</li>' +
+        '<li>Research &amp; development (anonymous aggregates) &rarr; legitimate interest (GDPR Art. 6.1.f + Recital 26 &mdash; outside GDPR scope | CCPA &sect;1798.145(a)(5))</li>' +
+        '<li>Longitudinal research on pseudonymised data &rarr; separate and optional explicit consent (<em>research_consent</em>, GDPR Art. 9.2.a) &mdash; optional, does not condition access to the service</li>' +
         '</ul>' +
         '<p><strong>We do not use your personal data for advertising and we do not sell it.</strong> Aggregated and anonymised data &mdash; not attributable to any individual &mdash; may be used for statistical and internal research purposes.</p>' +
 
@@ -132,6 +138,7 @@
         '<ul>' +
         '<li><strong>Supabase Inc.</strong> (USA) &mdash; database and storage</li>' +
         '<li><strong>Render Inc.</strong> (USA) &mdash; backend server hosting</li>' +
+        '<li><strong>Resend Inc.</strong> (USA) &mdash; transactional email delivery (account confirmation, service notifications)</li>' +
         '<li><strong>AI provider</strong> &mdash; language processing for &ldquo;Ask DUBI&rdquo; (only if active; the specific provider is listed in the current version of this policy)</li>' +
         '<li><strong>USDA FoodData Central</strong> (USA) &mdash; public nutritional database, no personal data</li>' +
         '<li><strong>WHOOP / Garmin / Strava</strong> &mdash; wearable data (only if connected by user)</li>' +
@@ -146,6 +153,8 @@
         '<li>Access logs: 90 days</li>' +
         '<li>&ldquo;Ask DUBI&rdquo; history: not stored on DUBI servers</li>' +
         '<li>Adherence and feedback: until account deletion</li>' +
+        '<li>Anonymous research aggregates (<em>research_aggregates</em>): retained indefinitely &mdash; these are anonymous data outside GDPR scope (Recital 26); no individual is identifiable</li>' +
+        '<li>Pseudonymised research data (<em>research_data_snapshots</em>, <em>research_longitudinal</em>): retained for the duration of <em>research_consent</em>; deleted within 30 days of consent withdrawal or account deletion</li>' +
         '</ul>' +
 
         '<h3>6. Your rights</h3>' +
@@ -153,7 +162,7 @@
         '<ul>' +
         '<li><strong>Access (Art. 15 GDPR)</strong> &mdash; request a copy of all data we hold about you</li>' +
         '<li><strong>Rectification (Art. 16)</strong> &mdash; correct inaccurate or incomplete data</li>' +
-        '<li><strong>Erasure / right to be forgotten (Art. 17)</strong> &mdash; request complete deletion</li>' +
+        '<li><strong>Erasure / right to be forgotten (Art. 17)</strong> &mdash; request complete deletion. <em>Exception (Art. 17.3.d GDPR)</em>: pseudonymised data processed under <em>research_consent</em> may be retained in further anonymised form for scientific research purposes to the extent strictly necessary (Art. 89 GDPR); withdrawing <em>research_consent</em> from settings triggers full deletion within 30 days</li>' +
         '<li><strong>Restriction (Art. 18)</strong> &mdash; suspend processing without deleting data</li>' +
         '<li><strong>Portability (Art. 20)</strong> &mdash; receive your data in a machine-readable format</li>' +
         '<li><strong>Objection (Art. 21)</strong> &mdash; object to processing based on legitimate interest</li>' +
@@ -168,6 +177,7 @@
         '<li>HTTPS/TLS encryption for all communications</li>' +
         '<li>Wearable access tokens not exposed to the frontend; where stored by DUBI they will be encrypted, otherwise managed directly by the wearable provider</li>' +
         '<li>Database access protected via Row-Level Security (Supabase RLS)</li>' +
+        '<li>Research data pseudonymised via <strong>HMAC-SHA-256</strong> with a separate salt (<em>RESEARCH_SALT</em>), stored exclusively as a server-side environment variable &mdash; never in the database; re-identification is technically impossible without the salt</li>' +
         '</ul>' +
 
         '<h3>8. Children and minors</h3>' +
