@@ -775,6 +775,7 @@ const getPlanProfileSignature = (userData = {}) => {
       ? data.wearables
       : String(data.wearable_provider ?? data.wearable ?? "none").split(",").filter(Boolean),
     wearableConsent: Boolean(data.wearable_consent ?? data.wearableConsent),
+    researchConsent: Boolean(data.research_consent ?? data.researchConsent ?? false),
     isMinor: Boolean(data.is_minor ?? data.isMinor),
     guardianEmail: data.guardian_email ?? data.guardianEmail ?? null,
     parentalConsentStatus: data.parental_consent_status ?? data.parentalConsentStatus ?? "not_required",
@@ -1006,7 +1007,8 @@ const saveOnboardingToBackend = async (data) => {
     terms_version: data.termsVersion || null,
     health_disclaimer_version: data.healthDisclaimerVersion || null,
     legal_accepted_at: data.legalAcceptedAt || data.privacyAcceptedAt || null,
-    health_data_consent_at: data.healthDataConsentAt || data.privacyAcceptedAt || null
+    health_data_consent_at: data.healthDataConsentAt || data.privacyAcceptedAt || null,
+    research_consent: Boolean(data.researchConsent ?? false)
   };
 
   try {
@@ -8947,6 +8949,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"Hai autorizzato DUBI a trattare i tuoi dati fisici e nutrizionali. Puoi revocare il consenso in qualsiasi momento.",
     "settings.privacy.wearable.label":"Consenso dati wearable",
     "settings.privacy.wearable.desc":"DUBI usa i dati del tuo wearable per personalizzare il piano. Puoi revocare il consenso in qualsiasi momento.",
+    "settings.privacy.research.label":"Consenso ricerca dati (Art. 9.2.a GDPR)",
+    "settings.privacy.research.desc":"Consenti l'uso dei tuoi dati pseudonimizzati per la ricerca interna di DUBI. Puoi cambiare idea in qualsiasi momento.",
+    "consent.research.title":"Aiuta DUBI a migliorare",
+    "consent.research.short":"Consenti l'uso dei tuoi dati per la ricerca interna del servizio. Puoi cambiare idea in qualsiasi momento.",
+    "consent.research.more":"I dati vengono pseudonimizzati con HMAC-SHA-256 prima della raccolta: non contengono nome, email o identificatori diretti. Utilizzati esclusivamente per ricerca interna e miglioramento del servizio, mai ceduti a terzi. Puoi revocare il consenso in qualsiasi momento dalle Impostazioni senza effetti sull'accesso al piano.",
     "trend.manual.estimateUpdated":"Stima aggiornata: TDEE {tdee} kcal, piano {calories} kcal.",
     "trend.manual.update":"Aggiorna stima e piano",
     "profile.targetWeight.required":"Prima di aggiornare il piano, inserisci il peso target: DUBI potrà così comprendere la direzione reale del tuo obiettivo.",
@@ -8988,6 +8995,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"You have authorised DUBI to process your physical and nutritional data. You can withdraw consent at any time.",
     "settings.privacy.wearable.label":"Wearable data consent",
     "settings.privacy.wearable.desc":"DUBI uses your wearable data to personalise your plan. You can withdraw consent at any time.",
+    "settings.privacy.research.label":"Research data consent (GDPR Art. 9.2.a)",
+    "settings.privacy.research.desc":"Allow the use of your pseudonymised data for DUBI's internal research. You can change your mind at any time.",
+    "consent.research.title":"Help DUBI improve",
+    "consent.research.short":"Allow the use of your data for internal service research. You can change your mind at any time.",
+    "consent.research.more":"Data is pseudonymised using HMAC-SHA-256 before collection: it contains no name, email or direct identifiers. Used exclusively for internal research and product improvement, never sold to third parties. You can revoke this consent at any time in Settings without affecting your plan access.",
     "trend.manual.estimateUpdated":"Estimate updated: TDEE {tdee} kcal, plan {calories} kcal.",
     "trend.manual.update":"Update estimate and plan",
     "profile.targetWeight.required":"Before updating the plan, enter your target weight so DUBI can understand the true direction of your goal.",
@@ -9029,6 +9041,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"Vous avez autorisé DUBI à traiter vos données physiques et nutritionnelles. Vous pouvez retirer votre consentement à tout moment.",
     "settings.privacy.wearable.label":"Consentement aux données du wearable",
     "settings.privacy.wearable.desc":"DUBI utilise les données de votre wearable pour personnaliser votre plan. Vous pouvez retirer votre consentement à tout moment.",
+    "settings.privacy.research.label":"Consentement à la recherche de données (art. 9.2.a RGPD)",
+    "settings.privacy.research.desc":"Autorisez l'utilisation de vos données pseudonymisées pour la recherche interne de DUBI. Vous pouvez changer d'avis à tout moment.",
+    "consent.research.title":"Aidez DUBI à s'améliorer",
+    "consent.research.short":"Autorisez l'utilisation de vos données pour la recherche interne du service. Vous pouvez changer d'avis à tout moment.",
+    "consent.research.more":"Les données sont pseudonymisées par HMAC-SHA-256 avant la collecte : elles ne contiennent ni nom, ni email, ni identifiants directs. Utilisées exclusivement pour la recherche interne et l'amélioration du service, jamais cédées à des tiers. Vous pouvez révoquer ce consentement à tout moment dans les Paramètres, sans effet sur l'accès à votre plan.",
     "trend.manual.estimateUpdated":"Estimation mise à jour : TDEE {tdee} kcal, plan {calories} kcal.",
     "trend.manual.update":"Mettre à jour le devis et le plan",
     "profile.targetWeight.required":"Avant de mettre à jour le plan, entrez votre poids cible afin que DUBI puisse comprendre la véritable direction de votre objectif.",
@@ -9070,6 +9087,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"Has autorizado a DUBI a tratar tus datos físicos y nutricionales. Puedes retirar el consentimiento en cualquier momento.",
     "settings.privacy.wearable.label":"Consentimiento de datos wearable",
     "settings.privacy.wearable.desc":"DUBI utiliza los datos de tu wearable para personalizar el plan. Puedes retirar el consentimiento en cualquier momento.",
+    "settings.privacy.research.label":"Consentimiento de investigación de datos (art. 9.2.a RGPD)",
+    "settings.privacy.research.desc":"Permite el uso de tus datos seudominizados para la investigación interna de DUBI. Puedes cambiar de opinión en cualquier momento.",
+    "consent.research.title":"Ayuda a DUBI a mejorar",
+    "consent.research.short":"Permite el uso de tus datos para la investigación interna del servicio. Puedes cambiar de opinión en cualquier momento.",
+    "consent.research.more":"Los datos se seudominiza con HMAC-SHA-256 antes de la recogida: no contienen nombre, email ni identificadores directos. Se usan exclusivamente para investigación interna y mejora del servicio, nunca cedidos a terceros. Puedes revocar este consentimiento en cualquier momento desde Ajustes sin que ello afecte al acceso a tu plan.",
     "trend.manual.estimateUpdated":"Estimación actualizada: TDEE {tdee} kcal, plan {calories} kcal.",
     "trend.manual.update":"Actualizar estimación y plan",
     "profile.targetWeight.required":"Antes de actualizar el plan, ingrese su peso objetivo para que DUBI pueda comprender la verdadera dirección de su objetivo.",
@@ -9111,6 +9133,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"Du hast DUBI die Verarbeitung deiner körperlichen und ernährungsbezogenen Daten erlaubt. Du kannst die Einwilligung jederzeit widerrufen.",
     "settings.privacy.wearable.label":"Einwilligung zu Wearable-Daten",
     "settings.privacy.wearable.desc":"DUBI nutzt die Daten deines Wearables, um deinen Plan zu personalisieren. Du kannst die Einwilligung jederzeit widerrufen.",
+    "settings.privacy.research.label":"Einwilligung zur Datenforschung (Art. 9.2.a DSGVO)",
+    "settings.privacy.research.desc":"Erlauben Sie die Verwendung Ihrer pseudonymisierten Daten für die interne Forschung von DUBI. Sie können Ihre Meinung jederzeit ändern.",
+    "consent.research.title":"Hilf DUBI, sich zu verbessern",
+    "consent.research.short":"Erlauben Sie die Verwendung Ihrer Daten für die interne Serviceforschung. Sie können Ihre Meinung jederzeit ändern.",
+    "consent.research.more":"Daten werden vor der Erhebung mit HMAC-SHA-256 pseudonymisiert: Sie enthalten keinen Namen, keine E-Mail und keine direkten Identifikatoren. Sie werden ausschließlich für interne Forschung und Produktverbesserung verwendet, niemals an Dritte weitergegeben. Sie können diese Einwilligung jederzeit in den Einstellungen widerrufen, ohne Ihren Planzugang zu beeinträchtigen.",
     "trend.manual.estimateUpdated":"Schätzung aktualisiert: TDEE {tdee} kcal, Plan {calories} kcal.",
     "trend.manual.update":"Kostenvoranschlag und Plan aktualisieren",
     "profile.targetWeight.required":"Geben Sie vor der Aktualisierung des Plans Ihr Zielgewicht ein, damit DUBI die wahre Richtung Ihres Ziels erkennen kann.",
@@ -9152,6 +9179,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"لقد سمحت لـ DUBI بمعالجة بياناتك الجسدية والغذائية. يمكنك سحب الموافقة في أي وقت.",
     "settings.privacy.wearable.label":"الموافقة على بيانات الأجهزة القابلة للارتداء",
     "settings.privacy.wearable.desc":"تستخدم DUBI بيانات جهازك القابل للارتداء لتخصيص الخطة. يمكنك سحب الموافقة في أي وقت.",
+    "settings.privacy.research.label":"الموافقة على أبحاث البيانات (المادة 9.2.أ من GDPR)",
+    "settings.privacy.research.desc":"اسمح باستخدام بياناتك المجهولة الهوية لأبحاث DUBI الداخلية. يمكنك تغيير رأيك في أي وقت.",
+    "consent.research.title":"ساعد DUBI على التحسن",
+    "consent.research.short":"اسمح باستخدام بياناتك لأبحاث الخدمة الداخلية. يمكنك تغيير رأيك في أي وقت.",
+    "consent.research.more":"يتم تجهيل البيانات باستخدام HMAC-SHA-256 قبل الجمع: لا تحتوي على اسم أو بريد إلكتروني أو معرفات مباشرة. تُستخدم حصراً للبحث الداخلي وتحسين الخدمة، ولا تُباع لأطراف ثالثة. يمكنك إلغاء هذه الموافقة في أي وقت من الإعدادات دون التأثير على وصولك إلى الخطة.",
     "trend.manual.estimateUpdated":"تم تحديث التقدير: TDEE {tdee} سعر حراري، خطة {calories} سعر حراري.",
     "trend.manual.update":"تحديث التقدير والخطة",
     "profile.targetWeight.required":"قبل تحديث الخطة، أدخل وزنك المستهدف حتى تتمكن DUBI من فهم الاتجاه الحقيقي لهدفك.",
@@ -9193,6 +9225,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"Autorizou a DUBI a tratar os seus dados físicos e nutricionais. Pode retirar o consentimento a qualquer momento.",
     "settings.privacy.wearable.label":"Consentimento de dados wearable",
     "settings.privacy.wearable.desc":"A DUBI utiliza os dados do seu wearable para personalizar o plano. Pode retirar o consentimento a qualquer momento.",
+    "settings.privacy.research.label":"Consentimento de investigação de dados (Art. 9.2.a RGPD)",
+    "settings.privacy.research.desc":"Permita o uso dos seus dados pseudonimizados para a investigação interna da DUBI. Pode mudar de ideia a qualquer momento.",
+    "consent.research.title":"Ajude a DUBI a melhorar",
+    "consent.research.short":"Permita o uso dos seus dados para a investigação interna do serviço. Pode mudar de ideia a qualquer momento.",
+    "consent.research.more":"Os dados são pseudonimizados com HMAC-SHA-256 antes da recolha: não contêm nome, email nem identificadores diretos. Utilizados exclusivamente para investigação interna e melhoria do serviço, nunca cedidos a terceiros. Pode revogar este consentimento a qualquer momento nas Definições sem afetar o acesso ao seu plano.",
     "trend.manual.estimateUpdated":"Estimativa atualizada: TDEE {tdee} kcal, plano {calories} kcal.",
     "trend.manual.update":"Atualizar estimativa e plano",
     "profile.targetWeight.required":"Antes de atualizar o plano, insira seu peso alvo para que o DUBI possa entender a verdadeira direção do seu objetivo.",
@@ -9234,6 +9271,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"您已授权 DUBI 处理您的身体和营养数据。您可以随时撤回同意。",
     "settings.privacy.wearable.label":"可穿戴设备数据同意",
     "settings.privacy.wearable.desc":"DUBI 使用您的可穿戴设备数据来个性化计划。您可以随时撤回同意。",
+    "settings.privacy.research.label":"数据研究同意（GDPR 第9.2.a条）",
+    "settings.privacy.research.desc":"允许将您的假名化数据用于 DUBI 的内部研究。您随时可以改变主意。",
+    "consent.research.title":"帮助 DUBI 改进",
+    "consent.research.short":"允许将您的数据用于服务内部研究。您随时可以改变主意。",
+    "consent.research.more":"数据在收集前通过 HMAC-SHA-256 进行假名化处理：不包含姓名、电子邮件或直接标识符。仅用于内部研究和产品改进，从不出售给第三方。您可以随时在设置中撤销此同意，不会影响您对计划的访问。",
     "trend.manual.estimateUpdated":"更新估算：TDEE {tdee} kcal，计划 {calories} kcal。",
     "trend.manual.update":"更新估算和计划",
     "profile.targetWeight.required":"在更新计划之前，输入您的目标体重，以便DUBI了解您目标的真实方向。",
@@ -9275,6 +9317,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"DUBI による身体・栄養データの処理を許可しています。同意はいつでも撤回できます。",
     "settings.privacy.wearable.label":"ウェアラブルデータへの同意",
     "settings.privacy.wearable.desc":"DUBI はウェアラブルデータを使用してプランを個別化します。同意はいつでも撤回できます。",
+    "settings.privacy.research.label":"データ研究への同意（GDPR 第9.2.a条）",
+    "settings.privacy.research.desc":"DUBI の内部調査のために仮名化データの使用を許可します。いつでも考えを変えることができます。",
+    "consent.research.title":"DUBI の改善に協力する",
+    "consent.research.short":"サービスの内部調査のためにデータの使用を許可します。いつでも考えを変えることができます。",
+    "consent.research.more":"データは収集前に HMAC-SHA-256 で仮名化されます：名前、メールアドレス、直接の識別子は含まれません。内部研究とサービス改善のみに使用され、第三者に販売されることはありません。設定からいつでもこの同意を撤回でき、プランへのアクセスに影響はありません。",
     "trend.manual.estimateUpdated":"更新された見積もり: TDEE {tdee} kcal、計画 {calories} kcal。",
     "trend.manual.update":"見積もりと計画を更新する",
     "profile.targetWeight.required":"計画を更新する前に、DUBI が目標の真の方向性を理解できるように、目標体重を入力してください。",
@@ -9316,6 +9363,11 @@ const PROMPT14_UI_TRANSLATIONS_2 = {
     "settings.privacy.health.desc":"Вы разрешили DUBI обрабатывать ваши физические данные и данные о питании. Согласие можно отозвать в любое время.",
     "settings.privacy.wearable.label":"Согласие на данные носимого устройства",
     "settings.privacy.wearable.desc":"DUBI использует данные носимого устройства для персонализации плана. Согласие можно отозвать в любое время.",
+    "settings.privacy.research.label":"Согласие на исследование данных (ст. 9.2.a GDPR)",
+    "settings.privacy.research.desc":"Разрешите использование ваших псевдонимизированных данных для внутренних исследований DUBI. Вы можете изменить решение в любое время.",
+    "consent.research.title":"Помогите DUBI стать лучше",
+    "consent.research.short":"Разрешите использование ваших данных для внутренних исследований сервиса. Вы можете изменить решение в любое время.",
+    "consent.research.more":"Данные псевдонимизируются с помощью HMAC-SHA-256 перед сбором: они не содержат имени, адреса электронной почты или прямых идентификаторов. Используются исключительно для внутренних исследований и улучшения сервиса, никогда не передаются третьим лицам. Вы можете отозвать это согласие в любое время в Настройках без влияния на доступ к плану.",
     "trend.manual.estimateUpdated":"Оценка обновлена: TDEE {tdee} ккал, план {calories} ккал.",
     "trend.manual.update":"Обновить смету и план",
     "profile.targetWeight.required":"Прежде чем обновлять план, введите целевой вес, чтобы DUBI мог понять истинное направление вашей цели.",
@@ -20509,9 +20561,12 @@ const handleSubmitBetaFeedback = async () => {
 
 const healthConsentActive = Boolean(userData?.health_data_consent ?? userData?.healthDataConsent);
 const wearableConsentActive = Boolean(userData?.wearable_consent ?? userData?.wearableConsent);
+const researchConsentActive = Boolean(userData?.research_consent ?? userData?.researchConsent);
 
 const updateLocalConsent = (field, value) => {
-  const camelField = field === "health_data_consent" ? "healthDataConsent" : "wearableConsent";
+  const camelField = field === "health_data_consent" ? "healthDataConsent"
+    : field === "wearable_consent" ? "wearableConsent"
+    : "researchConsent";
   const updatedData = {...userData, [field]: Boolean(value), [camelField]: Boolean(value)};
   setUserData(updatedData);
   saveDubiProfile(updatedData);
@@ -20555,6 +20610,20 @@ const handleWearableConsentToggle = async () => {
     return;
   }
   updateLocalConsent("wearable_consent", nextValue);
+  setConsentMessage(t("set.edit.success"));
+};
+
+const handleResearchConsentToggle = async () => {
+  setConsentBusy(true);
+  setConsentMessage("");
+  const nextValue = !researchConsentActive;
+  const result = await updateProfileConsentInBackend("research_consent", nextValue);
+  setConsentBusy(false);
+  if (!result.success) {
+    setConsentMessage(t("set.edit.error"));
+    return;
+  }
+  updateLocalConsent("research_consent", nextValue);
   setConsentMessage(t("set.edit.success"));
 };
 
@@ -21138,6 +21207,14 @@ const handleSaveProfile = async () => {
           onToggle={handleWearableConsentToggle}
         />
       </div>
+      <div style={{borderTop:`1px solid ${T.border}`}}>
+        <ConsentToggle
+          label={t("settings.privacy.research.label")}
+          description={t("settings.privacy.research.desc")}
+          active={researchConsentActive}
+          onToggle={handleResearchConsentToggle}
+        />
+      </div>
     </Card>
   </div>
   {consentMessage && (
@@ -21425,6 +21502,8 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [insuranceConsent, setInsuranceConsent] = React.useState(false);
   const [termsConsent, setTermsConsent] = React.useState(false);
   const [gdprConsent, setGdprConsent] = React.useState(false);
+  const [researchConsent, setResearchConsent] = React.useState(false);
+  const [showResearchMore, setShowResearchMore] = React.useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = React.useState(false);
   const [showTerms, setShowTerms] = React.useState(false);
   const [showHealthDisclaimer, setShowHealthDisclaimer] = React.useState(false);
@@ -21518,6 +21597,55 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
           </p>
         </div>
 
+        {/* Research Consent — optional */}
+        <div style={{background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:12}}>
+          <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+            <div
+              onClick={()=>setResearchConsent(!researchConsent)}
+              style={{
+                width:44,height:26,borderRadius:13,
+                background:researchConsent?T.accentD:T.border,
+                display:"flex",alignItems:"center",
+                padding:"0 3px",cursor:"pointer",flexShrink:0,marginTop:1,
+                transition:"background 0.2s"
+              }}
+            >
+              <div style={{
+                width:20,height:20,borderRadius:"50%",background:"#fff",
+                transform:researchConsent?"translateX(18px)":"translateX(0)",
+                transition:"transform 0.2s"
+              }}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                <p style={{margin:0,fontSize:13,fontWeight:700,color:T.text}}>{t("consent.research.title")}</p>
+                <span style={{fontSize:10,fontWeight:700,color:T.muted,background:T.sel,padding:"2px 7px",borderRadius:99,textTransform:"uppercase",letterSpacing:0.5}}>
+                  {lang==="it"?"Opzionale":"Optional"}
+                </span>
+              </div>
+              <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
+                {t("consent.research.short")}
+              </p>
+              {showResearchMore && (
+                <p style={{margin:"8px 0 0",fontSize:11,color:T.muted,lineHeight:1.55}}>
+                  {t("consent.research.more")}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={()=>setShowResearchMore(!showResearchMore)}
+                style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:8,cursor:"pointer",border:"none",background:"transparent",padding:0}}
+              >
+                <span style={{fontSize:12,color:T.accentD,fontWeight:600}}>
+                  {showResearchMore
+                    ? (lang==="it"?"Mostra meno":"Show less")
+                    : (lang==="it"?"Scopri di più":"Learn more")}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div style={{display:"none",background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:24}}>
           <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
             <div
@@ -21553,6 +21681,7 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
                 gdpr:true,
                 healthConsent:true,
                 medicalDisclaimer:true,
+                researchConsent:researchConsent,
                 privacyPolicyVersion:PRIVACY_POLICY_VERSION,
                 termsVersion:TERMS_VERSION,
                 healthDisclaimerVersion:HEALTH_DISCLAIMER_VERSION,
@@ -22348,6 +22477,7 @@ setPhase("app");
                 termsAccepted: Boolean(c?.terms),
                 privacyAccepted: Boolean(c?.terms),
                 healthDataConsent: Boolean(c?.healthConsent || c?.gdpr),
+                researchConsent: Boolean(c?.researchConsent),
                 privacyPolicyVersion: c?.privacyPolicyVersion || PRIVACY_POLICY_VERSION,
                 termsVersion: c?.termsVersion || TERMS_VERSION,
                 healthDisclaimerVersion: c?.healthDisclaimerVersion || HEALTH_DISCLAIMER_VERSION,
