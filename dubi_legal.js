@@ -27,6 +27,41 @@
 
       it: '<h2>Informativa sulla Privacy</h2>' +
         '<p><em>Ultimo aggiornamento: Giugno 2026 &mdash; v4</em></p>' +
+        '<div class="legal-summary">' +
+        '<h3>In breve &mdash; Riepilogo del trattamento</h3>' +
+        '<table class="legal-summary-table">' +
+        '<tr><td><strong>Chi tratta i tuoi dati?</strong></td>'
+        + '<td>DUBI &mdash; <a href="https://dubi.health">dubi.health</a>'
+        + ' &mdash; <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>'
+        + ' (identit&agrave; completa del titolare: &sect;1)</td></tr>' +
+        '<tr><td><strong>Quali dati trattiamo?</strong></td>'
+        + '<td>Dati account (nome, email); dati profilo e onboarding (et&agrave;, altezza, peso, obiettivi, allergie);'
+        + ' dati sanitari (Art.&nbsp;9 GDPR &mdash; solo con consenso esplicito);'
+        + ' dati wearable (solo se connessi dall&rsquo;utente);'
+        + ' dati tecnici (indirizzo IP, tipo dispositivo, sistema operativo);'
+        + ' conversazioni &ldquo;Chiedi a DUBI&rdquo; (non conservate sui server DUBI)</td></tr>' +
+        '<tr><td><strong>Perch&eacute; trattiamo i tuoi dati?</strong></td>'
+        + '<td>Fornitura del servizio (esecuzione contratto);'
+        + ' dati sanitari (consenso esplicito Art.&nbsp;9.2.a GDPR);'
+        + ' miglioramento servizio su aggregati anonimi (legittimo interesse);'
+        + ' ricerca longitudinale pseudonimizzata su consenso separato e facoltativo (<em>research_consent</em>)</td></tr>' +
+        '<tr><td><strong>Con chi li condividiamo?</strong></td>'
+        + '<td>Fornitori tecnici (Supabase, Render, Resend, provider AI) nominati responsabili del trattamento'
+        + ' ex Art.&nbsp;28 GDPR. I tuoi dati non vengono venduti n&eacute; comunicati a soggetti indeterminati.</td></tr>' +
+        '<tr><td><strong>Per quanto li conserviamo?</strong></td>'
+        + '<td>Di regola: fino alla cancellazione account + 24 mesi.'
+        + ' Dati pseudonimizzati R&amp;D: fino a revoca <em>research_consent</em> + 30 giorni.'
+        + ' Dati anonimi aggregati: indefinitamente (fuori scope GDPR, Considerando 26).'
+        + ' Vedi &sect;5 per i dettagli per categoria.</td></tr>' +
+        '<tr><td><strong>Quali sono i tuoi diritti?</strong></td>'
+        + '<td>Accesso, rettifica, cancellazione, limitazione, portabilit&agrave;,'
+        + ' opposizione, revoca del consenso &mdash; vedi &sect;6</td></tr>' +
+        '<tr><td><strong>Come contattarci?</strong></td>'
+        + '<td><a href="mailto:privacy@dubi.health">privacy@dubi.health</a>'
+        + ' &mdash; risposta entro 30 giorni</td></tr>' +
+        '</table>' +
+        '</div>' +
+
 
         '<h3>1. Titolari del Trattamento</h3>' +
         '<p><strong>Enrico Perlangeli e Francesco Calabrese</strong><br>' +
@@ -66,7 +101,7 @@
         '<h3>5. Conservazione</h3>' +
         '<ul>' +
         '<li><strong>Dati sanitari e biometrici:</strong> anonimizzati immediatamente su revoca del consenso</li>' +
-        '<li>Dati di account (email, nome): fino alla cancellazione + 30 giorni</li>' +
+        '<li>Dati di account (email, nome): fino alla cancellazione account + 24 mesi</li>' +
         '<li>Dati wearable: fino alla disconnessione + 30 giorni</li>' +
         '<li>Log di accesso: 90 giorni</li>' +
         '<li>Storico &ldquo;Chiedi a DUBI&rdquo;: non conservato sui server DUBI</li>' +
@@ -109,6 +144,41 @@
 
       en: '<h2>Privacy Policy</h2>' +
         '<p><em>Last updated: June 2026 &mdash; v4</em></p>' +
+        '<div class="legal-summary">' +
+        '<h3>At a glance &mdash; Summary</h3>' +
+        '<table class="legal-summary-table">' +
+        '<tr><td><strong>Who processes your data?</strong></td>'
+        + '<td>DUBI &mdash; <a href="https://dubi.health">dubi.health</a>'
+        + ' &mdash; <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>'
+        + ' (full controller identity: &sect;1)</td></tr>' +
+        '<tr><td><strong>What data do we process?</strong></td>'
+        + '<td>Account data (name, email); profile and onboarding data (age, height, weight, goals, allergies);'
+        + ' health data (GDPR Art.&nbsp;9 &mdash; explicit consent only);'
+        + ' wearable data (only if connected by you);'
+        + ' technical data (IP address, device type, OS);'
+        + ' &ldquo;Ask DUBI&rdquo; conversations (not stored on DUBI servers)</td></tr>' +
+        '<tr><td><strong>Why do we process your data?</strong></td>'
+        + '<td>Service delivery (performance of contract);'
+        + ' health data (explicit consent, GDPR Art.&nbsp;9.2.a);'
+        + ' service improvement on anonymous aggregates (legitimate interest);'
+        + ' pseudonymised longitudinal research under separate and optional consent (<em>research_consent</em>)</td></tr>' +
+        '<tr><td><strong>Who do we share it with?</strong></td>'
+        + '<td>Technical providers (Supabase, Render, Resend, AI provider) appointed as processors'
+        + ' under GDPR Art.&nbsp;28. Your data is never sold or disclosed to unidentified third parties.</td></tr>' +
+        '<tr><td><strong>How long do we keep it?</strong></td>'
+        + '<td>As a rule: until account deletion + 24 months.'
+        + ' Pseudonymised R&amp;D data: until <em>research_consent</em> withdrawal + 30 days.'
+        + ' Anonymous aggregates: indefinitely (outside GDPR scope, Recital 26).'
+        + ' See &sect;5 for per-category details.</td></tr>' +
+        '<tr><td><strong>What are your rights?</strong></td>'
+        + '<td>Access, rectification, erasure, restriction, portability,'
+        + ' objection, consent withdrawal &mdash; see &sect;6</td></tr>' +
+        '<tr><td><strong>How to contact us?</strong></td>'
+        + '<td><a href="mailto:privacy@dubi.health">privacy@dubi.health</a>'
+        + ' &mdash; response within 30 days</td></tr>' +
+        '</table>' +
+        '</div>' +
+
 
         '<h3>1. Data Controllers</h3>' +
         '<p><strong>Enrico Perlangeli and Francesco Calabrese</strong><br>' +
@@ -148,7 +218,7 @@
         '<h3>5. Retention</h3>' +
         '<ul>' +
         '<li><strong>Health and biometric data:</strong> anonymised immediately upon consent withdrawal</li>' +
-        '<li>Account data (email, name): until deletion + 30 days</li>' +
+        '<li>Account data (email, name): until account deletion + 24 months</li>' +
         '<li>Wearable data: until disconnection + 30 days</li>' +
         '<li>Access logs: 90 days</li>' +
         '<li>&ldquo;Ask DUBI&rdquo; history: not stored on DUBI servers</li>' +
