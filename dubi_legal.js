@@ -300,7 +300,16 @@
         '<p>Connettendo un wearable accetti anche i termini del relativo provider. Non siamo responsabili per il loro comportamento.</p>' +
 
         '<h3>8. Modifiche e Cancellazione</h3>' +
-        '<p>Possiamo modificare o sospendere il servizio con preavviso. Puoi cancellare il tuo account in qualsiasi momento dalle impostazioni.</p>' +
+        '<p>Possiamo modificare o sospendere il servizio con preavviso.</p>' +
+        '<p><strong>Cancellazione dell&rsquo;account.</strong> Puoi richiedere la cancellazione del tuo account in qualsiasi momento, senza necessit&agrave; di specificare alcuna motivazione, seguendo questa procedura:</p>' +
+        '<ol>' +
+        '<li>Accedi alla sezione <strong>Impostazioni</strong> del tuo profilo DUBI e seleziona l&rsquo;opzione <strong>Cancella account</strong>;</li>' +
+        '<li>Prima di completare la procedura, ti verr&agrave; mostrato un riepilogo delle conseguenze della cancellazione, inclusa la perdita definitiva di accesso a tutti i tuoi dati e piani nutrizionali;</li>' +
+        '<li>Potremmo chiederti di confermare la tua identit&agrave; tramite un codice inviato al tuo indirizzo email, per prevenire cancellazioni accidentali o non autorizzate;</li>' +
+        '<li>Al completamento della procedura riceverai una conferma via email dell&rsquo;avvenuta cancellazione.</li>' +
+        '</ol>' +
+        '<p>La cancellazione comporta l&rsquo;eliminazione permanente di tutti i dati associati al tuo account, fatti salvi gli obblighi di conservazione previsti dalla legge (vedi Informativa Privacy).</p>' +
+        '<p><strong>La cancellazione &egrave; irreversibile.</strong> In caso di nuova registrazione, i dati precedenti non potranno essere recuperati, trasferiti o associati al nuovo account.</p>' +
 
         '<h3>9. Legge Applicabile</h3>' +
         '<p>Legge italiana. Foro del consumatore o, in alternativa, Milano.</p>' +
@@ -335,7 +344,16 @@
         '<p>By connecting a wearable you also agree to the relevant provider’s terms. We are not responsible for their behaviour.</p>' +
 
         '<h3>8. Changes and Deletion</h3>' +
-        '<p>We may modify or suspend the service with notice. You may delete your account at any time from settings.</p>' +
+        '<p>We may modify or suspend the service with notice.</p>' +
+        '<p><strong>Account deletion.</strong> You may request deletion of your account at any time, without providing a reason, by following this procedure:</p>' +
+        '<ol>' +
+        '<li>Go to the <strong>Settings</strong> section of your DUBI profile and select the <strong>Delete account</strong> option;</li>' +
+        '<li>Before completing the procedure, you will be shown a summary of the consequences of deletion, including permanent loss of access to all your data and nutritional plans;</li>' +
+        '<li>We may ask you to verify your identity via a code sent to your email address, to prevent accidental or unauthorised deletions;</li>' +
+        '<li>Upon completion you will receive an email confirmation of the deletion.</li>' +
+        '</ol>' +
+        '<p>Deletion results in the permanent erasure of all data associated with your account, subject to retention obligations required by law (see Privacy Policy).</p>' +
+        '<p><strong>Deletion is irreversible.</strong> Should you register again, your previous data cannot be recovered, transferred or associated with the new account.</p>' +
 
         '<h3>9. Governing Law</h3>' +
         '<p>Italian law. Consumer’s court of residence or, alternatively, Milan.</p>' +
