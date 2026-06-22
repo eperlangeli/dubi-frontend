@@ -331,8 +331,14 @@
         '<p><strong>La cancellazione &egrave; irreversibile.</strong> In caso di nuova registrazione, i dati precedenti non potranno essere recuperati, trasferiti o associati al nuovo account.</p>' +
 
         '<h3>9. Legge Applicabile</h3>' +
-        '<p>Legge italiana. Foro del consumatore o, in alternativa, Milano.</p>' +
-        '<p>Contatti: <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> | <a href="mailto:support@dubi.health">support@dubi.health</a></p>',
+        '<p>I presenti Termini sono regolati dalla legge italiana.</p>' +
+        '<p>Per qualsiasi controversia, il foro competente &egrave; quello del luogo di residenza o domicilio del consumatore, ai sensi dell&rsquo;art. 66-<em>bis</em> del Codice del Consumo. Per gli utenti non qualificabili come consumatori, il foro esclusivamente competente &egrave; quello di Milano.</p>' +
+        '<p>Contatti: <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> | <a href="mailto:support@dubi.health">support@dubi.health</a></p>' +
+
+        '<h3>10. Risoluzione delle Controversie</h3>' +
+        '<p>In caso di controversia relativa ai presenti Termini o all&rsquo;utilizzo di DUBI, ti invitiamo a contattarci in primo luogo all&rsquo;indirizzo <a href="mailto:support@dubi.health">support@dubi.health</a> per trovare una soluzione amichevole. Ci impegniamo a rispondere entro 30 giorni.</p>' +
+        '<p>Il consumatore pu&ograve; inoltre ricorrere, prima di adire le vie giudiziali, alle procedure di mediazione civile e commerciale ai sensi del D.Lgs. 4 marzo 2010, n. 28, nonch&eacute; alle procedure di risoluzione alternativa delle controversie (ADR) previste dalla Parte V, Titolo II-<em>bis</em> del Codice del Consumo, presentando un reclamo presso un organismo ADR riconosciuto.</p>' +
+        '<p>Il ricorso alle procedure extragiudiziali non pregiudica in alcun modo il diritto di adire il giudice competente in qualsiasi momento.</p>',
 
       en: '<h2>Terms of Service</h2>' +
         '<p><em>Last updated: June 2026</em></p>' +
@@ -394,8 +400,14 @@
         '<p><strong>Deletion is irreversible.</strong> Should you register again, your previous data cannot be recovered, transferred or associated with the new account.</p>' +
 
         '<h3>9. Governing Law</h3>' +
-        '<p>Italian law. Consumer’s court of residence or, alternatively, Milan.</p>' +
-        '<p>Contact: <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> | <a href="mailto:support@dubi.health">support@dubi.health</a></p>',
+        '<p>These Terms are governed by Italian law.</p>' +
+        '<p>For any dispute, the competent court is that of the consumer&rsquo;s place of residence or domicile, pursuant to art. 66-<em>bis</em> of the Italian Consumer Code (D.Lgs. 206/2005). For users who do not qualify as consumers, the courts of Milan have exclusive jurisdiction.</p>' +
+        '<p>Contact: <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> | <a href="mailto:support@dubi.health">support@dubi.health</a></p>' +
+
+        '<h3>10. Dispute Resolution</h3>' +
+        '<p>In the event of a dispute relating to these Terms or the use of DUBI, we invite you to contact us first at <a href="mailto:support@dubi.health">support@dubi.health</a> to seek an amicable resolution. We undertake to respond within 30 days.</p>' +
+        '<p>Consumer users may also resort, before initiating legal proceedings, to civil and commercial mediation under D.Lgs. 28/2010, and to alternative dispute resolution (ADR) procedures under the Italian Consumer Code, by submitting a complaint to a recognised ADR body.</p>' +
+        '<p>Recourse to out-of-court procedures does not affect the right to bring proceedings before a competent court at any time.</p>',
     },
 
     // -------------------------------------------------------------------------
