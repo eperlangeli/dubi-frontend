@@ -121,6 +121,7 @@
         '<li><strong>Portabilità (Art. 20)</strong> &mdash; ricevere i tuoi dati in formato leggibile da macchina</li>' +
         '<li><strong>Opposizione (Art. 21)</strong> &mdash; opporti al trattamento basato su legittimo interesse</li>' +
         '<li><strong>Revoca del consenso (Art. 7.3)</strong> &mdash; ritirare il consenso in qualsiasi momento dalle impostazioni, senza effetto retroattivo</li>' +
+        '<li><strong>Notifica di violazione dei dati (Art. 34 GDPR)</strong> &mdash; in caso di violazione dei tuoi dati personali che presenti un rischio elevato per i tuoi diritti, ti avviseremo senza ingiustificato ritardo. La notifica indicher&agrave;: la natura della violazione, le probabili conseguenze e le misure adottate o proposte per porvi rimedio</li>' +
         '<li><strong>Reclamo</strong> &mdash; presentare reclamo al Garante Privacy (<a href="https://www.garanteprivacy.it" target="_blank">garanteprivacy.it</a>) o all&rsquo;Autorità competente del tuo paese</li>' +
         '</ul>' +
         '<p>Scrivi a <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>. Risponderemo entro <strong>1 mese</strong> dal ricevimento della richiesta (GDPR Art. 12.3). In caso di richieste complesse o numerose, il termine pu&ograve; essere prorogato di ulteriori 2 mesi (fino a 3 mesi complessivi); ti notificheremo la proroga e i relativi motivi entro il primo mese.</p>' +
@@ -239,6 +240,7 @@
         '<li><strong>Portability (Art. 20)</strong> &mdash; receive your data in a machine-readable format</li>' +
         '<li><strong>Objection (Art. 21)</strong> &mdash; object to processing based on legitimate interest</li>' +
         '<li><strong>Withdrawal of consent (Art. 7.3)</strong> &mdash; withdraw consent at any time from settings, without retroactive effect</li>' +
+        '<li><strong>Data breach notification (Art. 34 GDPR)</strong> &mdash; in the event of a personal data breach that poses a high risk to your rights, we will notify you without undue delay. The notification will include: the nature of the breach, its likely consequences, and the measures taken or proposed to address it</li>' +
         '<li><strong>Complaint</strong> &mdash; lodge a complaint with your supervisory authority (e.g. <a href="https://www.garanteprivacy.it" target="_blank">garanteprivacy.it</a> for Italy)</li>' +
         '</ul>' +
         '<p>Write to <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>. We will respond within <strong>1 month</strong> of receiving your request (GDPR Art. 12.3). Where requests are complex or numerous, the deadline may be extended by a further 2 months (up to 3 months total); we will notify you of any such extension and the reasons within the first month.</p>' +
