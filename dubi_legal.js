@@ -88,7 +88,7 @@
         '<p><strong>Non utilizziamo i tuoi dati personali per finalità pubblicitarie e non li vendiamo.</strong> Dati aggregati e anonimizzati &mdash; non riconducibili a nessun individuo &mdash; possono essere utilizzati a fini statistici e di ricerca interna.</p>' +
 
         '<h3>4. Provider terzi</h3>' +
-        '<p>Ci avvaliamo dei seguenti fornitori, che trattano dati per nostro conto ai sensi dei rispettivi data processing terms ove disponibili:</p>' +
+        '<p>Ci avvaliamo dei seguenti fornitori, che trattano dati per nostro conto ai sensi dei rispettivi data processing terms ove disponibili. <strong>I tuoi dati non vengono venduti n&eacute; comunicati a soggetti indeterminati:</strong> la condivisione &egrave; limitata esclusivamente ai provider elencati di seguito, per le finalit&agrave; indicate.</p>' +
         '<ul>' +
         '<li><strong>Supabase Inc.</strong> (USA) &mdash; database e storage</li>' +
         '<li><strong>Render Inc.</strong> (USA) &mdash; hosting server backend</li>' +
@@ -207,7 +207,7 @@
         '<p><strong>We do not use your personal data for advertising and we do not sell it.</strong> Aggregated and anonymised data &mdash; not attributable to any individual &mdash; may be used for statistical and internal research purposes.</p>' +
 
         '<h3>4. Third-party providers</h3>' +
-        '<p>We use the following providers, who process data on our behalf subject to their respective data processing terms where available:</p>' +
+        '<p>We use the following providers, who process data on our behalf subject to their respective data processing terms where available. <strong>Your data is never sold or disclosed to unidentified third parties:</strong> sharing is limited exclusively to the providers listed below, for the purposes indicated.</p>' +
         '<ul>' +
         '<li><strong>Supabase Inc.</strong> (USA) &mdash; database and storage</li>' +
         '<li><strong>Render Inc.</strong> (USA) &mdash; backend server hosting</li>' +
