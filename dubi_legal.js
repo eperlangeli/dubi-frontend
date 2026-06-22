@@ -58,7 +58,7 @@
         + ' opposizione, revoca del consenso &mdash; vedi &sect;6</td></tr>' +
         '<tr><td><strong>Come contattarci?</strong></td>'
         + '<td><a href="mailto:privacy@dubi.health">privacy@dubi.health</a>'
-        + ' &mdash; risposta entro 30 giorni</td></tr>' +
+        + ' &mdash; risposta entro 1 mese (prorogabile a 3 mesi, Art.&nbsp;12.3 GDPR)</td></tr>' +
         '</table>' +
         '</div>' +
 
@@ -123,7 +123,7 @@
         '<li><strong>Revoca del consenso (Art. 7.3)</strong> &mdash; ritirare il consenso in qualsiasi momento dalle impostazioni, senza effetto retroattivo</li>' +
         '<li><strong>Reclamo</strong> &mdash; presentare reclamo al Garante Privacy (<a href="https://www.garanteprivacy.it" target="_blank">garanteprivacy.it</a>) o all&rsquo;Autorità competente del tuo paese</li>' +
         '</ul>' +
-        '<p>Scrivi a <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> &mdash; risponderemo entro 30 giorni.</p>' +
+        '<p>Scrivi a <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>. Risponderemo entro <strong>1 mese</strong> dal ricevimento della richiesta (GDPR Art. 12.3). In caso di richieste complesse o numerose, il termine pu&ograve; essere prorogato di ulteriori 2 mesi (fino a 3 mesi complessivi); ti notificheremo la proroga e i relativi motivi entro il primo mese.</p>' +
 
         '<h3>7. Sicurezza</h3>' +
         '<ul>' +
@@ -176,7 +176,7 @@
         + ' objection, consent withdrawal &mdash; see &sect;6</td></tr>' +
         '<tr><td><strong>How to contact us?</strong></td>'
         + '<td><a href="mailto:privacy@dubi.health">privacy@dubi.health</a>'
-        + ' &mdash; response within 30 days</td></tr>' +
+        + ' &mdash; response within 1 month (extendable to 3 months, GDPR Art.&nbsp;12.3)</td></tr>' +
         '</table>' +
         '</div>' +
 
@@ -241,7 +241,7 @@
         '<li><strong>Withdrawal of consent (Art. 7.3)</strong> &mdash; withdraw consent at any time from settings, without retroactive effect</li>' +
         '<li><strong>Complaint</strong> &mdash; lodge a complaint with your supervisory authority (e.g. <a href="https://www.garanteprivacy.it" target="_blank">garanteprivacy.it</a> for Italy)</li>' +
         '</ul>' +
-        '<p>Write to <a href="mailto:privacy@dubi.health">privacy@dubi.health</a> &mdash; we will respond within 30 days.</p>' +
+        '<p>Write to <a href="mailto:privacy@dubi.health">privacy@dubi.health</a>. We will respond within <strong>1 month</strong> of receiving your request (GDPR Art. 12.3). Where requests are complex or numerous, the deadline may be extended by a further 2 months (up to 3 months total); we will notify you of any such extension and the reasons within the first month.</p>' +
 
         '<h3>7. Security</h3>' +
         '<ul>' +
