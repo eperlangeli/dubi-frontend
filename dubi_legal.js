@@ -290,8 +290,19 @@
         '<h3>4. Uso Accettabile</h3>' +
         '<p>Non puoi usare DUBI per violare leggi, accedere a dati altrui, effettuare reverse engineering, trasmettere malware o per finalità commerciali non autorizzate.</p>' +
 
-        '<h3>5. Proprietà Intellettuale</h3>' +
-        '<p>DUBI e i suoi contenuti originali sono di proprietà di Enrico Perlangeli e Francesco Calabrese. I tuoi dati personali rimangono tuoi.</p>' +
+        '<h3>5. Licenza d&rsquo;uso e Proprietà Intellettuale</h3>' +
+        '<p>Con l&rsquo;accettazione dei presenti Termini, DUBI ti concede una licenza d&rsquo;uso <strong>limitata, personale, non esclusiva, non trasferibile, non sublicenziabile e liberamente revocabile</strong>, per accedere e utilizzare il servizio esclusivamente per scopi personali e non commerciali, in conformità ai presenti Termini. La licenza non comporta alcun trasferimento di proprietà su DUBI o sui suoi componenti.</p>' +
+        '<p>DUBI e i suoi contenuti originali &mdash; inclusi codice, design, algoritmi, testi, loghi e database nutrizionale &mdash; sono di proprietà di Enrico Perlangeli e Francesco Calabrese. Tutti i diritti sono riservati.</p>' +
+        '<p>È vietato, direttamente o tramite terzi:</p>' +
+        '<ul>' +
+        '<li>Copiare, modificare, adattare, tradurre, decompilare, disassemblare o sottoporre a reverse engineering qualsiasi componente di DUBI, salvo quanto espressamente consentito dalla legge;</li>' +
+        '<li>Rimuovere, alterare o oscurare qualsiasi avviso di copyright, marchio o altra indicazione di proprietà intellettuale;</li>' +
+        '<li>Concedere in sublicenza, vendere, affittare, trasferire o distribuire a terzi l&rsquo;accesso a DUBI o ai suoi contenuti;</li>' +
+        '<li>Utilizzare sistemi automatizzati (bot, scraper, crawler) per accedere o estrarre dati da DUBI;</li>' +
+        '<li>Tentare di accedere a sezioni non autorizzate del servizio o dei sistemi informatici di DUBI;</li>' +
+        '<li>Utilizzare DUBI per finalità illecite, fraudolente o contrarie all&rsquo;ordine pubblico.</li>' +
+        '</ul>' +
+        '<p><strong>I tuoi dati personali rimangono tuoi.</strong> I contenuti che carichi (descrizioni dei pasti, parametri personali) restano di tua proprietà. Caricandoli, concedi a DUBI una licenza non esclusiva, gratuita e revocabile per utilizzarli esclusivamente ai fini dell&rsquo;erogazione e del miglioramento del servizio. Il trattamento di eventuali dati personali è disciplinato dall&rsquo;Informativa Privacy.</p>' +
 
         '<h3>6. Limitazione di Responsabilità</h3>' +
         '<p>DUBI è fornito “così com’è” durante la beta. Non garantiamo disponibilità continuativa né assenza di errori. Non siamo responsabili per decisioni sanitarie basate sui piani generati. Consulta sempre un professionista qualificato.</p>' +
@@ -334,8 +345,19 @@
         '<h3>4. Acceptable Use</h3>' +
         '<p>You may not use DUBI to violate laws, access others’ data, reverse-engineer the app, transmit malware or for unauthorised commercial purposes.</p>' +
 
-        '<h3>5. Intellectual Property</h3>' +
-        '<p>DUBI and its original content are the property of Enrico Perlangeli and Francesco Calabrese. Your personal data remains yours.</p>' +
+        '<h3>5. Licence and Intellectual Property</h3>' +
+        '<p>By accepting these Terms, DUBI grants you a <strong>limited, personal, non-exclusive, non-transferable, non-sublicensable and freely revocable</strong> licence to access and use the service solely for personal, non-commercial purposes in accordance with these Terms. The licence does not transfer any ownership rights over DUBI or its components.</p>' +
+        '<p>DUBI and its original content &mdash; including code, design, algorithms, texts, logos and nutritional database &mdash; are the property of Enrico Perlangeli and Francesco Calabrese. All rights reserved.</p>' +
+        '<p>The following are prohibited, directly or through third parties:</p>' +
+        '<ul>' +
+        '<li>Copying, modifying, adapting, translating, decompiling, disassembling or reverse-engineering any component of DUBI, except as expressly permitted by law;</li>' +
+        '<li>Removing, altering or obscuring any copyright notice, trademark or other intellectual property indication;</li>' +
+        '<li>Sublicensing, selling, renting, transferring or distributing access to DUBI or its content to third parties;</li>' +
+        '<li>Using automated systems (bots, scrapers, crawlers) to access or extract data from DUBI;</li>' +
+        '<li>Attempting to access unauthorised areas of the service or DUBI&rsquo;s computer systems;</li>' +
+        '<li>Using DUBI for unlawful, fraudulent or public-order-violating purposes.</li>' +
+        '</ul>' +
+        '<p><strong>Your personal data remains yours.</strong> Content you upload (meal descriptions, personal parameters) remains your property. By uploading it, you grant DUBI a non-exclusive, royalty-free, revocable licence to use it solely for the purpose of providing and improving the service. Any personal data contained therein is processed in accordance with the Privacy Policy.</p>' +
 
         '<h3>6. Limitation of Liability</h3>' +
         '<p>DUBI is provided “as is” during beta. We do not guarantee continuous availability or absence of errors. We are not liable for health decisions based on generated plans. Always consult a qualified professional.</p>' +
