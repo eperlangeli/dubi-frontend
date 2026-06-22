@@ -360,7 +360,15 @@
         '<li>Persistenza delle condotte gi&agrave; oggetto di sospensione temporanea, nonostante l&rsquo;avvertimento ricevuto.</li>' +
         '</ul>' +
         '<p><strong>Comunicazione.</strong> Salvo casi di urgenza, ti invieremo una comunicazione via email che indica: il tipo di misura adottata, le motivazioni, la durata prevista (per le sospensioni) e le eventuali azioni correttive che puoi intraprendere per il ripristino dell&rsquo;accesso.</p>' +
-        '<p><strong>Diritto di contestazione.</strong> Se ritieni che la sospensione o la cancellazione del tuo account sia avvenuta in modo non corretto, puoi contestare la decisione scrivendo a <a href="mailto:support@dubi.health">support@dubi.health</a>. Ci impegniamo a esaminare ogni richiesta e a rispondere entro 30 giorni. Resta impregiudicato il diritto di avvalersi delle procedure previste al &sect;10.</p>',
+        '<p><strong>Diritto di contestazione.</strong> Se ritieni che la sospensione o la cancellazione del tuo account sia avvenuta in modo non corretto, puoi contestare la decisione scrivendo a <a href="mailto:support@dubi.health">support@dubi.health</a>. Ci impegniamo a esaminare ogni richiesta e a rispondere entro 30 giorni. Resta impregiudicato il diritto di avvalersi delle procedure previste al &sect;10.</p>' +
+
+        '<h3>12. Disposizioni Finali</h3>' +
+        '<p><strong>Integrit&agrave; dell&rsquo;accordo.</strong> I presenti Termini, unitamente all&rsquo;Informativa Privacy, costituiscono l&rsquo;intero accordo tra l&rsquo;utente e DUBI in relazione all&rsquo;utilizzo del servizio e sostituiscono qualsiasi precedente intesa, scritta o verbale, sullo stesso oggetto.</p>' +
+        '<p><strong>Tolleranza.</strong> La mancata rivendicazione da parte di DUBI di un diritto previsto dai presenti Termini in un caso specifico non costituisce rinuncia a tale diritto, che potr&agrave; essere fatto valere in qualsiasi momento.</p>' +
+        '<p><strong>Clausole invalide.</strong> Se una disposizione dei presenti Termini dovesse essere dichiarata invalida o inapplicabile, essa sar&agrave; limitata nella misura minima necessaria e le restanti disposizioni rimarranno pienamente in vigore.</p>' +
+        '<p><strong>Sopravvivenza.</strong> Le disposizioni relative alla propriet&agrave; intellettuale (&sect;5) e alla limitazione di responsabilit&agrave; (&sect;6) rimarranno in vigore anche dopo la cessazione del rapporto contrattuale per qualsiasi causa.</p>' +
+        '<p><strong>Cessione.</strong> DUBI pu&ograve; cedere o trasferire i presenti Termini a terzi, previa comunicazione con almeno 30 giorni di preavviso. L&rsquo;utente non pu&ograve; cedere i propri diritti o obblighi senza il previo consenso scritto di DUBI.</p>' +
+        '<p><strong>Versione linguistica prevalente.</strong> I presenti Termini sono redatti in italiano e in inglese. In caso di discrepanza tra le due versioni, prevale la versione in lingua <strong>inglese</strong>.</p>',
 
       en: '<h2>Terms of Service</h2>' +
         '<p><em>Last updated: June 2026</em></p>' +
@@ -451,7 +459,15 @@
         '<li>Continuation of conduct already subject to temporary suspension, despite prior warning.</li>' +
         '</ul>' +
         '<p><strong>Notification.</strong> Except in cases of urgency, we will send you an email indicating: the type of measure taken, the reasons, the expected duration (for suspensions) and any corrective actions available to restore access.</p>' +
-        '<p><strong>Right to contest.</strong> If you believe the suspension or deletion of your account was incorrect, you may contest the decision by writing to <a href="mailto:support@dubi.health">support@dubi.health</a>. We undertake to review each request and respond within 30 days. Your right to use the procedures set out in &sect;10 remains unaffected.</p>',
+        '<p><strong>Right to contest.</strong> If you believe the suspension or deletion of your account was incorrect, you may contest the decision by writing to <a href="mailto:support@dubi.health">support@dubi.health</a>. We undertake to review each request and respond within 30 days. Your right to use the procedures set out in &sect;10 remains unaffected.</p>' +
+
+        '<h3>12. Final Provisions</h3>' +
+        '<p><strong>Entire agreement.</strong> These Terms, together with the Privacy Policy, constitute the entire agreement between the user and DUBI regarding use of the service and supersede any prior understanding, written or oral, on the same subject matter.</p>' +
+        '<p><strong>No waiver.</strong> Failure by DUBI to enforce any right under these Terms in a specific case does not constitute a waiver of that right, which may be exercised at any time.</p>' +
+        '<p><strong>Severability.</strong> If any provision of these Terms is held invalid or unenforceable, it shall be limited to the minimum extent necessary and the remaining provisions shall remain in full force and effect.</p>' +
+        '<p><strong>Survival.</strong> Provisions relating to intellectual property (&sect;5) and limitation of liability (&sect;6) shall survive termination of the contractual relationship for any reason.</p>' +
+        '<p><strong>Assignment.</strong> DUBI may assign or transfer these Terms to a third party, with at least 30 days&rsquo; prior notice. Users may not assign their rights or obligations without DUBI&rsquo;s prior written consent.</p>' +
+        '<p><strong>Prevailing language.</strong> These Terms are drafted in Italian and English. In the event of any discrepancy between the two versions, the <strong>English</strong> version shall prevail.</p>',
     },
 
     // -------------------------------------------------------------------------
