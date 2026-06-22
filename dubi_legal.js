@@ -338,7 +338,29 @@
         '<h3>10. Risoluzione delle Controversie</h3>' +
         '<p>In caso di controversia relativa ai presenti Termini o all&rsquo;utilizzo di DUBI, ti invitiamo a contattarci in primo luogo all&rsquo;indirizzo <a href="mailto:support@dubi.health">support@dubi.health</a> per trovare una soluzione amichevole. Ci impegniamo a rispondere entro 30 giorni.</p>' +
         '<p>Il consumatore pu&ograve; inoltre ricorrere, prima di adire le vie giudiziali, alle procedure di mediazione civile e commerciale ai sensi del D.Lgs. 4 marzo 2010, n. 28, nonch&eacute; alle procedure di risoluzione alternativa delle controversie (ADR) previste dalla Parte V, Titolo II-<em>bis</em> del Codice del Consumo, presentando un reclamo presso un organismo ADR riconosciuto.</p>' +
-        '<p>Il ricorso alle procedure extragiudiziali non pregiudica in alcun modo il diritto di adire il giudice competente in qualsiasi momento.</p>',
+        '<p>Il ricorso alle procedure extragiudiziali non pregiudica in alcun modo il diritto di adire il giudice competente in qualsiasi momento.</p>' +
+
+        '<h3>11. Sospensione e Cancellazione dell&rsquo;Account da parte di DUBI</h3>' +
+        '<p>Ci riserviamo il diritto di intervenire sull&rsquo;account dell&rsquo;utente nelle seguenti circostanze:</p>' +
+        '<p><strong>Sospensione temporanea</strong> &mdash; blocco temporaneo dell&rsquo;accesso, senza cancellazione dell&rsquo;account, in caso di:</p>' +
+        '<ul>' +
+        '<li>Violazioni, anche solo sospette, dei presenti Termini;</li>' +
+        '<li>Pattern di utilizzo anomali (accessi eccessivi, tentativi ripetuti non autorizzati, attivit&agrave; automatizzate non autorizzate);</li>' +
+        '<li>Richieste vincolanti di autorit&agrave; giudiziarie o amministrative;</li>' +
+        '<li>Necessit&agrave; di tutela della sicurezza e integrit&agrave; tecnica del servizio;</li>' +
+        '<li>Cause di forza maggiore che impediscono temporaneamente l&rsquo;erogazione del servizio.</li>' +
+        '</ul>' +
+        '<p><strong>Cancellazione definitiva</strong> &mdash; risoluzione del rapporto contrattuale e cancellazione dell&rsquo;account, in caso di:</p>' +
+        '<ul>' +
+        '<li>Violazione delle disposizioni sulla propriet&agrave; intellettuale e licenza d&rsquo;uso (&sect;5);</li>' +
+        '<li>Utilizzo di DUBI per finalit&agrave; illecite o in violazione di norme imperative;</li>' +
+        '<li>Caricamento o diffusione di contenuti illegali, offensivi, diffamatori o lesivi di diritti di terzi;</li>' +
+        '<li>Comunicazione intenzionale di informazioni false o fraudolente;</li>' +
+        '<li>Tentativi di accesso non autorizzato ai sistemi di DUBI o di altri utenti;</li>' +
+        '<li>Persistenza delle condotte gi&agrave; oggetto di sospensione temporanea, nonostante l&rsquo;avvertimento ricevuto.</li>' +
+        '</ul>' +
+        '<p><strong>Comunicazione.</strong> Salvo casi di urgenza, ti invieremo una comunicazione via email che indica: il tipo di misura adottata, le motivazioni, la durata prevista (per le sospensioni) e le eventuali azioni correttive che puoi intraprendere per il ripristino dell&rsquo;accesso.</p>' +
+        '<p><strong>Diritto di contestazione.</strong> Se ritieni che la sospensione o la cancellazione del tuo account sia avvenuta in modo non corretto, puoi contestare la decisione scrivendo a <a href="mailto:support@dubi.health">support@dubi.health</a>. Ci impegniamo a esaminare ogni richiesta e a rispondere entro 30 giorni. Resta impregiudicato il diritto di avvalersi delle procedure previste al &sect;10.</p>',
 
       en: '<h2>Terms of Service</h2>' +
         '<p><em>Last updated: June 2026</em></p>' +
@@ -407,7 +429,29 @@
         '<h3>10. Dispute Resolution</h3>' +
         '<p>In the event of a dispute relating to these Terms or the use of DUBI, we invite you to contact us first at <a href="mailto:support@dubi.health">support@dubi.health</a> to seek an amicable resolution. We undertake to respond within 30 days.</p>' +
         '<p>Consumer users may also resort, before initiating legal proceedings, to civil and commercial mediation under D.Lgs. 28/2010, and to alternative dispute resolution (ADR) procedures under the Italian Consumer Code, by submitting a complaint to a recognised ADR body.</p>' +
-        '<p>Recourse to out-of-court procedures does not affect the right to bring proceedings before a competent court at any time.</p>',
+        '<p>Recourse to out-of-court procedures does not affect the right to bring proceedings before a competent court at any time.</p>' +
+
+        '<h3>11. Account Suspension and Cancellation by DUBI</h3>' +
+        '<p>We reserve the right to take action on a user&rsquo;s account in the following circumstances:</p>' +
+        '<p><strong>Temporary suspension</strong> &mdash; temporary blocking of access, without account deletion, in the event of:</p>' +
+        '<ul>' +
+        '<li>Actual or suspected violations of these Terms;</li>' +
+        '<li>Anomalous usage patterns (excessive access, repeated unauthorised attempts, unauthorised automated activity);</li>' +
+        '<li>Binding requests from judicial or administrative authorities;</li>' +
+        '<li>Need to protect the security and technical integrity of the service;</li>' +
+        '<li>Force majeure events that temporarily prevent service delivery.</li>' +
+        '</ul>' +
+        '<p><strong>Definitive cancellation</strong> &mdash; termination of the contractual relationship and deletion of the account, in the event of:</p>' +
+        '<ul>' +
+        '<li>Violation of intellectual property and licence provisions (&sect;5);</li>' +
+        '<li>Use of DUBI for unlawful purposes or in breach of mandatory law;</li>' +
+        '<li>Uploading or distributing illegal, offensive, defamatory or third-party-rights-infringing content;</li>' +
+        '<li>Intentional communication of false or fraudulent information;</li>' +
+        '<li>Attempts to gain unauthorised access to DUBI&rsquo;s or other users&rsquo; systems;</li>' +
+        '<li>Continuation of conduct already subject to temporary suspension, despite prior warning.</li>' +
+        '</ul>' +
+        '<p><strong>Notification.</strong> Except in cases of urgency, we will send you an email indicating: the type of measure taken, the reasons, the expected duration (for suspensions) and any corrective actions available to restore access.</p>' +
+        '<p><strong>Right to contest.</strong> If you believe the suspension or deletion of your account was incorrect, you may contest the decision by writing to <a href="mailto:support@dubi.health">support@dubi.health</a>. We undertake to review each request and respond within 30 days. Your right to use the procedures set out in &sect;10 remains unaffected.</p>',
     },
 
     // -------------------------------------------------------------------------
