@@ -311,7 +311,15 @@
         '<p>Connettendo un wearable accetti anche i termini del relativo provider. Non siamo responsabili per il loro comportamento.</p>' +
 
         '<h3>8. Modifiche e Cancellazione</h3>' +
-        '<p>Possiamo modificare o sospendere il servizio con preavviso.</p>' +
+        '<p><strong>8a. Modifiche ai Termini di Servizio</strong></p>' +
+        '<p>Ci riserviamo la facolt&agrave; di modificare i presenti Termini per motivate esigenze tecniche, normative o di evoluzione del servizio. Le modifiche sono comunicate via email all&rsquo;indirizzo associato al tuo account. Il termine di preavviso dipende dalla rilevanza della modifica:</p>' +
+        '<ul>' +
+        '<li><strong>Modifiche formali o di adeguamento normativo</strong> (es. correzioni, aggiornamenti redazionali): entrata in vigore immediata, comunicazione contestuale.</li>' +
+        '<li><strong>Modifiche sostanziali</strong> (che incidono sui tuoi diritti o obblighi): preavviso di almeno <strong>15 giorni</strong>. Per modifiche che riguardano il trattamento dei tuoi dati personali potr&agrave; essere richiesta accettazione esplicita prima di continuare a usare DUBI.</li>' +
+        '<li><strong>Modifiche economiche</strong> (se e quando verranno introdotti piani a pagamento): preavviso di almeno <strong>30 giorni</strong>. Se non accetti le nuove condizioni economiche, potrai cancellare il tuo account senza penali.</li>' +
+        '</ul>' +
+        '<p>Per le modifiche non sostanziali, il proseguimento dell&rsquo;utilizzo di DUBI dopo la data di entrata in vigore costituisce accettazione dei nuovi Termini.</p>' +
+        '<p><strong>8b. Cancellazione dell&rsquo;account</strong></p>' +
         '<p><strong>Cancellazione dell&rsquo;account.</strong> Puoi richiedere la cancellazione del tuo account in qualsiasi momento, senza necessit&agrave; di specificare alcuna motivazione, seguendo questa procedura:</p>' +
         '<ol>' +
         '<li>Accedi alla sezione <strong>Impostazioni</strong> del tuo profilo DUBI e seleziona l&rsquo;opzione <strong>Cancella account</strong>;</li>' +
@@ -365,8 +373,16 @@
         '<h3>7. Third-Party Services</h3>' +
         '<p>By connecting a wearable you also agree to the relevant provider’s terms. We are not responsible for their behaviour.</p>' +
 
-        '<h3>8. Changes and Deletion</h3>' +
-        '<p>We may modify or suspend the service with notice.</p>' +
+        '<h3>8. Changes and Account Deletion</h3>' +
+        '<p><strong>8a. Amendments to the Terms of Service</strong></p>' +
+        '<p>We reserve the right to amend these Terms for justified technical, regulatory or service-evolution reasons. Changes are communicated by email to the address associated with your account. The notice period depends on the significance of the change:</p>' +
+        '<ul>' +
+        '<li><strong>Formal or regulatory amendments</strong> (e.g. corrections, editorial updates): effective immediately, with simultaneous notification.</li>' +
+        '<li><strong>Substantial amendments</strong> (affecting your rights or obligations): at least <strong>15 days&rsquo;</strong> notice. Amendments affecting the processing of your personal data may require explicit re-acceptance before you can continue using DUBI.</li>' +
+        '<li><strong>Economic amendments</strong> (if and when paid plans are introduced): at least <strong>30 days&rsquo;</strong> notice. If you do not accept the new economic conditions, you may delete your account without penalty.</li>' +
+        '</ul>' +
+        '<p>For non-substantial amendments, continued use of DUBI after the effective date constitutes acceptance of the updated Terms.</p>' +
+        '<p><strong>8b. Account deletion</strong></p>' +
         '<p><strong>Account deletion.</strong> You may request deletion of your account at any time, without providing a reason, by following this procedure:</p>' +
         '<ol>' +
         '<li>Go to the <strong>Settings</strong> section of your DUBI profile and select the <strong>Delete account</strong> option;</li>' +
