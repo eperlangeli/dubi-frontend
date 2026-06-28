@@ -549,15 +549,13 @@ const GOAL_CANONICAL_MAP = {
   mantenimento: "maintenance",
   definition: "definition",
   definizione: "definition",
-  competition: "competition",
-  gara: "competition"
+
 };
 const GOAL_APP_MAP = {
   fat_loss: "fatLoss",
   muscle_gain: "gain",
   maintenance: "maintain",
   definition: "definition",
-  competition: "competition"
 };
 const toCanonicalGoal = (value) => canonicalFromMap(value, GOAL_CANONICAL_MAP, "maintenance");
 const toAppGoal = (value) => GOAL_APP_MAP[toCanonicalGoal(value)] || value || "maintain";
@@ -674,6 +672,15 @@ const toCanonicalSport = (value) => {
   const normalized = canonicalFromMap(value, SPORT_CANONICAL_MAP, "");
   return normalized || cleanCanonicalInput(value);
 };
+const normalizeSports = (sports, legacySport = "") => {
+  const values = Array.isArray(sports)
+    ? sports
+    : (typeof sports === "string" ? sports.split(",") : []);
+  const normalized = [...new Set(values.map(toCanonicalSport).filter(Boolean))];
+  if (normalized.length) return normalized.slice(0, 5);
+  const legacy = toCanonicalSport(legacySport);
+  return legacy ? [legacy] : [];
+};
 
 const ALLERGY_KEYS = ["egg", "gluten", "dairy", "nuts", "shellfish", "soy", "sesame", "fish"];
 const ALLERGY_CANONICAL_MAP = {
@@ -727,18 +734,26 @@ const getSportLabel = (value, t) => {
   const key = toCanonicalSport(value);
   return SPORT_KEYS.includes(key) ? t(`sport.${key}`) : (value || "—");
 };
+const formatSportList = (sports, legacySport, t) => {
+  const values = normalizeSports(sports, legacySport);
+  return values.length ? values.map(value => getSportLabel(value, t)).join(" · ") : "—";
+};
 const getTrainingTimeLabelLocalized = (value, t) => t(`training.timing.${normalizeTrainingTime(value)}`);
 
-const canonicalizeOnboardingForBackend = (data = {}) => ({
-  ...data,
-  goal: toCanonicalGoal(data.goal),
-  diet: toCanonicalDiet(data.diet),
-  allergies: serializeCanonicalList(data.allergies),
-  sport: toCanonicalSport(data.sport),
-  workoutIntensity: toCanonicalIntensity(data.workoutIntensity ?? data.workout_intensity),
-  trainingTime: normalizeTrainingTime(data.trainingTime ?? data.training_time),
-  breakfastPref: toCanonicalBreakfast(data.breakfastPref ?? data.breakfast_pref)
-});
+const canonicalizeOnboardingForBackend = (data = {}) => {
+  const sports = normalizeSports(data.sports, data.sport);
+  return {
+    ...data,
+    goal: toCanonicalGoal(data.goal),
+    diet: toCanonicalDiet(data.diet),
+    allergies: serializeCanonicalList(data.allergies),
+    sports,
+    sport: sports[0] || "",
+    workoutIntensity: toCanonicalIntensity(data.workoutIntensity ?? data.workout_intensity),
+    trainingTime: normalizeTrainingTime(data.trainingTime ?? data.training_time),
+    breakfastPref: toCanonicalBreakfast(data.breakfastPref ?? data.breakfast_pref)
+  };
+};
 const getPlanProfileSignature = (userData = {}) => {
   const parseHourForSignature = (value, fallback) => {
     if (value === undefined || value === null || value === "") return fallback;
@@ -753,7 +768,7 @@ const getPlanProfileSignature = (userData = {}) => {
     weight: Number(userData.weight || 0),
     diet: String(userData.diet || ""),
     allergies: String(userData.allergies || "").trim().toLowerCase(),
-    sport: String(userData.sport || "").trim().toLowerCase(),
+    sports: normalizeSports(userData.sports, userData.sport).sort(),
     training_time: normalizeTrainingTime(userData.training_time ?? userData.trainingTime),
     workout_days: String(userData.workout_days ?? userData.workoutDays ?? ""),
     workout_duration: String(userData.workout_duration ?? userData.workoutDuration ?? ""),
@@ -781,7 +796,8 @@ const getPlanProfileSignature = (userData = {}) => {
     goal: toAppGoal(data.goal),
     diet: toCanonicalDiet(data.diet),
     allergies: serializeCanonicalList(data.allergies),
-    sport: toCanonicalSport(data.sport),
+    sports: normalizeSports(data.sports, data.sport),
+    sport: normalizeSports(data.sports, data.sport)[0] || "",
 
     targetWeight: data.target_weight ?? data.targetWeight ?? null,
     targetBf: data.target_body_fat ?? data.targetBf ?? null,
@@ -1060,6 +1076,7 @@ const saveOnboardingToBackend = async (data) => {
     diet_intensity: data.dietIntensity || "balanced",
     allergies: canonicalData.allergies || "",
     sport: canonicalData.sport || "",
+    sports: canonicalData.sports,
     training_time: canonicalData.trainingTime,
     breakfast_pref: canonicalData.breakfastPref,
 
@@ -1284,6 +1301,10 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     aiGenerated: true,
     ingredientGenerated: true,
     ingredientPlan,
+    sports: normalizeSports(ingredientPlan?.sports, userData?.sport),
+    sportGroups: Array.isArray(ingredientPlan?.sport_groups) ? ingredientPlan.sport_groups : [],
+    sportProfile: ingredientPlan?.sport_profile || "none",
+    macroSplit: ingredientPlan?.macro_split || null,
     giSummary: ingredientPlan?.gi_summary || null,
     pathologyFilter: ingredientPlan?.pathology_filter || null,
     profileSignature: getPlanProfileSignature(userData),
@@ -10245,16 +10266,80 @@ const FOOD_DICT = {
     "Albumi strapazzati":"Scrambled egg whites","Albumi":"Egg whites","Crema di avocado":"Avocado cream","Guacamole":"Guacamole","Baba ganoush":"Baba ganoush","Tzatziki":"Tzatziki","Bastoncini di verdure crude":"Raw veg sticks","Verdure miste":"Mixed vegetables","Verdure crude":"Raw vegetables","Verdure al forno miste":"Mixed roasted vegetables","Verdure alla julienne":"Julienned vegetables","Sedano e peperoni":"Celery and peppers",
     "Verdure fresche":"Fresh vegetables","Cereali & Legumi":"Grains & Legumes","Grassi & Semi":"Fats & Seeds","Frutta":"Fruit","Proteine":"Proteins",
     "Erba cipollina":"Chives","Prezzemolo":"Parsley","Basilico":"Basil","Timo":"Thyme","Pepe nero":"Black pepper","Pepe":"Pepper","Sale":"Salt",
-    "Frutto di stagione":"Seasonal fruit","Frutta secca mista":"Mixed dried fruit"
+    "Frutto di stagione":"Seasonal fruit","Frutta secca mista":"Mixed dried fruit",
+    "Castagne lessate":"Boiled chestnuts","Castagne arrosto":"Roasted chestnuts","Castagne":"Chestnuts",
+    "Uva":"Grapes","Melone":"Melon","Anguria":"Watermelon","Pesca":"Peach","Pesche":"Peaches",
+    "Albicocca":"Apricot","Albicocche":"Apricots","Fico":"Fig","Fichi":"Figs",
+    "Riso bianco":"White rice","Riso venere cotto":"Cooked black rice","Riso basmati cotto":"Cooked basmati rice",
+    "Pasta di ceci":"Chickpea pasta","Pasta di lenticchie":"Lentil pasta","Gnocchi di patate":"Potato gnocchi",
+    "Tofu silken":"Silken tofu","Tofu morbido":"Soft tofu","Tofu duro":"Firm tofu","Tofu fermentato":"Fermented tofu",
+    "Ricotta vaccina":"Cow ricotta","Ricotta di bufala":"Buffalo ricotta","Fiocchi di ricotta":"Ricotta flakes",
+    "Sgombro fresco":"Fresh mackerel","Sgombro in scatola":"Canned mackerel","Sgombro al vapore":"Steamed mackerel",
+    "Orata al vapore":"Steamed sea bream","Orata grigliata":"Grilled sea bream","Orata":"Sea bream",
+    "Branzino al forno":"Baked sea bass","Branzino al vapore":"Steamed sea bass","Branzino":"Sea bass",
+    "Polpo":"Octopus","Calamari":"Squid","Cozze":"Mussels","Vongole":"Clams","Sarde":"Sardines","Sardine":"Sardines",
+    "Acciughe":"Anchovies","Baccalà":"Salt cod","Baccalà dissalato":"Desalted cod",
+    "Manzo magro":"Lean beef","Filetto di manzo":"Beef fillet","Controfiletto":"Sirloin",
+    "Petto di tacchino":"Turkey breast","Coscia di pollo":"Chicken thigh","Fesa di tacchino":"Turkey slice",
+    "Lonza di maiale":"Pork loin","Filetto di maiale":"Pork fillet","Prosciutto crudo magro":"Lean prosciutto",
+    "Prosciutto cotto magro":"Lean cooked ham","Prosciutto cotto":"Cooked ham","Prosciutto crudo":"Prosciutto",
+    "Speck":"Speck","Mortadella light":"Light mortadella","Salame":"Salami",
+    "Albume d'uovo":"Egg white","Uovo intero":"Whole egg","Uovo":"Egg","Uova":"Eggs",
+    "Latte vaccino":"Cow's milk","Latte intero":"Whole milk","Latte scremato":"Skimmed milk",
+    "Formaggio spalmabile light":"Light cream cheese","Philadelphia light":"Light Philadelphia",
+    "Mozzarella di bufala":"Buffalo mozzarella","Mozzarella light":"Light mozzarella","Mozzarella":"Mozzarella",
+    "Parmigiano":"Parmesan","Grana padano":"Grana Padano","Pecorino":"Pecorino",
+    "Feta":"Feta","Stracchino":"Stracchino","Crescenza":"Crescenza",
+    "Pane di mais":"Corn bread","Pane senza glutine":"Gluten-free bread","Pane proteico integrale":"Whole-grain protein bread",
+    "Tortilla di mais":"Corn tortilla","Tortilla integrale":"Whole-grain tortilla","Tortilla":"Tortilla",
+    "Fiocchi di mais":"Corn flakes","Müsli senza zuccheri":"No-sugar muesli","Müsli":"Muesli",
+    "Piselli":"Peas","Piselli surgelati":"Frozen peas","Mais":"Corn","Mais in scatola":"Canned corn",
+    "Fagioli borlotti":"Borlotti beans","Fagioli cannellini":"Cannellini beans","Fagioli neri":"Black beans","Fagioli":"Beans",
+    "Soia edamame":"Soy edamame","Germogli di soia":"Bean sprouts","Germogli":"Sprouts",
+    "Zucca":"Pumpkin","Zucca al forno":"Roasted pumpkin","Zucca cotta":"Cooked pumpkin",
+    "Barbabietola":"Beetroot","Barbabietola cotta":"Cooked beetroot",
+    "Rape":"Turnips","Rapa":"Turnip","Carciofi":"Artichokes","Carciofo":"Artichoke",
+    "Cavoletti di Bruxelles":"Brussels sprouts","Cavoletti":"Brussels sprouts",
+    "Cavolo bianco":"White cabbage","Cavolo cappuccio":"Cabbage",
+    "Melanzane alla griglia":"Grilled aubergine","Melanzane al forno":"Baked aubergine","Melanzane":"Aubergine",
+    "Pomodori secchi":"Sun-dried tomatoes","Passata di pomodoro":"Tomato passata","Polpa di pomodoro":"Crushed tomatoes",
+    "Cipolla":"Onion","Cipolle":"Onions","Aglio":"Garlic","Porro":"Leek","Porri":"Leeks",
+    "Sedano":"Celery","Sedano rapa":"Celeriac","Lattuga":"Lettuce","Lattuga romana":"Romaine lettuce",
+    "Cicoria":"Chicory","Indivia":"Endive","Valeriana":"Corn salad","Crescione":"Watercress",
+    "Avocado maturo":"Ripe avocado","Guacamole fatto in casa":"Homemade guacamole",
+    "Olio di cocco":"Coconut oil","Olio di lino":"Linseed oil","Burro chiarificato":"Ghee",
+    "Aceto di mele":"Apple cider vinegar","Aceto balsamico":"Balsamic vinegar",
+    "Tamari":"Tamari","Miso":"Miso","Natto":"Natto","Kimchi":"Kimchi","Crauti":"Sauerkraut",
+    "Proteina del siero di latte":"Whey protein","Proteine in polvere":"Protein powder","Creatina":"Creatine",
+    "Barretta proteica":"Protein bar","Barretta energetica":"Energy bar",
+    "Acqua":"Water","Acqua con limone":"Lemon water","Caffè":"Coffee","Tè verde":"Green tea","Tè":"Tea",
+    "Succo di arancia":"Orange juice","Succo di mela":"Apple juice","Succo di carota":"Carrot juice",
+    "Latte di cocco":"Coconut milk","Latte di riso":"Rice milk","Latte di soia":"Soy milk",
+    "Frullato proteico":"Protein shake","Shake proteico":"Protein shake"
   },
   fr:{
-    "Petto di pollo":"Filet de poulet","Pollo":"Poulet","Salmone":"Saumon","Tonno":"Thon","Uova":"Œufs","Uova bio":"Œufs bio","Pane integrale":"Pain complet","Pane":"Pain","Riso integrale":"Riz complet","Riso":"Riz","Avena":"Avoine","Banana":"Banane","Mele":"Pommes","Mela":"Pomme","Frutti di bosco":"Fruits rouges","Spinaci":"Épinards","Broccoli":"Brocolis","Pomodorini":"Tomates cerises","Avocado":"Avocat","Limoni":"Citrons","Limone":"Citron","Yogurt greco":"Yaourt grec","Yogurt":"Yaourt","Mandorle":"Amandes","Noci":"Noix","Olio EVO":"Huile d'olive vierge extra","Olio EVO DOP":"Huile d'olive AOP","Quinoa":"Quinoa","Tonno fresco":"Thon frais","Lenticchie rosse":"Lentilles rouges","Lenticchie":"Lentilles","Tacchino":"Dinde","Tacchino a fette":"Dinde tranchée","Merluzzo":"Cabillaud","Patate dolci":"Patates douces","Patate":"Pommes de terre","Zucchine":"Courgettes","Peperoni":"Poivrons","Carote":"Carottes","Rucola":"Roquette","Insalata":"Salade","Cetrioli":"Concombres","Cetriolo":"Concombre","Ceci":"Pois chiches","Ceci secchi":"Pois chiches secs","Pasta integrale":"Pâtes complètes","Pasta":"Pâtes","Farro":"Épeautre","Latte":"Lait","Tofu":"Tofu","Tempeh":"Tempeh","Cioccolato fondente":"Chocolat noir","Miele":"Miel","Cannella":"Cannelle","Curcuma":"Curcuma","Manzo":"Bœuf","Bresaola":"Bresaola","Verdure fresche":"Légumes frais","Cereali & Legumi":"Céréales & Légumineuses","Grassi & Semi":"Graisses & Graines","Frutta":"Fruits","Proteine":"Protéines"
+    "Petto di pollo":"Filet de poulet","Pollo":"Poulet","Salmone":"Saumon","Tonno":"Thon","Uova":"Œufs","Uova bio":"Œufs bio","Pane integrale":"Pain complet","Pane":"Pain","Riso integrale":"Riz complet","Riso":"Riz","Avena":"Avoine","Banana":"Banane","Mele":"Pommes","Mela":"Pomme","Frutti di bosco":"Fruits rouges","Spinaci":"Épinards","Broccoli":"Brocolis","Pomodorini":"Tomates cerises","Avocado":"Avocat","Limoni":"Citrons","Limone":"Citron","Yogurt greco":"Yaourt grec","Yogurt":"Yaourt","Mandorle":"Amandes","Noci":"Noix","Olio EVO":"Huile d'olive vierge extra","Olio EVO DOP":"Huile d'olive AOP","Quinoa":"Quinoa","Tonno fresco":"Thon frais","Lenticchie rosse":"Lentilles rouges","Lenticchie":"Lentilles","Tacchino":"Dinde","Tacchino a fette":"Dinde tranchée","Merluzzo":"Cabillaud","Patate dolci":"Patates douces","Patate":"Pommes de terre","Zucchine":"Courgettes","Peperoni":"Poivrons","Carote":"Carottes","Rucola":"Roquette","Insalata":"Salade","Cetrioli":"Concombres","Cetriolo":"Concombre","Ceci":"Pois chiches","Ceci secchi":"Pois chiches secs","Pasta integrale":"Pâtes complètes","Pasta":"Pâtes","Farro":"Épeautre","Latte":"Lait","Tofu":"Tofu","Tempeh":"Tempeh","Cioccolato fondente":"Chocolat noir","Miele":"Miel","Cannella":"Cannelle","Curcuma":"Curcuma","Manzo":"Bœuf","Bresaola":"Bresaola","Verdure fresche":"Légumes frais","Cereali & Legumi":"Céréales & Légumineuses","Grassi & Semi":"Graisses & Graines","Frutta":"Fruits","Proteine":"Protéines",
+    "Castagne":"Châtaignes","Castagne lessate":"Châtaignes cuites","Uva":"Raisins",
+    "Melone":"Melon","Anguria":"Pastèque","Pesca":"Pêche","Albicocca":"Abricot","Fichi":"Figues",
+    "Riso bianco":"Riz blanc","Tofu silken":"Tofu soyeux","Orata":"Daurade","Branzino":"Bar",
+    "Melanzane":"Aubergine","Zucca":"Courge","Piselli":"Petits pois","Fagioli":"Haricots",
+    "Cipolla":"Oignon","Aglio":"Ail","Mozzarella":"Mozzarella","Uovo":"Œuf","Uova":"Œufs"
   },
   es:{
-    "Petto di pollo":"Pechuga de pollo","Pollo":"Pollo","Salmone":"Salmón","Tonno":"Atún","Uova":"Huevos","Uova bio":"Huevos ecológicos","Pane integrale":"Pan integral","Pane":"Pan","Riso integrale":"Arroz integral","Riso":"Arroz","Avena":"Avena","Banana":"Plátano","Banane":"Plátanos","Mele":"Manzanas","Mela":"Manzana","Frutti di bosco":"Frutos rojos","Spinaci":"Espinacas","Broccoli":"Brócoli","Pomodorini":"Tomates cherry","Avocado":"Aguacate","Limoni":"Limones","Limone":"Limón","Yogurt greco":"Yogur griego","Yogurt":"Yogur","Mandorle":"Almendras","Noci":"Nueces","Olio EVO":"Aceite de oliva virgen extra","Olio EVO DOP":"AOVE DOP","Quinoa":"Quinoa","Tonno fresco":"Atún fresco","Lenticchie rosse":"Lentejas rojas","Lenticchie":"Lentejas","Tacchino":"Pavo","Tacchino a fette":"Pavo en lonchas","Merluzzo":"Bacalao","Patate dolci":"Boniatos","Patate":"Patatas","Zucchine":"Calabacines","Peperoni":"Pimientos","Carote":"Zanahorias","Rucola":"Rúcula","Insalata":"Ensalada","Cetrioli":"Pepinos","Cetriolo":"Pepino","Ceci":"Garbanzos","Ceci secchi":"Garbanzos secos","Pasta integrale":"Pasta integral","Pasta":"Pasta","Farro":"Espelta","Latte":"Leche","Tofu":"Tofu","Tempeh":"Tempeh","Cioccolato fondente":"Chocolate negro","Miele":"Miel","Cannella":"Canela","Curcuma":"Cúrcuma","Manzo":"Ternera","Bresaola":"Bresaola","Verdure fresche":"Verduras frescas","Cereali & Legumi":"Cereales y Legumbres","Grassi & Semi":"Grasas y Semillas","Frutta":"Frutas","Proteine":"Proteínas"
+    "Petto di pollo":"Pechuga de pollo","Pollo":"Pollo","Salmone":"Salmón","Tonno":"Atún","Uova":"Huevos","Uova bio":"Huevos ecológicos","Pane integrale":"Pan integral","Pane":"Pan","Riso integrale":"Arroz integral","Riso":"Arroz","Avena":"Avena","Banana":"Plátano","Banane":"Plátanos","Mele":"Manzanas","Mela":"Manzana","Frutti di bosco":"Frutos rojos","Spinaci":"Espinacas","Broccoli":"Brócoli","Pomodorini":"Tomates cherry","Avocado":"Aguacate","Limoni":"Limones","Limone":"Limón","Yogurt greco":"Yogur griego","Yogurt":"Yogur","Mandorle":"Almendras","Noci":"Nueces","Olio EVO":"Aceite de oliva virgen extra","Olio EVO DOP":"AOVE DOP","Quinoa":"Quinoa","Tonno fresco":"Atún fresco","Lenticchie rosse":"Lentejas rojas","Lenticchie":"Lentejas","Tacchino":"Pavo","Tacchino a fette":"Pavo en lonchas","Merluzzo":"Bacalao","Patate dolci":"Boniatos","Patate":"Patatas","Zucchine":"Calabacines","Peperoni":"Pimientos","Carote":"Zanahorias","Rucola":"Rúcula","Insalata":"Ensalada","Cetrioli":"Pepinos","Cetriolo":"Pepino","Ceci":"Garbanzos","Ceci secchi":"Garbanzos secos","Pasta integrale":"Pasta integral","Pasta":"Pasta","Farro":"Espelta","Latte":"Leche","Tofu":"Tofu","Tempeh":"Tempeh","Cioccolato fondente":"Chocolate negro","Miele":"Miel","Cannella":"Canela","Curcuma":"Cúrcuma","Manzo":"Ternera","Bresaola":"Bresaola","Verdure fresche":"Verduras frescas","Cereali & Legumi":"Cereales y Legumbres","Grassi & Semi":"Grasas y Semillas","Frutta":"Frutas","Proteine":"Proteínas",
+    "Castagne":"Castañas","Castagne lessate":"Castañas cocidas","Uva":"Uvas",
+    "Melone":"Melón","Anguria":"Sandía","Pesca":"Melocotón","Albicocca":"Albaricoque","Fichi":"Higos",
+    "Riso bianco":"Arroz blanco","Tofu silken":"Tofu sedoso","Orata":"Dorada","Branzino":"Lubina",
+    "Melanzane":"Berenjena","Zucca":"Calabaza","Piselli":"Guisantes","Fagioli":"Judías",
+    "Cipolla":"Cebolla","Aglio":"Ajo","Mozzarella":"Mozzarella","Uovo":"Huevo","Uova":"Huevos"
   },
   de:{
-    "Petto di pollo":"Hähnchenbrust","Pollo":"Hähnchen","Salmone":"Lachs","Tonno":"Thunfisch","Uova":"Eier","Uova bio":"Bio-Eier","Pane integrale":"Vollkornbrot","Pane":"Brot","Riso integrale":"Vollkornreis","Riso":"Reis","Avena":"Hafer","Banana":"Banane","Banane":"Bananen","Mele":"Äpfel","Mela":"Apfel","Frutti di bosco":"Beeren","Spinaci":"Spinat","Broccoli":"Brokkoli","Pomodorini":"Kirschtomaten","Avocado":"Avocado","Limoni":"Zitronen","Limone":"Zitrone","Yogurt greco":"Griechischer Joghurt","Yogurt":"Joghurt","Mandorle":"Mandeln","Noci":"Walnüsse","Olio EVO":"Natives Olivenöl extra","Olio EVO DOP":"Natives Olivenöl extra g.U.","Quinoa":"Quinoa","Tonno fresco":"Frischer Thunfisch","Lenticchie rosse":"Rote Linsen","Lenticchie":"Linsen","Tacchino":"Pute","Tacchino a fette":"Putenscheiben","Merluzzo":"Kabeljau","Patate dolci":"Süßkartoffeln","Patate":"Kartoffeln","Zucchine":"Zucchini","Peperoni":"Paprika","Carote":"Karotten","Rucola":"Rucola","Insalata":"Salat","Cetrioli":"Gurken","Cetriolo":"Gurke","Ceci":"Kichererbsen","Ceci secchi":"Getrocknete Kichererbsen","Pasta integrale":"Vollkornpasta","Pasta":"Nudeln","Farro":"Dinkel","Latte":"Milch","Tofu":"Tofu","Tempeh":"Tempeh","Cioccolato fondente":"Zartbitterschokolade","Miele":"Honig","Cannella":"Zimt","Curcuma":"Kurkuma","Manzo":"Rind","Bresaola":"Bresaola","Verdure fresche":"Frisches Gemüse","Cereali & Legumi":"Getreide & Hülsenfrüchte","Grassi & Semi":"Fette & Samen","Frutta":"Obst","Proteine":"Proteine"
+    "Petto di pollo":"Hähnchenbrust","Pollo":"Hähnchen","Salmone":"Lachs","Tonno":"Thunfisch","Uova":"Eier","Uova bio":"Bio-Eier","Pane integrale":"Vollkornbrot","Pane":"Brot","Riso integrale":"Vollkornreis","Riso":"Reis","Avena":"Hafer","Banana":"Banane","Banane":"Bananen","Mele":"Äpfel","Mela":"Apfel","Frutti di bosco":"Beeren","Spinaci":"Spinat","Broccoli":"Brokkoli","Pomodorini":"Kirschtomaten","Avocado":"Avocado","Limoni":"Zitronen","Limone":"Zitrone","Yogurt greco":"Griechischer Joghurt","Yogurt":"Joghurt","Mandorle":"Mandeln","Noci":"Walnüsse","Olio EVO":"Natives Olivenöl extra","Olio EVO DOP":"Natives Olivenöl extra g.U.","Quinoa":"Quinoa","Tonno fresco":"Frischer Thunfisch","Lenticchie rosse":"Rote Linsen","Lenticchie":"Linsen","Tacchino":"Pute","Tacchino a fette":"Putenscheiben","Merluzzo":"Kabeljau","Patate dolci":"Süßkartoffeln","Patate":"Kartoffeln","Zucchine":"Zucchini","Peperoni":"Paprika","Carote":"Karotten","Rucola":"Rucola","Insalata":"Salat","Cetrioli":"Gurken","Cetriolo":"Gurke","Ceci":"Kichererbsen","Ceci secchi":"Getrocknete Kichererbsen","Pasta integrale":"Vollkornpasta","Pasta":"Nudeln","Farro":"Dinkel","Latte":"Milch","Tofu":"Tofu","Tempeh":"Tempeh","Cioccolato fondente":"Zartbitterschokolade","Miele":"Honig","Cannella":"Zimt","Curcuma":"Kurkuma","Manzo":"Rind","Bresaola":"Bresaola","Verdure fresche":"Frisches Gemüse","Cereali & Legumi":"Getreide & Hülsenfrüchte","Grassi & Semi":"Fette & Samen","Frutta":"Obst","Proteine":"Proteine",
+    "Castagne":"Kastanien","Castagne lessate":"Gekochte Kastanien","Uva":"Weintrauben",
+    "Melone":"Melone","Anguria":"Wassermelone","Pesca":"Pfirsich","Albicocca":"Aprikose","Fichi":"Feigen",
+    "Riso bianco":"Weißer Reis","Tofu silken":"Seidenweicher Tofu","Orata":"Brasse","Branzino":"Wolfsbarsch",
+    "Melanzane":"Aubergine","Zucca":"Kürbis","Piselli":"Erbsen","Fagioli":"Bohnen",
+    "Cipolla":"Zwiebel","Aglio":"Knoblauch","Mozzarella":"Mozzarella","Uovo":"Ei","Uova":"Eier"
   },
   ar:{
     "Petto di pollo":"صدر دجاج","Pollo":"دجاج","Salmone":"سلمون","Tonno":"تونة","Uova":"بيض","Uova bio":"بيض عضوي","Pane integrale":"خبز كامل الحبوب","Pane":"خبز","Riso integrale":"أرز بنّي","Riso":"أرز","Avena":"شوفان","Banana":"موزة","Mele":"تفاح","Mela":"تفاحة","Frutti di bosco":"توت متنوع","Spinaci":"سبانخ","Broccoli":"بروكلي","Pomodorini":"طماطم كرزية","Avocado":"أفوكادو","Limone":"ليمون","Yogurt greco":"زبادي يوناني","Yogurt":"زبادي","Mandorle":"لوز","Noci":"جوز","Olio EVO":"زيت زيتون بكر","Quinoa":"كينوا","Tonno fresco":"تونة طازجة","Lenticchie rosse":"عدس أحمر","Lenticchie":"عدس","Tacchino":"ديك رومي","Merluzzo":"سمك القد","Patate dolci":"بطاطا حلوة","Patate":"بطاطس","Zucchine":"كوسا","Peperoni":"فلفل","Carote":"جزر","Rucola":"جرجير","Insalata":"سلطة","Cetrioli":"خيار","Cetriolo":"خيار","Ceci":"حمص","Pasta integrale":"معكرونة كاملة","Pasta":"معكرونة","Farro":"فاروـ قمح قديم","Latte":"حليب","Tofu":"توفو","Tempeh":"تمبيه","Cioccolato fondente":"شوكولاتة داكنة","Miele":"عسل","Cannella":"قرفة","Curcuma":"كركم","Manzo":"لحم بقر","Bresaola":"بريسولا","Verdure fresche":"خضروات طازجة","Cereali & Legumi":"حبوب وبقوليات","Grassi & Semi":"دهون وبذور","Frutta":"فواكه","Proteine":"بروتينات"
@@ -12471,61 +12556,13 @@ const SRC_STUDI = [
   {org:"Wishnofsky M — 1958",sub:"American Journal of Clinical Nutrition",note:"Regola delle 7700 kcal: 1 kg di grasso corporeo ≈ 7700 kcal di deficit. Base del calcolo del tasso di perdita settimanale.",noteEN:"The 7700 kcal rule: 1 kg of body fat ≈ 7700 kcal deficit. Foundation of weekly weight loss rate estimation.",badge:"NEW"},
   {org:"ACSM Position Stand — 2021",sub:"Medicine & Science in Sports & Exercise",note:"Range sicuro di perdita di peso: 0.25–1.0 kg/settimana. Pavimento calorico: ≥1200 kcal (donne) / ≥1500 kcal (uomini). Deficit raccomandato: 300–500 kcal/die.",noteEN:"Safe weight loss range: 0.25–1.0 kg/week. Caloric floor: ≥1200 kcal (women) / ≥1500 kcal (men). Recommended deficit: 300–500 kcal/day.",badge:"NEW"},
   {org:"Barakat CI et al. — 2020",sub:"Strength & Conditioning Journal",note:"Ricomposizione corporea (recomp): deficit moderato 200–350 kcal + alto apporto proteico 1.6–2.4g/kg per perdere grasso e mantenere/guadagnare massa magra simultaneamente.",noteEN:"Body recomposition: moderate deficit 200–350 kcal + high protein 1.6–2.4g/kg to lose fat and maintain/gain lean mass simultaneously.",badge:"NEW"},
+  // ── Fonti performance atletica ──
+  {org:"Thomas DT, Erdman KA, Burke LM — 2016",sub:"Journal of the Academy of Nutrition and Dietetics",note:"Posizione ufficiale di AND, Dietitians of Canada e ACSM su nutrizione e performance atletica. Macro target, timing, idratazione per atleti.",noteEN:"Official position of AND, Dietitians of Canada and ACSM on nutrition and athletic performance. Macro targets, timing, hydration for athletes.",badge:"NEW"},
+  {org:"Maughan RJ et al. — 2018",sub:"British Journal of Sports Medicine · IOC Consensus Statement",note:"Dichiarazione di consenso del CIO su integratori alimentari e atleti d'élite. Protocolli di nutrizione periodizzata per la performance.",noteEN:"IOC consensus statement on dietary supplements and elite athletes. Periodised nutrition protocols for performance.",badge:"NEW"},
+  {org:"Antonio J et al. — 2021",sub:"Journal of the International Society of Sports Nutrition",note:"ISSN Position Stand su creatina, proteine e supplementazione per atleti di forza e potenza. Dose: 3-5g/die di creatina monoidrato.",noteEN:"ISSN Position Stand on creatine, protein and supplementation for strength and power athletes. Dose: 3-5g/day of creatine monohydrate.",badge:"NEW"},
+  {org:"Helms ER, Aragon AA, Fitschen PJ — 2014",sub:"Journal of the International Society of Sports Nutrition",note:"Raccomandazioni evidence-based per atleti: deficit calorico moderato, proteine 2.3-3.1g/kg, frequenza dei pasti per ottimizzare la composizione corporea.",noteEN:"Evidence-based recommendations for athletes: moderate caloric deficit, protein 2.3-3.1g/kg, meal frequency for optimal body composition.",badge:"NEW"},
+  {org:"Reale R, Slater G, Burke LM — 2017",sub:"International Journal of Sports Physiology and Performance",note:"Strategie di gestione del peso per sport da combattimento: riduzione acuta del peso con mantenimento della performance.",noteEN:"Weight management strategies for combat sports: acute weight reduction while maintaining performance.",badge:"NEW"},
 ];
-
-// ── NUOVE FONTI — Preparazione Gara Agonistica ──
-// Aggiunte con l'introduzione del goal "competition" (April 2026)
-const SRC_SPORT = [
-  {
-    org:"Thomas DT, Erdman KA, Burke LM — 2016",
-    sub:"Journal of the Academy of Nutrition and Dietetics",
-    note:"Posizione ufficiale di AND, Dietitians of Canada e ACSM su nutrizione e performance atletica. Macro target, timing, idratazione per atleti agonisti.",
-    noteEN:"Official position of AND, Dietitians of Canada and ACSM on nutrition and athletic performance. Macro targets, timing, hydration for competitive athletes.",
-    badge:"NEW",
-    sport:"Tutti gli sport",sportEN:"All sports",
-  },
-  {
-    org:"Maughan RJ et al. — 2018",
-    sub:"British Journal of Sports Medicine · IOC Consensus Statement",
-    note:"Dichiarazione di consenso del CIO su integratori alimentari e atleti d'élite. Protocolli di nutrizione periodizzata per la gara.",
-    noteEN:"IOC consensus statement on dietary supplements and elite athletes. Periodised nutrition protocols for competition.",
-    badge:"NEW",
-    sport:"Tutti gli sport",sportEN:"All sports",
-  },
-  {
-    org:"Antonio J et al. — 2021",
-    sub:"Journal of the International Society of Sports Nutrition",
-    note:"ISSN Position Stand aggiornato su creatina, proteine e supplementazione per atleti di forza e potenza. Dose: 3-5g/die di creatina monoidrato.",
-    noteEN:"Updated ISSN Position Stand on creatine, protein and supplementation for strength and power athletes. Dose: 3-5g/day of creatine monohydrate.",
-    badge:"NEW",
-    sport:"Forza / Potenza",sportEN:"Strength / Power",
-  },
-  {
-    org:"Helms ER, Aragon AA, Fitschen PJ — 2014",
-    sub:"Journal of the International Society of Sports Nutrition",
-    note:"Raccomandazioni evidence-based per la preparazione di gare di bodybuilding naturale: deficit calorico, proteine 2.3-3.1g/kg, frequenza dei pasti.",
-    noteEN:"Evidence-based recommendations for natural bodybuilding competition preparation: caloric deficit, protein 2.3-3.1g/kg, meal frequency.",
-    badge:"NEW",
-    sport:"Estetica / Bodybuilding",sportEN:"Aesthetics / Bodybuilding",
-  },
-  {
-    org:"Reale R, Slater G, Burke LM — 2017",
-    sub:"International Journal of Sports Physiology and Performance",
-    note:"Strategie di riduzione acuta del peso per sport da combattimento (boxe, wrestling, MMA). Gestione della categoria di peso con mantenimento della performance.",
-    noteEN:"Acute weight reduction strategies for combat sports (boxing, wrestling, MMA). Weight category management while maintaining performance.",
-    badge:"NEW",
-    sport:"Sport da Combattimento",sportEN:"Combat Sports",
-  },
-  {
-    org:"Burke et al. — 2011",
-    sub:"Journal of Sports Sciences",
-    note:"Già in DUBI. Carb loading per atleti di endurance: 8-12g/kg/die nei 3 giorni pre-gara, 1-4g/kg 1-4h prima dell'evento.",
-    noteEN:"Already in DUBI. Carb loading for endurance athletes: 8-12g/kg/day in the 3 days pre-race, 1-4g/kg 1-4h before the event.",
-    badge:"GIÀ PRESENTE",
-    sport:"Endurance",sportEN:"Endurance",
-  },
-];
-
 // ═══════════════════════════════════════════════
 // ICONS
 // ═══════════════════════════════════════════════
@@ -15721,21 +15758,13 @@ const GOALS = [
   {id:"definition",ic:"scissors",tk:"goal.definition.t",dk:"goal.definition.d"},
   {id:"gain",ic:"dumbbell",tk:"goal.gain.t",dk:"goal.gain.d"},
   {id:"maintain",ic:"balance",tk:"goal.maintain.t",dk:"goal.maintain.d"},
-  {id:"competition",ic:"star",tk:"goal.competition.t",dk:"goal.competition.d"},
 ];
 
-const COMPETITION_SPORTS = [
-  {id:"endurance", ic:"steps",   tk:"comp.sport.endurance.t", dk:"comp.sport.endurance.d", macro:"62% C · 18% P · 20% G"},
-  {id:"strength",  ic:"dumbbell",tk:"comp.sport.strength.t",  dk:"comp.sport.strength.d",  macro:"42% C · 32% P · 26% G"},
-  {id:"aesthetic", ic:"scissors",tk:"comp.sport.aesthetic.t", dk:"comp.sport.aesthetic.d", macro:"45% C · 35% P · 20% G"},
-  {id:"team",      ic:"balance", tk:"comp.sport.team.t",      dk:"comp.sport.team.d",       macro:"50% C · 25% P · 25% G"},
-  {id:"combat",    ic:"flame",   tk:"comp.sport.combat.t",    dk:"comp.sport.combat.d",     macro:"42% C · 33% P · 25% G"},
-];
+
 
 const GoalStep = ({d, u, page}) => {
   const { t, lang } = useT();
 
-  const racePhase = d.goal==="competition" && d.competitionDate ? calcRacePhase(d.competitionDate) : null;
 
   const handleGoalTap = (goalId) => {
     u("goal", goalId);
@@ -15778,31 +15807,27 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
       {page === 0 ? (<>
       {GOALS.map(g=>{
         const sel    = d.goal===g.id;
-        const isComp = g.id==="competition";
         return (
           <button key={g.id} onClick={()=>handleGoalTap(g.id)}
             style={{width:"100%",display:"flex",alignItems:"flex-start",gap:14,padding:16,marginBottom:10,borderRadius:16,
-              border:`1.5px solid ${sel ? (isComp?"#C9A87C":T.accent) : T.border}`,
-              background: sel ? (isComp?"rgba(201,168,124,0.12)":T.sel) : T.card,
+              border:`1.5px solid ${sel ? T.accent : T.border}`,
+              background: sel ? T.sel : T.card,
               cursor:"pointer",textAlign:"left",position:"relative",overflow:"hidden"}}>
             <div style={{width:44,height:44,borderRadius:14,
-              background: sel ? (isComp?"rgba(201,168,124,0.22)":T.accentD+"22") : T.bg,
+              background: sel ? T.accentD+"22" : T.bg,
               display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-              border:`1px solid ${sel ? (isComp?"#C9A87C":T.accent) : T.border}`,
-              opacity: 1}}>
-              <Ico n={g.ic} size={22} c={sel ? (isComp?"#B8893A":T.accentD) : T.muted}/>
+              border:`1px solid ${sel ? T.accent : T.border}`}}>
+              <Ico n={g.ic} size={22} c={sel ? T.accentD : T.muted}/>
             </div>
-            <div style={{flex:1, opacity: 1}}>
+            <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                 <span style={{fontSize:15,fontWeight:600,color:T.text}}>{t(g.tk)}</span>
-                {isComp && <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:6,
-                  background:"rgba(201,168,124,0.2)",color:"#B8893A"}}>{t("goal.competition.badge")}</span>}
               </div>
               <div style={{fontSize:13,color:T.muted,marginTop:2}}>{t(g.dk)}</div>
             </div>
             {sel && (
               <div style={{width:22,height:22,borderRadius:"50%",
-                background:isComp?"#B8893A":T.accentD,
+                background:T.accentD,
                 display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                 <Ico n="check" size={12} c={T.white}/>
               </div>
@@ -15814,7 +15839,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
       </>) : (<>
 
       {/* ── Target peso / BF — per fatLoss, gain, definition, competition ── */}
-      {["fatLoss","gain","definition","competition"].includes(d.goal) && (
+      {["fatLoss","gain","definition"].includes(d.goal) && (
         <div style={{marginBottom:10,padding:"16px",background:T.sel,borderRadius:16,border:`1px solid ${T.border}`}}>
           <p style={{fontSize:11,color:T.muted,fontWeight:700,letterSpacing:0.5,marginBottom:14}}>
             {t("goal.target.section")} <span style={{fontWeight:400,color:T.muted,letterSpacing:0}}>{t("goal.target.optional")}</span>
@@ -15853,40 +15878,6 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
 
           </div>
 
-          {/* % Grasso Corporeo target — solo per competition */}
-          {d.goal === "competition" && (
-            <div>
-              <p style={{fontSize:13,color:T.text,fontWeight:600,marginBottom:8}}>{t("goal.target.bf")}</p>
-              <div style={{display:"flex",alignItems:"center",gap:10,background:T.card,
-                border:`1.5px solid ${d.targetBf?T.accent:T.border}`,borderRadius:14,padding:"10px 16px",transition:"border-color 0.2s"}}>
-                <input
-                  type="number" inputMode="decimal"
-                  value={d.targetBf||""}
-                  onChange={e=>{ const v=e.target.value; if(v===""||(!isNaN(parseFloat(v))&&parseFloat(v)>0)) u("targetBf",v); }}
-                  placeholder="—"
-                  style={{flex:1,fontSize:20,fontWeight:700,color:T.text,background:"none",border:"none",outline:"none",
-                    fontFamily:"inherit",MozAppearance:"textfield",WebkitAppearance:"none",appearance:"textfield",textAlign:"center"}}
-                />
-                <span style={{fontSize:13,color:T.muted,fontWeight:500,flexShrink:0}}>%</span>
-                {d.targetBf && (
-                  <button onClick={()=>u("targetBf","")}
-                    style={{background:"none",border:"none",cursor:"pointer",color:T.muted,padding:"0 0 0 4px",fontSize:18,lineHeight:1,flexShrink:0}}>×</button>
-                )}
-              </div>
-              {bfWarn && (
-                <div style={{display:"flex",gap:6,alignItems:"flex-start",marginTop:6,padding:"8px 10px",
-                  background: bfNum<minBf?"rgba(196,123,123,0.12)":"rgba(201,168,124,0.12)",borderRadius:8}}>
-                  <Ico n="info" size={12} c={bfNum<minBf?"#C47B7B":"#C9A87C"}/>
-                  <p style={{fontSize:11,color:bfNum<minBf?"#C47B7B":"#B8893A",margin:0,lineHeight:1.5}}>{bfWarn}</p>
-                </div>
-              )}
-              <p style={{fontSize:11,color:T.muted,lineHeight:1.5,marginTop:6}}>
-                {d.gender==="F"
-                  ? t("goal.target.refF")
-                  : t("goal.target.refM")}
-              </p>
-            </div>
-          )}
 
           <div style={{display:"flex",gap:5,alignItems:"flex-start",marginTop:12,opacity:0.65}}>
             <Ico n="book" size={11} c={T.muted}/>
@@ -15898,87 +15889,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
       )}
 
       {/* Sezione agonismo inclusa nella beta gratuita */}
-      {d.goal==="competition" && (
-        <div style={{marginTop:4,padding:"16px",background:"rgba(201,168,124,0.08)",borderRadius:16,border:"1.5px solid rgba(201,168,124,0.4)"}}>
 
-          {/* Sport selector */}
-          <p style={{fontSize:11,color:"#B8893A",fontWeight:700,letterSpacing:0.5,marginBottom:12}}>
-            {t("goal.step.sport.header")}
-          </p>
-          {COMPETITION_SPORTS.map(s=>(
-            <button key={s.id} onClick={()=>u("competitionSport",s.id)}
-              style={{width:"100%",display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",marginBottom:8,
-                borderRadius:14,border:`1.5px solid ${d.competitionSport===s.id?"#C9A87C":T.border}`,
-                background:d.competitionSport===s.id?"rgba(201,168,124,0.15)":T.card,
-                cursor:"pointer",textAlign:"left"}}>
-              <div style={{width:36,height:36,borderRadius:11,
-                background:d.competitionSport===s.id?"rgba(201,168,124,0.25)":T.bg,
-                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Ico n={s.ic} size={18} c={d.competitionSport===s.id?"#B8893A":T.muted}/>
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:600,color:T.text,marginBottom:2}}>{t(s.tk)}</div>
-                <div style={{fontSize:11,color:T.muted,marginBottom:3}}>{t(s.dk)}</div>
-                <div style={{fontSize:10,color:"#B8893A",fontWeight:600}}>{s.macro}</div>
-              </div>
-              {d.competitionSport===s.id&&<div style={{width:20,height:20,borderRadius:"50%",background:"#B8893A",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
-                <Ico n="check" size={10} c={T.white}/>
-              </div>}
-            </button>
-          ))}
-
-          {/* Data della gara */}
-          <div style={{marginTop:14}}>
-            <p style={{fontSize:11,color:"#B8893A",fontWeight:700,letterSpacing:0.5,marginBottom:10}}>
-              {t("goal.step.race.header")}
-            </p>
-            <div style={{background:T.card,border:`1.5px solid ${d.competitionDate?"#C9A87C":T.border}`,borderRadius:14,padding:"4px 16px",display:"flex",alignItems:"center",gap:10}}>
-              <Ico n="cal" size={18} c={d.competitionDate?"#B8893A":T.muted}/>
-              <input
-                type="date"
-                value={d.competitionDate||""}
-                min={fmt(minDate)}
-                max={fmt(maxDate)}
-                onChange={e=>u("competitionDate",e.target.value)}
-                style={{flex:1,padding:"13px 0",fontSize:15,fontWeight:600,color:T.text,
-                  background:"none",border:"none",outline:"none",fontFamily:"inherit",
-                  colorScheme:"light",cursor:"pointer"}}
-              />
-            </div>
-
-            {/* Fase nutrizionale calcolata */}
-            {racePhase && (
-              <div style={{marginTop:10,padding:"12px 14px",
-                background:`${racePhase.color}14`,
-                border:`1.5px solid ${racePhase.color}44`,borderRadius:12,
-                display:"flex",gap:10,alignItems:"flex-start"}}>
-                <Ico n={racePhase.icon} size={16} c={racePhase.color}/>
-                <div>
-                  <p style={{fontSize:12,fontWeight:700,color:racePhase.color,margin:"0 0 3px",letterSpacing:0.3}}>
-                    {t(racePhase.labelKey).toUpperCase()}
-                    {racePhase.weeks && racePhase.weeks > 0 ? ` · ${t("goal.race.weeksLeft",{n:racePhase.weeks})}` : ""}
-                  </p>
-                  <p style={{fontSize:12,color:T.text,margin:0,lineHeight:1.5}}>{t(racePhase.noteKey, racePhase.weeks ? {weeks:racePhase.weeks} : {})}</p>
-                </div>
-              </div>
-            )}
-
-            {!d.competitionDate && (
-              <p style={{fontSize:11,color:T.muted,margin:"8px 0 0",textAlign:"center"}}>
-                {t("goal.step.race.nodate")}
-              </p>
-            )}
-          </div>
-
-          {/* Fonti */}
-          <div style={{marginTop:12,padding:"10px 12px",background:"rgba(201,168,124,0.1)",borderRadius:10,display:"flex",gap:8,alignItems:"flex-start"}}>
-            <Ico n="info" size={13} c="#B8893A"/>
-            <p style={{fontSize:11,color:"#B8893A",lineHeight:1.5,margin:0}}>
-              <strong>Burke et al. 2011 · IOC 2018 · ISSN 2021 · Thomas et al. 2016</strong>
-            </p>
-          </div>
-        </div>
-      )}
 
       {d.goal === "maintain" && (
         <div style={{padding:"24px 20px",background:T.sel,borderRadius:16,border:`1px solid ${T.border}`,textAlign:"center"}}>
@@ -16099,14 +16010,34 @@ const AllergyChipPicker = ({ value, onChange, compact = false }) => {
   );
 };
 
-const SportChipPicker = ({ value, onChange, compact = false }) => {
+const SportChipPicker = ({ value, legacyValue = "", onChange, compact = false }) => {
   const { t, lang } = useT();
   const [custom, setCustom] = React.useState("");
-  const selected = toCanonicalSport(value);
+  const selected = normalizeSports(value, legacyValue);
+  const MAX_SPORTS = 5;
+  const lowIntensitySports = ["yoga","pilates","golf","archery","equestrian","dance"];
+  const copy = ({
+    it:{selected:"selezionati",limit:"Puoi selezionare fino a 5 sport.",low:"Profilo benessere: l'ottimizzazione sportiva dei macronutrienti sarà più leggera."},
+    en:{selected:"selected",limit:"You can select up to 5 sports.",low:"Wellness profile: sport-specific macro optimization will be lighter."},
+    fr:{selected:"sélectionnés",limit:"Vous pouvez sélectionner jusqu'à 5 sports.",low:"Profil bien-être : l'optimisation sportive des macros sera plus légère."},
+    es:{selected:"seleccionados",limit:"Puedes seleccionar hasta 5 deportes.",low:"Perfil de bienestar: la optimización deportiva de macros será más ligera."},
+    de:{selected:"ausgewählt",limit:"Du kannst bis zu 5 Sportarten auswählen.",low:"Wellness-Profil: Die sportspezifische Makro-Optimierung fällt leichter aus."},
+    pt:{selected:"selecionados",limit:"Podes selecionar até 5 desportos.",low:"Perfil de bem-estar: a otimização desportiva dos macros será mais leve."},
+    ar:{selected:"محدد",limit:"يمكنك اختيار ما يصل إلى 5 رياضات.",low:"ملف العافية: سيكون تحسين المغذيات الكبرى الخاص بالرياضة أخف."},
+    zh:{selected:"已选择",limit:"最多可选择 5 项运动。",low:"健康型配置：运动专项宏量营养优化会较轻。"},
+    ja:{selected:"選択済み",limit:"最大5種目まで選択できます。",low:"ウェルネスプロフィール：競技別のマクロ最適化は控えめになります。"},
+    ru:{selected:"выбрано",limit:"Можно выбрать до 5 видов спорта.",low:"Оздоровительный профиль: спортивная оптимизация макронутриентов будет мягче."}
+  }[lang] || {selected:"selected",limit:"You can select up to 5 sports.",low:"Wellness profile: sport-specific macro optimization will be lighter."});
+  const toggle = (key) => {
+    const next = selected.includes(key)
+      ? selected.filter(item => item !== key)
+      : (selected.length < MAX_SPORTS ? [...selected, key] : selected);
+    onChange(next);
+  };
   const addCustom = () => {
     const clean = toCanonicalSport(custom);
-    if (!clean) return;
-    onChange(clean);
+    if (!clean || selected.includes(clean) || selected.length >= MAX_SPORTS) return;
+    onChange([...selected, clean]);
     setCustom("");
   };
   const SPORT_GROUPS_UI = [
@@ -16124,9 +16055,9 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
           </p>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {group.keys.map(key => {
-              const active = selected === key;
+              const active = selected.includes(key);
               return (
-                <button key={key} onClick={() => onChange(key)}
+                <button key={key} onClick={() => toggle(key)}
                   style={{padding:compact?"6px 10px":"9px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:11,fontWeight:800,cursor:"pointer"}}>
                   {t(`sport.${key}`)}
                 </button>
@@ -16139,9 +16070,9 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
       <div style={{marginBottom:compact?8:12}}>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
           {["other"].map(key => {
-            const active = selected === key;
+            const active = selected.includes(key);
             return (
-              <button key={key} onClick={() => onChange(key)}
+              <button key={key} onClick={() => toggle(key)}
                 style={{padding:compact?"6px 10px":"9px 12px",borderRadius:999,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:active?T.accentD:T.text,fontSize:11,fontWeight:800,cursor:"pointer"}}>
                 {t(`sport.${key}`)}
               </button>
@@ -16149,8 +16080,10 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
           })}
         </div>
       </div>
-      {!SPORT_KEYS.includes(selected) && selected && (
-        <p style={{fontSize:11,color:T.accentD,margin:"8px 2px 0",fontWeight:800}}>{selected}</p>
+      {selected.some(item => !SPORT_KEYS.includes(item)) && (
+        <p style={{fontSize:11,color:T.accentD,margin:"8px 2px 0",fontWeight:800}}>
+          {selected.filter(item => !SPORT_KEYS.includes(item)).join(" · ")}
+        </p>
       )}
       <div style={{display:"flex",gap:8,marginTop:10}}>
         <input value={custom} onChange={e=>setCustom(e.target.value)} placeholder={t("pref.sport.ph")}
@@ -16161,6 +16094,13 @@ const SportChipPicker = ({ value, onChange, compact = false }) => {
           {t("allergy.addCustom")}
         </button>
       </div>
+      <div style={{display:"flex",justifyContent:"space-between",gap:10,margin:"9px 2px 0"}}>
+        <span style={{fontSize:11,fontWeight:900,color:T.accentD}}>{selected.length} / {MAX_SPORTS} {copy.selected}</span>
+        {selected.length >= MAX_SPORTS && <span style={{fontSize:11,color:T.muted}}>{copy.limit}</span>}
+      </div>
+      {selected.length > 0 && selected.every(item => lowIntensitySports.includes(item)) && (
+        <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"9px 2px 0"}}>ⓘ {copy.low}</p>
+      )}
     </div>
   );
 };
@@ -16242,7 +16182,14 @@ const PreferencesStep = ({d, u, page}) => {
 
       {/* Sport */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.sport")}</p>
-      <SportChipPicker value={d.sport} onChange={v=>u("sport",v)} />
+      <SportChipPicker
+        value={d.sports}
+        legacyValue={d.sport}
+        onChange={sports=>{
+          u("sports", sports);
+          u("sport", sports[0] || "");
+        }}
+      />
 
       {/* Orario allenamento */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.training")}</p>
@@ -16423,8 +16370,7 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   goal:"fatLoss",
   targetWeight:"",
   targetBodyFat:"",
-  competitionSport:"endurance",
-  competitionDate:"",
+
   occupation:"sedentary",
   workoutDays:"3-4",
   workoutDuration:"45-60",
@@ -16435,6 +16381,7 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   dietIntensity:"balanced",
   allergies:"",
   sport:"",
+  sports:[],
   trainingTime:"evening",
   breakfastPref:"entrambi",
   dayStart:"07:00",
@@ -16491,8 +16438,7 @@ const normalizeInitialOnboardingData = (source) => {
     goal: toAppGoal(source.goal || defaultOnboardingData.goal),
     targetWeight: source.target_weight || source.targetWeight || "",
     targetBodyFat: source.target_body_fat || source.targetBodyFat || "",
-    competitionSport: source.competition_sport || source.competitionSport || "",
-    competitionDate: source.competition_date || source.competitionDate || "",
+
     occupation: source.occupation || defaultOnboardingData.occupation,
     workoutDays: source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
     workoutDuration: source.workout_duration || source.workoutDuration || defaultOnboardingData.workoutDuration,
@@ -16502,7 +16448,8 @@ const normalizeInitialOnboardingData = (source) => {
     diet: toCanonicalDiet(source.diet || defaultOnboardingData.diet),
     dietIntensity: source.diet_intensity || source.dietIntensity || defaultOnboardingData.dietIntensity,
     allergies: serializeCanonicalList(source.allergies || ""),
-    sport: toCanonicalSport(source.sport || ""),
+    sports: normalizeSports(source.sports, source.sport),
+    sport: normalizeSports(source.sports, source.sport)[0] || "",
     trainingTime: normalizeTrainingTime(source.training_time || source.trainingTime || defaultOnboardingData.trainingTime),
     breakfastPref: toAppBreakfast(source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref),
     dayStart: safeTime(source.day_start || source.dayStart, "07:00"),
@@ -18499,7 +18446,7 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
   const { t } = useT();
   const GOAL_LABELS = {
     fatLoss: t("goal.labels.fatLoss"), definition: t("goal.labels.definition"),
-    gain: t("goal.labels.gain"), maintain: t("goal.labels.maintain"), competition: t("goal.labels.competition")
+    gain: t("goal.labels.gain"), maintain: t("goal.labels.maintain")
   };
 
   const handleSearch = () => {
@@ -18788,7 +18735,7 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
                   {t("partner.found.code",{code:partnerProfile.userData?.dubiCode||"—"})}
                 </p>
                 <p style={{fontSize:11,color:T.muted,margin:0}}>
-                  {({fatLoss:t("goal.labels.fatLoss"),definition:t("goal.labels.definition"),gain:t("goal.labels.gain"),maintain:t("goal.labels.maintain"),competition:t("goal.labels.competition")})[partnerProfile.userData?.goal]||partnerProfile.userData?.goal}
+                  {({fatLoss:t("goal.labels.fatLoss"),definition:t("goal.labels.definition"),gain:t("goal.labels.gain"),maintain:t("goal.labels.maintain")})[partnerProfile.userData?.goal]||partnerProfile.userData?.goal}
                   {" · "}{partnerProfile.plan?.calories||"—"} kcal/g
                   {" · "}{partnerProfile.userData?.weight||"—"}kg
                 </p>
@@ -18980,7 +18927,7 @@ const SourcesScreen = ({userData, lang: langProp}) => {
   const [expandedStudy, setExpandedStudy] = useState(null);
   const studies = React.useMemo(() => {
     const seen = new Set();
-    return [...SRC_STUDI, ...SRC_SPORT].filter((study) => {
+    return [...SRC_STUDI].filter((study) => {
       const key = String(study.org || "")
         .trim()
         .toLowerCase()
@@ -20833,6 +20780,7 @@ const handleConfirmHealthRevocation = async () => {
     goal:null,
     diet:null,
     sport:null,
+    sports:[],
     workout_days:null,
     workoutDays:null,
     workout_duration:null,
@@ -20880,6 +20828,7 @@ const [profileForm, setProfileForm] = useState({
   sedentary_days: userData?.sedentary_days || userData?.sedentaryDays || "",
   diet: toCanonicalDiet(userData?.diet || ""),
   allergies: serializeCanonicalList(userData?.allergies || ""),
+  sports: normalizeSports(userData?.sports, userData?.sport),
   sport: toCanonicalSport(userData?.sport || ""),
   training_time: normalizeTrainingTime(userData?.training_time || userData?.trainingTime || ""),
   breakfast_pref: toAppBreakfast(userData?.breakfast_pref || userData?.breakfastPref || ""),
@@ -20900,7 +20849,7 @@ const PROFILE_FIELDS = [
   {key:"workout_intensity", label:t("set.field.workoutIntensity"), section:t("set.edit.training"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["leggera",t("intensity.low")],["moderata",t("intensity.moderate")],["alta",t("intensity.high")]]},
   {key:"diet", label:t("set.field.diet"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["omnivore",t("diet.omnivore")],["pescatarian",t("diet.pescatarian")],["vegetarian",t("diet.vegetarian")],["vegan",t("diet.vegan")]]},
   {key:"allergies", label:t("set.field.allergies"), section:t("set.edit.nutrition"), type:"allergy_chips", impactsDiet:true, reason:t("set.reason.foods")},
-  {key:"sport", label:t("set.field.sport"), section:t("set.edit.training"), type:"sport_chips", impactsDiet:true, reason:t("set.reason.training")},
+  {key:"sports", label:t("set.field.sport"), section:t("set.edit.training"), type:"sport_chips", impactsDiet:true, reason:t("set.reason.training")},
   {key:"training_time", label:t("set.field.trainingTime"), section:t("set.edit.routine"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["morning",t("training.timing.morning")],["lunch",t("training.timing.lunch")],["afternoon",t("training.timing.afternoon")],["evening",t("training.timing.evening")],["varies",t("training.timing.varies")]]},
   {key:"breakfast_pref", label:t("set.field.breakfastPref"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["dolce",t("breakfast.sweet")],["salata",t("breakfast.savory")],["entrambi",t("breakfast.both")],["none",t("breakfast.none")]]},
   {key:"day_start", label:t("set.field.dayStart"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
@@ -20912,7 +20861,7 @@ const profileFieldGroups = [...new Set(PROFILE_FIELDS.map(f => f.section))];
 const profileFieldValue = (field) => {
   const value = profileForm[field.key] ?? "";
   if (field.key === "allergies") return formatAllergyList(value, t);
-  if (field.key === "sport") return getSportLabel(value, t);
+  if (field.key === "sports") return formatSportList(value, profileForm.sport, t);
   if (field.options) return (field.options.find(o => String(o[0]) === String(value)) || [null,value])[1] || "—";
   return value ? `${value}${field.unit ? ` ${field.unit}` : ""}` : "—";
 };
@@ -20924,6 +20873,7 @@ const currentProfileValue = (key) => ({
   workout_intensity: userData?.workout_intensity ?? userData?.workoutIntensity,
   daily_steps: userData?.daily_steps ?? userData?.dailySteps,
   sedentary_days: userData?.sedentary_days ?? userData?.sedentaryDays,
+  sports: normalizeSports(userData?.sports, userData?.sport),
   training_time: userData?.training_time ?? userData?.trainingTime,
   breakfast_pref: userData?.breakfast_pref ?? userData?.breakfastPref,
   day_start: userData?.day_start ?? userData?.dayStart,
@@ -20936,7 +20886,7 @@ const comparableProfileValue = (key, value) => {
   if (key === "workout_intensity") return toAppIntensity(value);
   if (key === "breakfast_pref") return toAppBreakfast(value);
   if (key === "diet") return toCanonicalDiet(value);
-  if (key === "sport") return toCanonicalSport(value);
+  if (key === "sports") return JSON.stringify(normalizeSports(value));
   if (key === "allergies") return serializeCanonicalList(value);
   return String(value ?? "");
 };
@@ -20973,6 +20923,7 @@ const handleSaveProfile = async () => {
     const value = profileForm[key];
     return value !== undefined && value !== null && String(value).trim() !== "" ? value : fallback;
   };
+  const selectedSports = normalizeSports(profileForm.sports, profileForm.sport);
   const updatedData = {
     ...userData,
     name: pick("name", userData?.name || ""),
@@ -20993,7 +20944,8 @@ const handleSaveProfile = async () => {
     sedentaryDays: Number(pick("sedentary_days", userData?.sedentaryDays || 0)),
     diet: toCanonicalDiet(pick("diet", userData?.diet || "omnivore")),
     allergies: serializeCanonicalList(pick("allergies", userData?.allergies || "")),
-    sport: toCanonicalSport(pick("sport", userData?.sport || "")),
+    sports: selectedSports,
+    sport: selectedSports[0] || "",
     trainingTime: normalizeTrainingTime(pick("training_time", userData?.trainingTime || "varies")),
     breakfastPref: toAppBreakfast(pick("breakfast_pref", userData?.breakfastPref || "entrambi")),
     dayStart: parseProfileHour(pick("day_start", userData?.dayStart || userData?.day_start || 7), 7),
@@ -21228,7 +21180,12 @@ const requestDeletionOtp = async () => {
             <SportChipPicker
               compact
               value={profileForm[selectedProfileDef.key]}
-              onChange={value=>{handleProfileFieldChange(selectedProfileDef.key,value);setConfirmProfileSave(false);}}
+              legacyValue={profileForm.sport}
+              onChange={value=>{
+                setProfileForm(prev=>({...prev,[selectedProfileDef.key]:value,sport:value[0] || ""}));
+                setProfileMessage("");
+                setConfirmProfileSave(false);
+              }}
             />
           ) : selectedProfileDef.type==="select" ? (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -22807,110 +22764,4 @@ setPhase("app");
               await finalizeData(dataToGenerate);
               setPendingPlanData(null);
             }}
-            onDecline={()=>setPhase("welcome")}
-          />
-        )}
-        {phase==="wearable-connect" && (
-          <WearableConnectScreen
-            userData={pendingPlanData || userData}
-            onSkip={async ()=>{
-              const dataToGenerate = pendingPlanData || userData;
-              await finalizeData(dataToGenerate);
-              setPendingPlanData(null);
-            }}
-          />
-        )}
-        {phase==="minor" && (
-          <MinorScreen
-            userData={userData}
-            onComplete={(approvedUser)=>{
-              setUserData(normalizeOnboarding({...userData, ...approvedUser, parentalConsentStatus:"approved"}));
-              setPhase("onboarding");
-            }}
-            onBack={()=>setPhase("onboarding")}
-          />
-        )}
-        {phase==="free-beta" && <FreeBetaAccessScreen userData={userData} plan={plan} onContinue={()=>setPhase("loading")} />}
-        {phase==="loading" && <LoadingScreen onDone={() => {
-  setActiveTab("today");
-  setPhase("app");
-}} />}
-        {phase==="app" && (
-          <>
-            <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
-            <div className="dubi-screen-motion" style={{height:"100vh",overflowY:"auto",position:"relative"}}>
-              {activeTab==="today"    && (healthDataConsentGranted
-                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />
-                : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
-              {activeTab==="weekly"   && (healthDataConsentGranted
-                ? <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />
-                : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
-              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
-              {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
-              {activeTab==="settings" && (
-  <SettingsScreen
-    userData={userData}
-    setUserData={setUserData}
-    plan={plan}
-    setPlan={setPlan}
-    onLogout={handleLogout}
-    onDeleteAccount={handleDeleteAccount}
-    onHealthConsentReactivated={handleHealthConsentReactivated}
-    onEditOnboarding={() => {
-  setActiveTab("today");
-  setPhase("onboarding");
-}}
-  />
-)}
-            </div>
-    
-            <BottomNav active={activeTab} onChange={setActiveTab} />
-            {showWrap && <WrapScreen userData={userData} plan={plan} onClose={()=>setShowWrap(false)} />}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DUBIRoot() {
-  const params = new URLSearchParams(window.location.search);
-  if (window.location.hostname === "127.0.0.1" && params.get("_trend_preview") === "1") {
-    return <TrendScreen userData={{weight:76.5,height:175,age:35,is_minor:false,targetWeight:72}} plan={{goal:"fatLoss",calories:2100,tdee:2500}} lang="en" />;
-  }
-  if (window.location.hostname === "127.0.0.1" && params.get("_sources_preview") === "1") {
-    return <SourcesScreen userData={{name:"DUBI Preview"}} lang={params.get("lang") || "en"} />;
-  }
-  const legal = params.get("legal") || params.get("page");
-  if (legal === "privacy" || window.location.pathname === "/privacy") {
-    return <PrivacyPolicyPage />;
-  }
-  if (legal === "terms" || legal === "health" || window.location.pathname === "/terms") {
-    return <TermsPage />;
-  }
-  return <DUBIApp />;
-}
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<LangProvider><WearableProvider><DUBIRoot /></WearableProvider></LangProvider>);
-
-    // Nascondi schermata di boot non appena React ha montato il componente
-    window._dubiReady = true;
-    clearTimeout(window._dubiBootTimer);
-    const bootEl = document.getElementById('dubi-boot');
-    if (bootEl) {
-      bootEl.classList.add('hidden');
-      setTimeout(function() { bootEl.style.display = 'none'; }, 350);
-    }
-  </script>
-  <script>
-    if ("serviceWorker" in navigator && window.location.protocol === "https:") {
-      window.addEventListener("load", function() {
-        navigator.serviceWorker.register("/sw.js").catch(function(error) {
-          console.warn("DUBI service worker registration failed:", error);
-        });
-      });
-    }
-  </script>
-</body>
-</html>
+            onDecl
