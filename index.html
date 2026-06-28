@@ -22477,6 +22477,13 @@ function DUBIApp() {
 }
       }
 
+      if (response.status === 401) {
+        localStorage.removeItem("dubi_token");
+        localStorage.removeItem("dubi_email");
+        setPhase("welcome");
+        return;
+      }
+
       setPhase("onboarding");
       if (currentUser) setUserData(normalizeOnboarding(currentUser));
     } catch (error) {
