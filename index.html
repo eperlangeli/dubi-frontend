@@ -10320,11 +10320,31 @@ function localizeFood(text, lang){
       .replace(/latte scremato/gi,"semi-skimmed milk")
       .replace(/verdure miste/gi,"mixed vegetables")
       .replace(/\bporzione\b/gi,"serving")
-      .replace(/\ba piacere\b/gi,"to taste");
+      .replace(/\ba piacere\b/gi,"to taste")
+      .replace(/\bleggero\b/gi,"lean").replace(/\bleggerai\b/gi,"lean")
+      .replace(/\bvaccin[oa]?\b/gi,"cow's milk")
+      .replace(/\balla benedict\b/gi,"benedict")
+      .replace(/\bintegrale\b/gi,"whole grain").replace(/\bintegrali\b/gi,"whole grain")
+      .replace(/\bscremato\b/gi,"skimmed").replace(/\bparzialmente\b/gi,"semi")
+      .replace(/\bmacinato\b/gi,"ground").replace(/\bmacinata\b/gi,"ground")
+      .replace(/\bcrudo\b/gi,"raw").replace(/\bcruda\b/gi,"raw")
+      .replace(/\bcotto\b/gi,"cooked").replace(/\bcotta\b/gi,"cooked")
+      .replace(/\bfumante\b/gi,"smoked").replace(/\baffumicato\b/gi,"smoked").replace(/\baffumicata\b/gi,"smoked")
+      .replace(/\bdi manzo\b/gi,"beef").replace(/\bdi pollo\b/gi,"chicken")
+      .replace(/\btagliata\b/gi,"tagliata")
+      .replace(/\bcondito\b/gi,"seasoned").replace(/\bcondita\b/gi,"seasoned")
+      .replace(/\bnaturale\b/gi,"natural").replace(/\bbianco\b/gi,"white").replace(/\bbianca\b/gi,"white")
+      .replace(/\brosso\b/gi,"red").replace(/\brossa\b/gi,"red")
+      .replace(/\bgrigio\b/gi,"grey").replace(/\bverde\b/gi,"green")
+      .replace(/\bfresco\b/gi,"fresh").replace(/\bfresca\b/gi,"fresh")
+      .replace(/\balla griglia\b/gi,"grilled").replace(/\bgriglia\b/gi,"grilled")
+      .replace(/\bal vapore\b/gi,"steamed").replace(/\bin padella\b/gi,"pan-fried");
   }
   return out;
 }
 
+
+function capitalizeFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 // ═══════════════════════════════════════════════
 // LANGUAGE SELECTOR (compact pill, opens modal)
 // ═══════════════════════════════════════════════
@@ -13301,7 +13321,7 @@ const IngredientModal = ({ingredient, onClose}) => {
               <div style={{padding:"12px 14px",background:T.sel,border:`1px solid ${T.border}`,borderRadius:14,marginBottom:14}}>
                 <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,margin:"0 0 5px"}}>{t("ingr.macros")}</p>
                 <p style={{fontSize:14,fontWeight:600,color:T.text,margin:0}}>
-                  {[ingredient.calories?`${Math.round(ingredient.calories)} kcal`:null,ingredient.protein?`P ${Math.round(ingredient.protein)}g`:null,ingredient.carbs?`C ${Math.round(ingredient.carbs)}g`:null,(ingredient.fats??ingredient.fat)?`G ${Math.round(ingredient.fats??ingredient.fat)}g`:null].filter(Boolean).join(" · ")}
+                  {[ingredient.calories?`${Math.round(ingredient.calories)} kcal`:null,ingredient.protein?`${t("today.macro.short.p")} ${Math.round(ingredient.protein)}g`:null,ingredient.carbs?`${t("today.macro.short.c")} ${Math.round(ingredient.carbs)}g`:null,(ingredient.fats??ingredient.fat)?`${t("today.macro.short.f")} ${Math.round(ingredient.fats??ingredient.fat)}g`:null].filter(Boolean).join(" · ")}
                 </p>
               </div>
             )}
@@ -17944,15 +17964,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                   <div style={{fontSize:12,color:T.muted}}>{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  {st!=="done" && st!=="skip" && (
-                    <span role="button" tabIndex={0} data-no-haptic="true"
-                      onClick={(e)=>{e.stopPropagation();dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));}}
-                      onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));}}}
-                      style={{display:"flex",alignItems:"center",gap:5,padding:"7px 10px",borderRadius:999,background:T.accentD,color:T.white,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
-                      <Ico n="check" size={12} c={T.white}/> {t("meal.eaten")}
-                    </span>
-                  )}
-                  {st==="done"&&<div style={{width:22,height:22,borderRadius:"50%",background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center"}}><Ico n="check" size={11} c={T.white}/></div>}
+                  {st==="done"&&<div style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:999,background:T.accentD,color:T.white,fontSize:11,fontWeight:800,whiteSpace:"nowrap"}}><Ico n="check" size={11} c={T.white}/> {t("meal.eaten")}</div>}
                   <div style={{transform:isOpen?"rotate(90deg)":"rotate(0)",transition:"0.2s"}}><Ico n="chev" size={16} c={T.muted}/></div>
                 </div>
               </button>
@@ -17981,7 +17993,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                         onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
                         <div style={{width:5,height:5,borderRadius:"50%",background:T.accent,flexShrink:0}} />
                         <div style={{flex:1,minWidth:0}}>
-                          <span style={{display:"block",fontSize:14,color:T.text}}>{localizeFood(_tName, lang)}</span>
+                          <span style={{display:"block",fontSize:14,color:T.text}}>{capitalizeFirst(localizeFood(_tName, lang))}</span>
                           {_tMeta && <span style={{display:"block",fontSize:10.5,color:T.muted,lineHeight:1.35,marginTop:2}}>{_tMeta}</span>}
                         </div>
                         <Ico n="chev" size={12} c={T.muted}/>
@@ -18898,7 +18910,7 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
                       <span style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                         <span style={{fontSize:14,color:isDone?T.muted:T.text,
                           textDecoration:isDone?"line-through":"none",transition:"color 0.2s"}}>
-                          {localizeFood(display.name, lang)}
+                          {capitalizeFirst(localizeFood(display.name, lang))}
                         </span>
                         {display.quantity && (
                           <span style={{fontSize:11,fontWeight:800,color:isDone?T.muted:T.accentD,
