@@ -12988,6 +12988,50 @@ const INGREDIENT_DB = [
    macros:"Per 40g: 180 kcal · 4.8g P · 30g C · 5.5g G",
    benefits:["Avena tostata + noci → fibra + grassi buoni in combinazione","Fibre β-glucano da avena → sazietà duratura","Energia stabile per 2-3 ore post-colazione"],
    tip:"Scegliere versioni senza zuccheri aggiunti o con miele: le versioni classiche hanno troppo zucchero.",source:"Ludwig & Ebbeling, JAMA 2018"},
+  {rx:/pera|pere|pear/i,name:"Pera",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g: 57 kcal · 0.4g P · 15g C · 0.1g G",
+   benefits:["Fibre solubili (pectina) → sazietà e colesterolo LDL","Vitamina C → immunità e collagene","Basso IG (38) → glicemia stabile"],
+   tip:"Consumata con la buccia: +25% di fibra rispetto a sbucciata.",source:"EFSA NDA Panel 2019"},
+  {rx:/castagna|castagne|chestnut/i,name:"Castagne",cat:"Frutto amidaceo",catC:"#C9A87C",
+   macros:"Per 100g: 213 kcal · 2.9g P · 45g C · 2.2g G",
+   benefits:["Fonte insolita di carboidrati complessi tra i frutti","Vitamina C intatta anche dopo cottura","Potassio → pressione e funzione muscolare"],
+   tip:"Le castagne arrosto hanno IG più alto delle bollite — preferire lesse.",source:"USDA FoodData Central"},
+  {rx:/kiwi/i,name:"Kiwi",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g: 61 kcal · 1.1g P · 15g C · 0.5g G",
+   benefits:["Vitamina C: 93mg/100g → 103% RDA in una sola porzione","Actinidina → migliora digestione proteine","Vitamina K → coagulazione e salute ossea"],
+   tip:"2 kiwi prima di dormire: studi mostrano miglioramento qualità del sonno.",source:"Sears et al., Asia Pac J Clin Nutr 2012"},
+  {rx:/arancia|arance|orange/i,name:"Arancia",cat:"Agrume",catC:"#8FBC8F",
+   macros:"Per 100g: 47 kcal · 0.9g P · 12g C · 0.1g G",
+   benefits:["Vitamina C: 53mg/100g → antiossidante e immunità","Flavonoidi (esperidina) → vasi sanguigni e pressione","Fibra solubile → microbioma e glicemia"],
+   tip:"Mangiare l'arancia intera è più efficace del succo: mantiene la fibra.",source:"EFSA NDA Panel 2019"},
+  {rx:/uva|grapes/i,name:"Uva",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g: 69 kcal · 0.7g P · 18g C · 0.2g G",
+   benefits:["Resveratrolo → antiossidante e cardioprotettivo","Polifenoli → anti-infiammatorio naturale","Potassio → equilibrio elettrolitico"],
+   tip:"Uva nera > uva verde: maggiore concentrazione di antocianine.",source:"EFSA NDA Panel 2019"},
+  {rx:/melone|melon/i,name:"Melone",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g: 34 kcal · 0.8g P · 8g C · 0.2g G",
+   benefits:["Vitamina A (β-carotene) → pelle e visione","Alta percentuale acqua (90%) → idratazione","Potassio → recupero post-allenamento"],
+   tip:"Ottimo spuntino estivo post-workout: idratante e rapido da assimilare.",source:"USDA FoodData Central"},
+  {rx:/anguria|watermelon/i,name:"Anguria",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g: 30 kcal · 0.6g P · 8g C · 0.2g G",
+   benefits:["Licopene → antiossidante e cardioprotettivo","L-citrullina → riduce affaticamento muscolare","92% acqua → idratazione ottimale"],
+   tip:"Post-allenamento: la citrullina aiuta la circolazione e il recupero.",source:"Tarazona-Díaz et al., J Agric Food Chem 2013"},
+  {rx:/pesca|pesche|nettarina|albicocca|albicocche/i,name:"Pesca / Albicocca",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g: 39-48 kcal · 0.9g P · 10g C · 0.3g G",
+   benefits:["β-carotene → precursore vitamina A, salute visiva","Vitamina C e polifenoli → anti-infiammatori","Fibra solubile → microbioma e sazietà"],
+   tip:"Le albicocche secche sono più caloriche ma concentrano ferro e potassio.",source:"EFSA NDA Panel 2019"},
+  {rx:/fico|fichi|fig/i,name:"Fichi",cat:"Frutto",catC:"#8FBC8F",
+   macros:"Per 100g freschi: 74 kcal · 0.8g P · 19g C · 0.3g G",
+   benefits:["Calcio vegetale: 35mg/100g → integrativo per chi evita latticini","Prebiotici naturali → microbioma","Ferro non-eme in forma assimilabile"],
+   tip:"Fichi secchi: concentrano i nutrienti ma triplicano le calorie.",source:"USDA FoodData Central"},
+  {rx:/riso bianco|riso/i,name:"Riso bianco",cat:"Cereale",catC:"#C9A87C",
+   macros:"Per 100g cotto: 130 kcal · 2.7g P · 28g C · 0.3g G",
+   benefits:["Carbo facilmente digeribili → energia rapida pre/post workout","Gluten free → adatto a celiachia","Basso residuo di fibra → ideale in caso di GI sensibile"],
+   tip:"Preferire cottura al vapore per preservare vitamine del gruppo B.",source:"Hall et al., Cell Metabolism 2019"},
+  {rx:/pasta(?! integrale)/i,name:"Pasta",cat:"Cereale",catC:"#C9A87C",
+   macros:"Per 100g cotta: 131 kcal · 5g P · 25g C · 1g G",
+   benefits:["Fonte principale di carboidrati complessi nel pasto","Amido resistente aumenta con raffreddamento","Serotonina → umore e senso di sazietà"],
+   tip:"Al dente abbassa l'IG; raffreddata e riscaldata crea più amido resistente.",source:"Hall et al., Cell Metabolism 2019"},
   {rx:/cannella/i,name:"Cannella",cat:"Spezia insulino-sensibilizzante",catC:"#C9A87C",
    macros:"Per 2g: 5 kcal · 0.1g P · 1.7g C · 0.1g G",
    benefits:["Cinamaldeide → insulino-sensibilizzante: glicemia pp -15-29% (meta-analisi 2013)","Antiossidanti ORAC: 267.536 → tra le spezie più potenti in assoluto","Antimicrobica → azione diretta su Candida e batteri gram-positivi"],
@@ -13159,7 +13203,8 @@ const INGREDIENT_EN = {
 };
 
 function getIngredientInfo(str) {
-  return INGREDIENT_DB.find(item=>item.rx.test(str)) || null;
+  const text = formatFoodText(str);
+  return INGREDIENT_DB.find(item=>item.rx.test(text)) || null;
 }
 
 const DUBI_MODAL_Z = 10000;
@@ -13252,12 +13297,14 @@ const IngredientModal = ({ingredient, onClose}) => {
               <p style={{fontSize:11,color:T.muted,margin:"0 0 3px",letterSpacing:0.5}}>{t("ingr.in.plan")}</p>
               <p style={{fontSize:13,fontWeight:600,color:T.text,margin:0}}>{localizeFood(ingredient, lang)}</p>
             </div>
-            <div style={{padding:"12px 14px",background:T.sel,border:`1px solid ${T.border}`,borderRadius:14,marginBottom:14}}>
-              <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,margin:"0 0 5px"}}>{t("ingr.why")}</p>
-              <p style={{fontSize:13,color:T.text,lineHeight:1.55,margin:0}}>
-                {t("ingr.why.text")}
-              </p>
-            </div>
+            {(ingredient?.calories > 0 || ingredient?.protein > 0) && (
+              <div style={{padding:"12px 14px",background:T.sel,border:`1px solid ${T.border}`,borderRadius:14,marginBottom:14}}>
+                <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,margin:"0 0 5px"}}>{t("ingr.macros")}</p>
+                <p style={{fontSize:14,fontWeight:600,color:T.text,margin:0}}>
+                  {[ingredient.calories?`${Math.round(ingredient.calories)} kcal`:null,ingredient.protein?`P ${Math.round(ingredient.protein)}g`:null,ingredient.carbs?`C ${Math.round(ingredient.carbs)}g`:null,(ingredient.fats??ingredient.fat)?`G ${Math.round(ingredient.fats??ingredient.fat)}g`:null].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            )}
             <div style={{padding:"12px 14px",background:T.accentD+"15",border:`1px solid ${T.accent}`,borderRadius:14,marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                 <Ico n="info" size={14} c={T.accentD}/>
