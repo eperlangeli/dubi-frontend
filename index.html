@@ -14899,6 +14899,180 @@ const WearableModal = ({type, onClose}) => {
 // ═══════════════════════════════════════════════
 // WELCOME SCREEN
 // ═══════════════════════════════════════════════
+
+const WelcomeTermsScreen = ({ onAccept }) => {
+  const { lang } = useT();
+  const [privacyOpen, setPrivacyOpen] = React.useState(false);
+  const [termsOpen, setTermsOpen] = React.useState(false);
+  const TERMS_WELCOME_COPY = {
+    it: {
+      title:"Benvenuto su DUBI",
+      tagline:"Data-Driven Understanding\ndi Body Intelligence",
+      pre:"Toccando ",
+      ctaRef:"«Accetta e continua»",
+      mid1:" accetti i nostri ",
+      termsLink:"Termini di Servizio",
+      mid2:". Scopri come raccogliamo, utilizziamo e condividiamo i tuoi dati nella nostra ",
+      privacyLink:"Privacy Policy",
+      post:".",
+      cta:"Accetta e continua"
+    },
+    en: {
+      title:"Welcome to DUBI",
+      tagline:"Data-Driven Understanding\nof Body Intelligence",
+      pre:"By tapping ",
+      ctaRef:"«Agree and continue»",
+      mid1:" you accept our ",
+      termsLink:"Terms of Service",
+      mid2:". Find out how we collect, use and share your data in our ",
+      privacyLink:"Privacy Policy",
+      post:".",
+      cta:"Agree and continue"
+    },
+    fr: {
+      title:"Bienvenue sur DUBI",
+      tagline:"Data-Driven Understanding\nde l’Intelligence Corporelle",
+      pre:"En appuyant sur ",
+      ctaRef:"«Accepter et continuer»",
+      mid1:" vous acceptez nos ",
+      termsLink:"Conditions d’utilisation",
+      mid2:". Découvrez comment nous collectons, utilisons et partageons vos données dans notre ",
+      privacyLink:"Politique de confidentialité",
+      post:".",
+      cta:"Accepter et continuer"
+    },
+    es: {
+      title:"Bienvenido a DUBI",
+      tagline:"Data-Driven Understanding\nde la Inteligencia Corporal",
+      pre:"Al tocar ",
+      ctaRef:"«Aceptar y continuar»",
+      mid1:" aceptas nuestros ",
+      termsLink:"Términos de servicio",
+      mid2:". Descubre cómo recopilamos, usamos y compartimos tus datos en nuestra ",
+      privacyLink:"Política de privacidad",
+      post:".",
+      cta:"Aceptar y continuar"
+    },
+    de: {
+      title:"Willkommen bei DUBI",
+      tagline:"Data-Driven Understanding\nder Köperintelligenz",
+      pre:"Indem du auf ",
+      ctaRef:"«Akzeptieren und weiter»",
+      mid1:" tippst, stimmst du unseren ",
+      termsLink:"Nutzungsbedingungen",
+      mid2:" zu. Erfahre, wie wir deine Daten in unserer ",
+      privacyLink:"Datenschutzrichtlinie",
+      post:" erfassen, verwenden und teilen.",
+      cta:"Akzeptieren und weiter"
+    },
+    ar: {
+      title:"مرحباً بك في DUBI",
+      tagline:"Data-Driven Understanding\nلذكاء الجسم",
+      pre:"بالنقر على ",
+      ctaRef:"«موافقة ومتابعة»",
+      mid1:" فأنت تقبل ",
+      termsLink:"شروط الخدمة",
+      mid2:". اكتشف كيف نجمع بياناتك ونستخدمها ونشاركها في ",
+      privacyLink:"سياسة الخصوصية",
+      post:".",
+      cta:"موافقة ومتابعة"
+    },
+    pt: {
+      title:"Bem-vindo ao DUBI",
+      tagline:"Data-Driven Understanding\nda Inteligência Corporal",
+      pre:"Ao tocar em ",
+      ctaRef:"«Aceitar e continuar»",
+      mid1:" você aceita os nossos ",
+      termsLink:"Termos de Serviço",
+      mid2:". Descubra como coletamos, usamos e compartilhamos seus dados em nossa ",
+      privacyLink:"Política de Privacidade",
+      post:".",
+      cta:"Aceitar e continuar"
+    },
+    zh: {
+      title:"欢迎使用 DUBI",
+      tagline:"Data-Driven Understanding\n身体智能",
+      pre:"点击「",
+      ctaRef:"同意并继续」",
+      mid1:"即表示您接受我们的",
+      termsLink:"服务条款",
+      mid2:"。在我们的",
+      privacyLink:"隐私政策",
+      post:"中了解我们如何收集、使用和共享您的数据。",
+      cta:"同意并继续"
+    }
+  };
+  const c = TERMS_WELCOME_COPY[lang] || TERMS_WELCOME_COPY.en;
+  const isRtl = lang === "ar";
+  const accentColor = T.accentD || "#2563EB";
+  return (
+    <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column",position:"relative",direction:isRtl?"rtl":"ltr"}}>
+      <LanguageSelector />
+      {/* Illustration area — logo centrato grande */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"72px 40px 24px"}}>
+        <div style={{
+          width:128,height:128,borderRadius:32,
+          background:T.card,
+          border:`1.5px solid ${T.border}`,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          marginBottom:32,
+          boxShadow:"0 8px 40px rgba(0,0,0,0.08)"
+        }}>
+          <DUBILogo size={76} variant="dark"/>
+        </div>
+        <h1 style={{
+          fontFamily:"'Manrope','Inter',sans-serif",
+          fontSize:28,fontWeight:800,
+          color:T.text,letterSpacing:-0.8,
+          margin:0,textAlign:"center",lineHeight:1.2
+        }}>{c.title}</h1>
+        <p style={{
+          fontSize:10,color:T.muted,
+          letterSpacing:1.4,textTransform:"uppercase",
+          margin:"10px 0 0",textAlign:"center",
+          lineHeight:1.7,whiteSpace:"pre-line"
+        }}>{c.tagline}</p>
+      </div>
+      {/* Footer: testo legale + CTA */}
+      <div style={{padding:"0 32px 56px"}}>
+        <p style={{
+          fontSize:12,color:T.muted,
+          textAlign:"center",lineHeight:1.9,
+          margin:"0 0 24px"
+        }}>
+          {c.pre}
+          <span style={{color:T.text,fontWeight:700}}>{c.ctaRef}</span>
+          {c.mid1}
+          <span
+            onClick={()=>setTermsOpen(true)}
+            style={{color:accentColor,cursor:"pointer",fontWeight:600,borderBottom:`1px solid ${accentColor}`}}
+          >{c.termsLink}</span>
+          {c.mid2}
+          <span
+            onClick={()=>setPrivacyOpen(true)}
+            style={{color:accentColor,cursor:"pointer",fontWeight:600,borderBottom:`1px solid ${accentColor}`}}
+          >{c.privacyLink}</span>
+          {c.post}
+        </p>
+        <button
+          onClick={()=>{localStorage.setItem("dubi_terms_accepted","1");onAccept();}}
+          style={{
+            width:"100%",background:T.text,color:T.bg,
+            border:"none",borderRadius:50,
+            padding:"18px 24px",fontSize:16,fontWeight:700,
+            cursor:"pointer",letterSpacing:0.1,
+            display:"flex",alignItems:"center",justifyContent:"center",gap:10
+          }}>
+          <DUBILogo size={20} variant="light"/>
+          <span>{c.cta}</span>
+        </button>
+      </div>
+      {privacyOpen && <PrivacyPolicyModal lang={lang} onClose={()=>setPrivacyOpen(false)} />}
+      {termsOpen && <TermsModal lang={lang} onClose={()=>setTermsOpen(false)} />}
+    </div>
+  );
+};
+
 const WelcomeScreen = ({onStart}) => {
   const { t, lang } = useT();
   return (
@@ -22453,7 +22627,7 @@ function DUBIApp() {
     const token = localStorage.getItem("dubi_token");
 
     if (!token) {
-      setPhase("welcome");
+      setPhase(localStorage.getItem("dubi_terms_accepted") ? "welcome" : "terms");
       return;
     }
 
@@ -22673,7 +22847,8 @@ setPhase("app");
     </div>
   </div>
 )}
-        {phase==="welcome" && <WelcomeScreen onStart={() => { setAuthStartMode(null); setPhase("auth"); }} />}
+        {phase==="terms" && <WelcomeTermsScreen onAccept={() => setPhase("welcome")} />}
+{phase==="welcome" && <WelcomeScreen onStart={() => { setAuthStartMode(null); setPhase("auth"); }} />}
 {phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding, authUser = null) => {
   if (existingOnboarding) {
    setUserData(existingOnboarding);
