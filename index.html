@@ -14903,8 +14903,9 @@ const WearableModal = ({type, onClose}) => {
 const WelcomeTermsScreen = ({ onAccept }) => {
   const { lang } = useT();
   const [privacyOpen, setPrivacyOpen] = React.useState(false);
-  const [termsOpen, setTermsOpen] = React.useState(false);
-  const TERMS_WELCOME_COPY = {
+  const [termsOpen,   setTermsOpen]   = React.useState(false);
+  const [healthOpen,  setHealthOpen]  = React.useState(false);
+  const COPY = {
     it: {
       title:"Benvenuto su DUBI",
       tagline:"Data-Driven Understanding\ndi Body Intelligence",
@@ -14912,8 +14913,10 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"«Accetta e continua»",
       mid1:" accetti i nostri ",
       termsLink:"Termini di Servizio",
-      mid2:". Scopri come raccogliamo, utilizziamo e condividiamo i tuoi dati nella nostra ",
-      privacyLink:"Privacy Policy",
+      mid2:" e acconsenti esplicitamente al trattamento dei tuoi ",
+      healthLink:"Dati Sanitari",
+      mid3:" ai sensi dell'art. 9(2)(a) GDPR per la creazione del tuo piano nutrizionale personalizzato. Scopri come utilizziamo i tuoi dati nella nostra ",
+      privacyLink:"Informativa sulla Privacy",
       post:".",
       cta:"Accetta e continua"
     },
@@ -14924,19 +14927,23 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"«Agree and continue»",
       mid1:" you accept our ",
       termsLink:"Terms of Service",
-      mid2:". Find out how we collect, use and share your data in our ",
+      mid2:" and explicitly consent to processing your ",
+      healthLink:"Health Data",
+      mid3:" under Art. 9(2)(a) GDPR to create your personalized nutrition plan. Find out how we use your data in our ",
       privacyLink:"Privacy Policy",
       post:".",
       cta:"Agree and continue"
     },
     fr: {
       title:"Bienvenue sur DUBI",
-      tagline:"Data-Driven Understanding\nde l’Intelligence Corporelle",
+      tagline:"Data-Driven Understanding\nde l'Intelligence Corporelle",
       pre:"En appuyant sur ",
       ctaRef:"«Accepter et continuer»",
       mid1:" vous acceptez nos ",
-      termsLink:"Conditions d’utilisation",
-      mid2:". Découvrez comment nous collectons, utilisons et partageons vos données dans notre ",
+      termsLink:"Conditions d'utilisation",
+      mid2:" et consentez explicitement au traitement de vos ",
+      healthLink:"Données de Santé",
+      mid3:" en vertu de l'art. 9(2)(a) RGPD pour créer votre plan nutritionnel personnalisé. Découvrez comment nous utilisons vos données dans notre ",
       privacyLink:"Politique de confidentialité",
       post:".",
       cta:"Accepter et continuer"
@@ -14948,7 +14955,9 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"«Aceptar y continuar»",
       mid1:" aceptas nuestros ",
       termsLink:"Términos de servicio",
-      mid2:". Descubre cómo recopilamos, usamos y compartimos tus datos en nuestra ",
+      mid2:" y consientes expresamente el tratamiento de tus ",
+      healthLink:"Datos de Salud",
+      mid3:" según el art. 9(2)(a) RGPD para crear tu plan nutricional personalizado. Descubre cómo usamos tus datos en nuestra ",
       privacyLink:"Política de privacidad",
       post:".",
       cta:"Aceptar y continuar"
@@ -14960,9 +14969,11 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"«Akzeptieren und weiter»",
       mid1:" tippst, stimmst du unseren ",
       termsLink:"Nutzungsbedingungen",
-      mid2:" zu. Erfahre, wie wir deine Daten in unserer ",
+      mid2:" zu und willigst ausdrücklich in die Verarbeitung deiner ",
+      healthLink:"Gesundheitsdaten",
+      mid3:" gemäß Art. 9(2)(a) DSGVO zur Erstellung deines persönlichen Ernährungsplans ein. Erfahre mehr in unserer ",
       privacyLink:"Datenschutzrichtlinie",
-      post:" erfassen, verwenden und teilen.",
+      post:".",
       cta:"Akzeptieren und weiter"
     },
     ar: {
@@ -14972,7 +14983,9 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"«موافقة ومتابعة»",
       mid1:" فأنت تقبل ",
       termsLink:"شروط الخدمة",
-      mid2:". اكتشف كيف نجمع بياناتك ونستخدمها ونشاركها في ",
+      mid2:" وتوافق صراحةً على معالجة ",
+      healthLink:"بياناتك الصحية",
+      mid3:" وفقاً للمادة 9(2)(أ) من اللائحة العامة لحماية البيانات لإنشاء خطتك الغذائية الشخصية. اكتشف كيف نستخدم بياناتك في ",
       privacyLink:"سياسة الخصوصية",
       post:".",
       cta:"موافقة ومتابعة"
@@ -14984,7 +14997,9 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"«Aceitar e continuar»",
       mid1:" você aceita os nossos ",
       termsLink:"Termos de Serviço",
-      mid2:". Descubra como coletamos, usamos e compartilhamos seus dados em nossa ",
+      mid2:" e consente expressamente no tratamento dos seus ",
+      healthLink:"Dados de Saúde",
+      mid3:" nos termos do art. 9(2)(a) RGPD para criar o seu plano nutricional personalizado. Saiba como usamos os seus dados na nossa ",
       privacyLink:"Política de Privacidade",
       post:".",
       cta:"Aceitar e continuar"
@@ -14996,80 +15011,59 @@ const WelcomeTermsScreen = ({ onAccept }) => {
       ctaRef:"同意并继续」",
       mid1:"即表示您接受我们的",
       termsLink:"服务条款",
-      mid2:"。在我们的",
+      mid2:"，并依据GDPR第 9(2)(a)条明确同意处理您的",
+      healthLink:"健康数据",
+      mid3:"以创建您的个性化营养计划。在我们的",
       privacyLink:"隐私政策",
-      post:"中了解我们如何收集、使用和共享您的数据。",
+      post:"中了解我们如何使用您的数据。",
       cta:"同意并继续"
     }
   };
-  const c = TERMS_WELCOME_COPY[lang] || TERMS_WELCOME_COPY.en;
+  const c = COPY[lang] || COPY.en;
   const isRtl = lang === "ar";
-  const accentColor = T.accentD || "#2563EB";
+  const accent = T.accentD || "#2563EB";
+  const linkStyle = {color:accent,cursor:"pointer",fontWeight:600,borderBottom:"1px solid "+accent};
   return (
     <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column",position:"relative",direction:isRtl?"rtl":"ltr"}}>
       <LanguageSelector />
       <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"72px 40px 24px"}}>
         <div style={{
           width:128,height:128,borderRadius:32,
-          background:T.card,
-          border:"1.5px solid "+T.border,
+          background:T.card,border:"1.5px solid "+T.border,
           display:"flex",alignItems:"center",justifyContent:"center",
-          marginBottom:32,
-          boxShadow:"0 8px 40px rgba(0,0,0,0.08)"
+          marginBottom:32,boxShadow:"0 8px 40px rgba(0,0,0,0.08)"
         }}>
           <DUBILogo size={76} variant="dark"/>
         </div>
-        <h1 style={{
-          fontFamily:"'Manrope','Inter',sans-serif",
-          fontSize:28,fontWeight:800,
-          color:T.text,letterSpacing:-0.8,
-          margin:0,textAlign:"center",lineHeight:1.2
-        }}>{c.title}</h1>
-        <p style={{
-          fontSize:10,color:T.muted,
-          letterSpacing:1.4,textTransform:"uppercase",
-          margin:"10px 0 0",textAlign:"center",
-          lineHeight:1.7,whiteSpace:"pre-line"
-        }}>{c.tagline}</p>
+        <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:28,fontWeight:800,color:T.text,letterSpacing:-0.8,margin:0,textAlign:"center",lineHeight:1.2}}>{c.title}</h1>
+        <p style={{fontSize:10,color:T.muted,letterSpacing:1.4,textTransform:"uppercase",margin:"10px 0 0",textAlign:"center",lineHeight:1.7,whiteSpace:"pre-line"}}>{c.tagline}</p>
       </div>
       <div style={{padding:"0 32px 56px"}}>
-        <p style={{
-          fontSize:12,color:T.muted,
-          textAlign:"center",lineHeight:1.9,
-          margin:"0 0 24px"
-        }}>
-          {c.pre}
-          <span style={{color:T.text,fontWeight:700}}>{c.ctaRef}</span>
-          {c.mid1}
-          <span
-            onClick={()=>setTermsOpen(true)}
-            style={{color:accentColor,cursor:"pointer",fontWeight:600,borderBottom:"1px solid "+accentColor}}
-          >{c.termsLink}</span>
-          {c.mid2}
-          <span
-            onClick={()=>setPrivacyOpen(true)}
-            style={{color:accentColor,cursor:"pointer",fontWeight:600,borderBottom:"1px solid "+accentColor}}
-          >{c.privacyLink}</span>
+        <p style={{fontSize:12,color:T.muted,textAlign:"center",lineHeight:1.9,margin:"0 0 24px"}}>
+          {c.pre}<span style={{color:T.text,fontWeight:700}}>{c.ctaRef}</span>
+          {c.mid1}<span onClick={()=>setTermsOpen(true)} style={linkStyle}>{c.termsLink}</span>
+          {c.mid2}<span onClick={()=>setHealthOpen(true)} style={linkStyle}>{c.healthLink}</span>
+          {c.mid3}<span onClick={()=>setPrivacyOpen(true)} style={linkStyle}>{c.privacyLink}</span>
           {c.post}
         </p>
         <button
-          onClick={()=>{localStorage.setItem("dubi_terms_accepted","1");onAccept();}}
-          style={{
-            width:"100%",background:T.text,color:T.bg,
-            border:"none",borderRadius:50,
-            padding:"18px 24px",fontSize:16,fontWeight:700,
-            cursor:"pointer",letterSpacing:0.1,
-            display:"flex",alignItems:"center",justifyContent:"center",gap:10
-          }}>
+          onClick={()=>{
+            localStorage.setItem("dubi_terms_accepted","1");
+            localStorage.setItem("dubi_health_consent","1");
+            onAccept();
+          }}
+          style={{width:"100%",background:T.text,color:T.bg,border:"none",borderRadius:50,padding:"18px 24px",fontSize:16,fontWeight:700,cursor:"pointer",letterSpacing:0.1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
           <DUBILogo size={20} variant="light"/>
           <span>{c.cta}</span>
         </button>
       </div>
-      {privacyOpen && <PrivacyPolicyModal lang={lang} onClose={()=>setPrivacyOpen(false)} />}
-      {termsOpen && <TermsModal lang={lang} onClose={()=>setTermsOpen(false)} />}
+      {privacyOpen && <PrivacyPolicyModal    lang={lang} onClose={()=>setPrivacyOpen(false)} />}
+      {termsOpen   && <TermsModal            lang={lang} onClose={()=>setTermsOpen(false)} />}
+      {healthOpen  && <HealthDisclaimerModal lang={lang} onClose={()=>setHealthOpen(false)} />}
     </div>
   );
 };
+
 
 const WelcomeScreen = ({onStart}) => {
   const { t, lang } = useT();
@@ -21944,6 +21938,20 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [showTerms, setShowTerms] = React.useState(false);
   const [showHealthDisclaimer, setShowHealthDisclaimer] = React.useState(false);
   const [acceptingConsent, setAcceptingConsent] = React.useState(false);
+  React.useEffect(() => {
+    if (localStorage.getItem("dubi_health_consent") === "1") {
+      onAccept({
+        terms:true, gdpr:true, healthConsent:true, medicalDisclaimer:true,
+        researchConsent:false,
+        privacyPolicyVersion:PRIVACY_POLICY_VERSION,
+        termsVersion:TERMS_VERSION,
+        healthDisclaimerVersion:HEALTH_DISCLAIMER_VERSION,
+        privacyAcceptedAt:new Date().toISOString(),
+        legalAcceptedAt:new Date().toISOString(),
+        healthDataConsentAt:new Date().toISOString()
+      });
+    }
+  }, []);
   const { t, lang } = useT();
   const privacyCopy = getPrivacyCopy(lang);
   const termsConsentText = getLegalConsent("terms", lang);
