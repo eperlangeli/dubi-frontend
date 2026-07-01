@@ -17276,7 +17276,10 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   }, [todayMealStatusStorageKey]);
 
   React.useEffect(() => {
-    try { localStorage.setItem(todayMealStatusStorageKey, JSON.stringify(status)); } catch(e) {}
+    try {
+      localStorage.setItem(todayMealStatusStorageKey, JSON.stringify(status));
+      window.dispatchEvent(new CustomEvent("dubi-meal-status-change"));
+    } catch(e) {}
   }, [todayMealStatusStorageKey, status]);
 
   React.useEffect(() => {
@@ -21798,7 +21801,34 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
   const { t, lang } = useT();
   const name = (userData?.name || "DUBI").split(" ")[0];
   const kcal = Number(plan?.calories || 0);
-  const dailyProgress = 0;
+
+  const getProgress = React.useCallback(() => {
+    try {
+      const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
+      const dateKey = new Date().toISOString().slice(0, 10);
+      const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.calories || "plan";
+      const storageKey = `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24)}`;
+      const statusMap = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      const meals = getMealsFromPlan(plan) || [];
+      if (!meals.length || !kcal) return 0;
+      const consumedCal = meals
+        .filter(m => statusMap[m.id] === "done")
+        .reduce((sum, m) => sum + Number(m.data?.macros?.cal || m.macros?.cal || 0), 0);
+      return Math.min(100, Math.round((consumedCal / kcal) * 100));
+    } catch(e) { return 0; }
+  }, [userData, plan, kcal]);
+
+  const [dailyProgress, setDailyProgress] = React.useState(getProgress);
+
+  React.useEffect(() => {
+    const update = () => setDailyProgress(getProgress());
+    window.addEventListener("dubi-meal-status-change", update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener("dubi-meal-status-change", update);
+      window.removeEventListener("storage", update);
+    };
+  }, [getProgress]);
   return (
     <aside className="dubi-desktop-sidebar" style={{gridColumn:1,flexDirection:"column",height:"100vh",position:"sticky",top:0,background:"#F4F1EC",borderRight:`1px solid ${T.border}`,padding:"28px 22px",gap:22}}>
       <div>
