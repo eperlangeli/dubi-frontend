@@ -17676,56 +17676,15 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
         </div>
       )}
 
-      <div style={{padding:`${activeNotif && !notifDismissed ? "16px" : "56px"} 24px 20px`}}>
+      <div style={{padding:`${activeNotif && !notifDismissed ? "16px" : "60px"} 24px 16px`}}>
         <p style={{fontSize:13,color:T.muted,textTransform:"capitalize",marginBottom:2}}>{today}</p>
         <h1 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:28,fontWeight:700,color:T.text,margin:0,letterSpacing:-0.5}}>
           {t(greeting.prefixKey)}{greeting.name ? `, ${greeting.name}` : ""}
         </h1>
-        <p style={{fontSize:14,color:T.muted,margin:"4px 0 0"}}>
-          {isFirstAccess
-            ? t("today.subtitle.first",{n:plan.mealCount})
-            : t("today.subtitle",{n:plan.mealCount})}
-        </p>
+        
       </div>
 
-      {/* ── Weight target announcement banner (first access only) ── */}
-      <div style={{margin:"0 24px 18px",padding:"14px 14px 13px",borderRadius:18,background:T.card,border:`1.5px solid ${T.border}`,boxShadow:"0 2px 12px rgba(43,43,43,.04)"}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-          <div style={{width:38,height:38,borderRadius:13,background:T.accentD+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <Ico n="zap" size={18} c={T.accentD}/>
-          </div>
-          <div style={{flex:1}}>
-            <p style={{fontSize:13,fontWeight:850,color:T.text,margin:0}}>
-              {t("home.training.title")}
-            </p>
-            <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"3px 0 0"}}>
-              {t("home.training.timingMessage", { timing: getTrainingTimeLabelLocalized(userData?.trainingTime, t).toLowerCase() })}
-            </p>
-          </div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5, minmax(0, 1fr))",gap:7}}>
-          {[
-            ["morning", t("training.timing.morning")],
-            ["lunch", t("training.timing.lunch")],
-            ["afternoon", t("training.timing.afternoon")],
-            ["evening", t("training.timing.evening")],
-            ["varies", t("training.timing.varies")]
-          ].map(([id,label]) => {
-            const active = normalizeTrainingTime(userData?.trainingTime) === id;
-            return (
-              <button key={id} disabled={trainingSaving} onClick={()=>handleTrainingTimeUpdate(id)}
-                style={{padding:"9px 4px",borderRadius:12,border:`1.5px solid ${active ? T.accent : T.border}`,background:active ? T.sel : T.bg,color:active ? T.accentD : T.text,fontSize:10,fontWeight:850,cursor:trainingSaving?"wait":"pointer",opacity:trainingSaving ? .8 : 1}}>
-                {label}
-              </button>
-            );
-          })}
-        </div>
-        {(trainingSaving || trainingMessage) && (
-          <p style={{fontSize:11,color:trainingMessage.includes("Non") || trainingMessage.includes("could not") ? "#B64C3B" : T.accentD,margin:"10px 2px 0",lineHeight:1.4,fontWeight:700}}>
-            {trainingSaving ? t("home.training.updating") : trainingMessage}
-          </p>
-        )}
-      </div>
+
 
       {isFirstAccess && userData?.targetWeight && userData?.weight && (
         (() => {
@@ -17767,39 +17726,43 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
         })()
       )}
 
-      {/* Wearable — cliccabile */}
-      <div style={{padding:"0 24px",marginBottom:18}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-          <p style={{fontSize:11,color:T.muted,letterSpacing:1,margin:0}}>{t("today.wearable.label")}</p>
-          <span style={{fontSize:10,fontWeight:800,color:(availableWearableMetrics.length || hasWearableConnection) ? T.accentD : T.muted,background:(availableWearableMetrics.length || hasWearableConnection) ? T.sel : T.card,border:`1px solid ${T.border}`,borderRadius:999,padding:"5px 9px"}}>
-            {!availableWearableMetrics.length ? (hasWearableConnection ? t("today.wearable.live") : wearableUiCopy.statusNone) : hasPartialWearableData ? wearableUiCopy.statusPartial : (wearableProvider ? t("today.wearable.live") : t("today.wearable.demo"))}
-          </span>
-        </div>
-        {(!availableWearableMetrics.length || hasPartialWearableData) && (
-          <button onClick={hasWearableConnection ? undefined : onOpenSettings}
-            style={{width:"100%",padding:"11px 12px",marginBottom:10,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`,textAlign:"left",cursor:hasWearableConnection?"default":"pointer"}}>
-            <p style={{fontSize:11,color:hasWearableConnection ? T.accentD : T.muted,lineHeight:1.45,margin:0,fontWeight:hasWearableConnection ? 700 : 500}}>
-              {!availableWearableMetrics.length ? wearableUiCopy.noData : wearableUiCopy.partialData}
-              {!hasWearableConnection && <span style={{color:T.accentD,fontWeight:800}}> →</span>}
-            </p>
-          </button>
-        )}
-        {availableWearableMetrics.length > 0 && (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {wearableMetrics.filter(metric => metric.available || latestWearable).map(metric => (
-              <WearableMetricCard
-                key={metric.type}
-                icon={<Ico n={metric.icon} size={18} c={metric.color}/>}
-                label={metric.label}
-                value={metric.value}
-                color={metric.color}
-                source={metric.available ? wearableSource : wearableUiCopy.unavailable}
-                available={metric.available}
-              />
+      {/* Wearable — compatto */}
+      {availableWearableMetrics.length > 0 ? (
+        <div style={{padding:"0 24px",marginBottom:20}}>
+          <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:2,scrollbarWidth:"none"}}>
+            {wearableMetrics.filter(m=>m.available).map(m=>(
+              <div key={m.type} style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,
+                padding:"9px 13px",borderRadius:14,
+                background:T.card,border:"1px solid "+T.border,
+                boxShadow:"0 1px 6px rgba(0,0,0,.04)"}}>
+                <Ico n={m.icon} size={15} c={m.color}/>
+                <div>
+                  <div style={{fontSize:9,color:T.muted,letterSpacing:0.5,textTransform:"uppercase"}}>{m.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:T.text,letterSpacing:-0.3}}>{m.value}</div>
+                </div>
+              </div>
             ))}
           </div>
-        )}
-      </div>
+          {hasPartialWearableData && (
+            <p style={{fontSize:10,color:T.muted,margin:"8px 0 0",paddingLeft:2}}>{wearableUiCopy.partialData}</p>
+          )}
+        </div>
+      ) : hasWearableConnection ? (
+        <div style={{padding:"0 24px",marginBottom:16}}>
+          <p style={{fontSize:11,color:T.accentD,margin:0,fontWeight:600}}>{wearableUiCopy.noData}</p>
+        </div>
+      ) : (
+        <div style={{padding:"0 24px",marginBottom:16}}>
+          <button onClick={onOpenSettings}
+            style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 12px",
+              borderRadius:10,background:"transparent",border:"1px dashed "+T.border,
+              cursor:"pointer",textDecoration:"none"}}>
+            <Ico n="link" size={12} c={T.muted}/>
+            <span style={{fontSize:11,color:T.muted}}>{t("wearable.connect.prompt")}</span>
+            <span style={{fontSize:11,color:T.accentD,fontWeight:700}}>→</span>
+          </button>
+        </div>
+      )}
 
       {/* ── Anomalia wearable — card contestuale ── */}
       {anomalyState && anomalyState !== "dismissed" && (
@@ -17917,23 +17880,43 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
       )}
 
       {/* Macros */}
-      <div style={{margin:"0 24px 18px",padding:20,background:T.card,border:`1px solid ${T.border}`,borderRadius:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:16}}>
-          <div>
-            <p style={{fontSize:11,color:T.muted,margin:0,letterSpacing:0.5}}>{t("today.kcalConsumed")}</p>
-            <p style={{fontSize:30,fontWeight:700,color:T.text,margin:"4px 0 0",letterSpacing:-1}}>
-              {consumed.cal} <span style={{fontSize:14,fontWeight:400,color:T.muted}}>/ {plan.calories} kcal</span>
+      <div style={{margin:"0 24px 18px",padding:"18px 20px",background:T.card,border:"1px solid "+T.border,borderRadius:22,boxShadow:"0 2px 16px rgba(0,0,0,.04)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:18,marginBottom:18}}>
+          {/* Anello calorie SVG */}
+          {(() => {
+            const pct = Math.min(1, consumed.cal / Math.max(1, plan.calories));
+            const r = 28, stroke = 5, cx = 33, cy = 33;
+            const circ = 2 * Math.PI * r;
+            const dash = circ * pct;
+            return (
+              <div style={{flexShrink:0,position:"relative",width:66,height:66}}>
+                <svg width="66" height="66" style={{transform:"rotate(-90deg)"}}>
+                  <circle cx={cx} cy={cy} r={r} fill="none" stroke={T.border} strokeWidth={stroke}/>
+                  <circle cx={cx} cy={cy} r={r} fill="none" stroke={T.accentD} strokeWidth={stroke}
+                    strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+                    style={{transition:"stroke-dasharray 0.5s ease"}}/>
+                </svg>
+                <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:14,fontWeight:800,color:T.text,lineHeight:1}}>{Math.round(pct*100)}</span>
+                  <span style={{fontSize:8,color:T.muted,letterSpacing:0.3}}>%</span>
+                </div>
+              </div>
+            );
+          })()}
+          <div style={{flex:1}}>
+            <p style={{fontSize:10,color:T.muted,margin:"0 0 2px",letterSpacing:0.5,textTransform:"uppercase"}}>{t("today.kcalConsumed")}</p>
+            <p style={{fontSize:26,fontWeight:800,color:T.text,margin:0,letterSpacing:-1,lineHeight:1.1}}>
+              {consumed.cal}
+              <span style={{fontSize:13,fontWeight:400,color:T.muted,marginLeft:4}}>/ {plan.calories} kcal</span>
             </p>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <p style={{fontSize:11,color:T.muted,margin:0}}>{t("today.mealsDone",{a:done.length,b:mealList.length})}</p>
-            <p style={{fontSize:14,fontWeight:600,color:T.accentD,margin:"2px 0 0"}}>{Math.round((consumed.cal/plan.calories)*100)}%</p>
+            <p style={{fontSize:11,color:T.muted,margin:"4px 0 0"}}>{t("today.mealsDone",{a:done.length,b:mealList.length})}</p>
           </div>
         </div>
-        <MacroBar label={t("today.macro.prot")} current={consumed.p} max={plan.protein} color={T.accent} />
-        <MacroBar label={t("today.macro.carb")} current={consumed.c} max={plan.carbs} color="#C9A87C" />
-        <MacroBar label={t("today.macro.fat")} current={consumed.f} max={plan.fat} color="#9A8FBF" />
-        {/* ── Tasso perdita/guadagno atteso (ACSM · Wishnofsky 1958) ── */}
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <MacroBar label={t("today.macro.prot")} current={consumed.p} max={plan.protein} color={T.accent} />
+          <MacroBar label={t("today.macro.carb")} current={consumed.c} max={plan.carbs} color="#C9A87C" />
+          <MacroBar label={t("today.macro.fat")} current={consumed.f} max={plan.fat} color="#9A8FBF" />
+        </div>
         {plan.weeklyLossKg !== undefined && plan.weeklyLossKg !== 0 && (plan.goal === "fatLoss" || plan.goal === "definition" || plan.goal === "gain") && (() => {
           const isGain   = plan.goal === "gain";
           const rate     = Math.abs(plan.weeklyLossKg).toFixed(2);
@@ -17945,7 +17928,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
             ? t("home.calories.gainEstimate", { rate })
             : t("home.calories.lossEstimate", { rate });
           return (
-            <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:7}}>
+            <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid "+T.border,display:"flex",alignItems:"center",gap:7}}>
               <div style={{width:7,height:7,borderRadius:"50%",background:dotColor,flexShrink:0}}/>
               <p style={{fontSize:11,color:T.muted,margin:0,lineHeight:1.4}}>{label}</p>
             </div>
