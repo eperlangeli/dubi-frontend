@@ -18069,6 +18069,25 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
               </button>
               {isOpen && (
                 <div style={{padding:"0 16px 16px"}}>
+                  {mt.id === "colazione" && userData?.breakfastPref !== "none" && (
+                    <div style={{display:"flex",gap:6,marginBottom:12,marginTop:4}}>
+                      {[{id:"dolce",lk:"breakfast.sweet"},{id:"salata",lk:"breakfast.savory"}].map(o => {
+                        const isActive = userData?.breakfastPref === o.id;
+                        return (
+                          <button key={o.id} onClick={async (e) => {
+                            e.stopPropagation();
+                            const nd = {...userData, breakfastPref: o.id};
+                            setUserData?.(nd);
+                            try { await saveDubiProfile(nd); } catch(err) {}
+                          }}
+                            style={{flex:1,padding:"7px 10px",borderRadius:10,border:`1.5px solid ${isActive?T.accent:T.border}`,background:isActive?T.sel:T.bg,cursor:"pointer",textAlign:"center",fontSize:12,fontWeight:isActive?700:400,color:isActive?T.accentD:T.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                            <Ico n={o.id==="dolce"?"sunrise":"fork"} size={12} c={isActive?T.accentD:T.muted}/>
+                            {t(o.lk)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{borderTop:`1px solid ${T.border}`,paddingTop:12,marginBottom:14}}>
                     <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("today.ingredients")}</p>
                     {meal.items.map((item,i)=>{
@@ -18217,13 +18236,11 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   };
   const _sb = _seasonBannerText[lang] || _seasonBannerText.it;
   const _monthName = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"][new Date().getMonth()];
-  const defBf = userData.breakfastPref==="salata" ? "salata" : "dolce";
-  const [dayBfPrefs,setDayBfPrefs] = useState(Array(7).fill(defBf));
   const days = [0,1,2,3,4,5,6].map(i=>t("days.short."+i));
 
   const weekMeals = optimizeWeeklyPlanQuality(getDietMeals(userData?.diet, null, userData?.allergies));
   const dayMeals = weekMeals[selDay] || weekMeals[0];
-  const bfKey = dayBfPrefs[selDay]==="salata" ? "colazione_salata" : "colazione_dolce";
+  const bfKey = userData.breakfastPref==="salata" ? "colazione_salata" : "colazione_dolce";
 
   const slots = getMealSlots(plan.mealCount || 4);
   const times = plan.mealTimes || ["08:00","13:00","16:30","20:00"];
@@ -18242,7 +18259,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     return {...sl, time: times[i]||"--:--", meal: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct};
   });
   const preferredAiWeeklyMeals = aiWeeklyMeals?.map((meal) => {
-    if (meal.id !== "colazione") return meal;
+    if (meal.id !== "colazione" || !["dolce","salata"].includes(userData?.breakfastPref)) return meal;
     const preferredBreakfast = dayMeals[bfKey] || meal.data;
     return {...meal, data: preferredBreakfast};
   });
@@ -18414,19 +18431,6 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
             </button>
           );
         })}
-      </div>
-
-      {/* Breakfast toggle per giorno */}
-      <div style={{padding:"0 24px",marginBottom:14}}>
-        <div style={{display:"flex",gap:8}}>
-          {[{id:"dolce",ic:"sunrise",lk:"weekly.bf.sweet"},{id:"salata",ic:"fork",lk:"weekly.bf.salty"}].map(o=>(
-            <button key={o.id} onClick={()=>setDayBfPrefs(p=>{const n=[...p];n[selDay]=o.id;return n;})}
-              style={{flex:1,padding:"10px 12px",borderRadius:12,border:`1.5px solid ${dayBfPrefs[selDay]===o.id?T.accent:T.border}`,background:dayBfPrefs[selDay]===o.id?T.sel:T.card,cursor:"pointer",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
-              <Ico n={o.ic} size={15} c={dayBfPrefs[selDay]===o.id?T.accentD:T.muted}/>
-              <span style={{fontSize:13,fontWeight:dayBfPrefs[selDay]===o.id?600:400,color:T.text}}>{t(o.lk)}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Macro pills */}
