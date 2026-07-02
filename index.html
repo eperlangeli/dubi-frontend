@@ -17248,6 +17248,36 @@ const ConsentRevokedPlanScreen = ({onOpenConsentSettings}) => {
   );
 };
 
+function migrateTodayStatus(oldPlan, newPlan, userData) {
+  try {
+    if (!oldPlan || !newPlan) return;
+    const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
+    const dateKey = new Date().toISOString().slice(0,10);
+    const makeKey = (p) => {
+      const pk = p?.aiEnginePlan?.generatedAt || p?.generatedAt || p?.calories || "plan";
+      return `dubi_meal_status_${userKey}_${dateKey}_${String(pk).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
+    };
+    const oldKey = makeKey(oldPlan);
+    const newKey = makeKey(newPlan);
+    if (oldKey === newKey) return;
+    const oldStatus = JSON.parse(localStorage.getItem(oldKey) || "{}");
+    if (!Object.keys(oldStatus).length) return;
+    const nowHHMM = new Date().toTimeString().slice(0,5);
+    const newMeals = typeof getAskDubiTodayMeals === "function" ? getAskDubiTodayMeals(newPlan, userData) : [];
+    const migrated = {};
+    for (const meal of newMeals) {
+      if (meal.time && meal.time <= nowHHMM && oldStatus[meal.id] !== undefined) {
+        migrated[meal.id] = oldStatus[meal.id];
+      }
+    }
+    if (Object.keys(migrated).length) {
+      localStorage.setItem(newKey, JSON.stringify(migrated));
+    }
+  } catch(e) {
+    console.warn("migrateTodayStatus error:", e);
+  }
+}
+
 const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
@@ -17483,6 +17513,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
           force: true,
           reason: "ask_dubi_regenerate_plan"
         });
+        migrateTodayStatus(plan, updatedPlan, userData);
         setPlan?.(updatedPlan);
         if (!savedByAi) await savePlanToBackend(updatedPlan, userData);
         setTrainingMessage(t("home.training.regenerated"));
@@ -17514,6 +17545,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
         force: true,
         reason: `home_training_time_${nextTrainingTime}`
       });
+      migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan?.(updatedPlan);
       if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
       setTrainingMessage(t("home.training.updated"));
@@ -21132,6 +21164,7 @@ const handleSaveProfile = async () => {
         force: true,
         reason: `profile_update_${changed.map(f => f.key).join("_") || "settings"}`
       });
+      migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan(updatedPlan);
       if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
     }
