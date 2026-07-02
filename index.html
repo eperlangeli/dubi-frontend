@@ -11948,6 +11948,7 @@ function adaptMealForUserProfile(meal, slotId, userData) {
   if (!isActiveOmnivore) return meal;
 
   const proteinBySlot = {
+    colazione: "Uova strapazzate (2) o yogurt greco (150g)",
     snack_m: "Bresaola o tacchino - 80g",
     pranzo: "Petto di pollo o tonno fresco - 150g",
     cena: "Salmone, merluzzo o uova - 160g",
@@ -11957,9 +11958,9 @@ function adaptMealForUserProfile(meal, slotId, userData) {
   const plantPrimary = /\b(seitan|tofu|tempeh|edamame|burger vegetale|burger di vegetali|soia|vegan[oa]|vegetal[ei])\b/i;
   let changed = false;
   const items = meal.items.map((item, idx) => {
-    if (!plantPrimary.test(String(item))) return item;
+    if (idx !== 0 || !plantPrimary.test(String(item))) return item;
     changed = true;
-    return idx === 0 ? (proteinBySlot[slotId] || "Proteina magra animale - 150g") : item;
+    return proteinBySlot[slotId] || "Proteina magra animale - 150g";
   });
   if (!changed) return meal;
   return {
