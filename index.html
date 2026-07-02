@@ -18072,10 +18072,14 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
                   {mt.id === "colazione" && userData?.breakfastPref !== "none" && (
                     <div style={{display:"flex",gap:6,marginBottom:12,marginTop:4}}>
                       {[{id:"dolce",lk:"breakfast.sweet"},{id:"salata",lk:"breakfast.savory"}].map(o => {
-                        const isActive = userData?.breakfastPref === o.id;
+                        const _bfIsSalata = !!(dayMeals?.colazione_salata && mt.data === dayMeals.colazione_salata);
+                        const _bfIsDolce = !!(dayMeals?.colazione_dolce && mt.data === dayMeals.colazione_dolce);
+                        const _bfEff = _bfIsSalata ? "salata" : _bfIsDolce ? "dolce" : (["dolce","salata"].includes(userData?.breakfastPref) ? userData.breakfastPref : null);
+                        const isActive = _bfEff === o.id;
                         return (
                           <button key={o.id} onClick={async (e) => {
                             e.stopPropagation();
+                            if (_bfEff === o.id) return;
                             const nd = {...userData, breakfastPref: o.id};
                             setUserData?.(nd);
                             try { await saveDubiProfile(nd); } catch(err) {}
@@ -21813,7 +21817,7 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
       const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.calories || "plan";
       const storageKey = `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24)}`;
       const statusMap = JSON.parse(localStorage.getItem(storageKey) || "{}");
-      const meals = getMealsFromPlan(plan) || [];
+      const meals = (typeof getAskDubiTodayMeals === "function" ? getAskDubiTodayMeals(plan, userData) : []) || [];
       if (!meals.length || !kcal) return 0;
       const consumedCal = meals
         .filter(m => statusMap[m.id] === "done")
