@@ -12773,7 +12773,6 @@ const NumInput = ({label,unit,value,onChange,min,max}) => {
             type="number"
             inputMode="numeric"
             value={raw}
-            placeholder="—"
             onFocus={handleFocus}
             onBlur={handleBlur}
             onKeyDown={handleKey}
@@ -15065,7 +15064,6 @@ const WelcomeTermsScreen = ({ onAccept }) => {
         <button
           onClick={()=>{
             localStorage.setItem("dubi_terms_accepted","1");
-            localStorage.setItem("dubi_health_consent","1");
             onAccept();
           }}
           style={{width:"100%",background:T.text,color:T.bg,border:"none",borderRadius:50,padding:"18px 24px",fontSize:16,fontWeight:700,cursor:"pointer",letterSpacing:0.1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
@@ -17301,6 +17299,68 @@ function migrateTodayStatus(oldPlan, newPlan, userData) {
   }
 }
 
+// ── Invito ricerca post-piano (Opzione B): mostrato solo a chi NON ha dato il consenso
+// ricerca in onboarding. Chiede il consenso nel momento di massimo valore percepito
+// (piano appena generato). Mai preselezionato, dismissibile, max 2 richieste totali
+// con 14 giorni di distanza. Usa lo stesso canale di salvataggio delle Impostazioni.
+const ResearchInviteCard = ({userData, setUserData}) => {
+  const { lang } = useT();
+  const [busy, setBusy] = React.useState(false);
+  const [hidden, setHidden] = React.useState(false);
+  const hasResearch = Boolean(userData?.research_consent ?? userData?.researchConsent);
+  const inviteState = React.useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("dubi_research_invite") || "{}"); } catch(e) { return {}; }
+  }, []);
+  const dismissCount = inviteState.count || 0;
+  const dismissedRecently = inviteState.dismissedAt && (Date.now() - inviteState.dismissedAt) < 14*24*60*60*1000;
+  if (hasResearch || hidden || dismissCount >= 2 || dismissedRecently) return null;
+  const dismiss = () => {
+    try { localStorage.setItem("dubi_research_invite", JSON.stringify({dismissedAt: Date.now(), count: dismissCount + 1})); } catch(e) {}
+    setHidden(true);
+  };
+  const accept = async () => {
+    if (busy) return;
+    setBusy(true);
+    const result = await updateProfileConsentInBackend("research_consent", true);
+    setBusy(false);
+    if (!result || !result.success) return;
+    const updated = {...userData, research_consent:true, researchConsent:true};
+    setUserData(updated);
+    saveDubiProfile(updated);
+    setHidden(true);
+  };
+  const it = lang === "it";
+  return (
+    <div style={{margin:"60px 16px 0",padding:"16px",borderRadius:16,background:T.card,border:"1.5px solid rgba(107,138,100,.45)",boxShadow:"0 2px 12px rgba(107,138,100,.12)"}}>
+      <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+        <div style={{width:36,height:36,borderRadius:10,background:"rgba(107,138,100,.18)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <span style={{fontSize:17}}>🔬</span>
+        </div>
+        <div style={{flex:1}}>
+          <p style={{margin:"0 0 4px",fontSize:13,fontWeight:800,color:T.text}}>
+            {it ? "Ti sta piacendo il tuo piano?" : "Enjoying your plan?"}
+          </p>
+          <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.55}}>
+            {it
+              ? "Aiuta DUBI a migliorare i piani di tutti: condividi i tuoi dati in forma anonima e aggregata. Nessun dato identificabile, revocabile in ogni momento dalle Impostazioni."
+              : "Help DUBI improve everyone's plans: share your data in anonymous, aggregated form. No identifiable data, revocable anytime from Settings."}
+          </p>
+          <div style={{display:"flex",gap:10,marginTop:12}}>
+            <button onClick={accept} disabled={busy}
+              style={{flex:1,padding:"11px 12px",borderRadius:12,border:"none",cursor:busy?"default":"pointer",background:T.accentD,color:"#fff",fontSize:13,fontWeight:700,opacity:busy?.7:1}}>
+              {busy ? (it ? "Salvataggio…" : "Saving…") : (it ? "Sì, contribuisco" : "Yes, count me in")}
+            </button>
+            <button onClick={dismiss} disabled={busy}
+              style={{flex:1,padding:"11px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:"transparent",color:T.muted,fontSize:13,fontWeight:600,cursor:busy?"default":"pointer"}}>
+              {it ? "No grazie" : "No thanks"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
@@ -17716,6 +17776,11 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
 
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
+
+      {/* ── Invito ricerca post-piano (solo se consenso non dato, mai insieme alla notifica) ── */}
+      {!(activeNotif && !notifDismissed) && (
+        <ResearchInviteCard userData={userData} setUserData={setUserData}/>
+      )}
 
       {/* ── Notifica giornaliera DUBI (2x al giorno) ── */}
       {activeNotif && !notifDismissed && (
@@ -22008,28 +22073,16 @@ const BottomNav = ({active,onChange}) => {
 // ═══════════════════════════════════════════════════════════════
 const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const [insuranceConsent, setInsuranceConsent] = React.useState(false);
-  const [termsConsent, setTermsConsent] = React.useState(false);
-  const [gdprConsent, setGdprConsent] = React.useState(false);
+  // Termini gia accettati esplicitamente al primo avvio (WelcomeTermsScreen) e in registrazione
+  const [termsConsent] = React.useState(true);
+  // Consenso salute gia fornito esplicitamente allo step 0 dell'onboarding (HealthDataConsentPrompt)
+  const [gdprConsent, setGdprConsent] = React.useState(Boolean(userData?.healthDataConsent));
   const [researchConsent, setResearchConsent] = React.useState(false);
   const [showResearchMore, setShowResearchMore] = React.useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = React.useState(false);
   const [showTerms, setShowTerms] = React.useState(false);
   const [showHealthDisclaimer, setShowHealthDisclaimer] = React.useState(false);
   const [acceptingConsent, setAcceptingConsent] = React.useState(false);
-  React.useEffect(() => {
-    if (localStorage.getItem("dubi_health_consent") === "1") {
-      onAccept({
-        terms:true, gdpr:true, healthConsent:true, medicalDisclaimer:true,
-        researchConsent:false,
-        privacyPolicyVersion:PRIVACY_POLICY_VERSION,
-        termsVersion:TERMS_VERSION,
-        healthDisclaimerVersion:HEALTH_DISCLAIMER_VERSION,
-        privacyAcceptedAt:new Date().toISOString(),
-        legalAcceptedAt:new Date().toISOString(),
-        healthDataConsentAt:new Date().toISOString()
-      });
-    }
-  }, []);
   const { t, lang } = useT();
   const privacyCopy = getPrivacyCopy(lang);
   const termsConsentText = getLegalConsent("terms", lang);
@@ -22052,14 +22105,13 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
         <div className="dubi-legal-consent-card">
           <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
             <div
-              onClick={()=>setTermsConsent(!termsConsent)}
-              style={{width:24,height:24,borderRadius:6,border:`2px solid ${termsConsent?T.accentD:T.border}`,background:termsConsent?T.accentD:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,marginTop:2}}
+              style={{width:24,height:24,borderRadius:6,border:`2px solid ${T.accentD}`,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}
             >
               {termsConsent && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
             </div>
             <div style={{flex:1}}>
               <p style={{margin:"0 0 4px",fontSize:13,fontWeight:800,color:T.text}}>
-                {lang==="it" ? "Termini e Privacy" : "Terms and Privacy"}
+                {lang==="it" ? "Termini e Privacy — già accettati" : "Terms and Privacy — already accepted"}
               </p>
               <p style={{margin:0,fontSize:12,color:T.muted,lineHeight:1.5}}>
                 {termsConsentText}
@@ -22119,8 +22171,8 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
           </p>
         </div>
 
-        {/* Research Consent — optional */}
-        <div style={{background:T.card,borderRadius:16,border:`1px solid ${T.border}`,padding:"18px 16px",marginBottom:12}}>
+        {/* Research Consent — optional (prominenza onesta: ben visibile, mai preselezionato) */}
+        <div style={{background:"linear-gradient(135deg, rgba(107,138,100,0.12), rgba(107,138,100,0.05))",borderRadius:16,border:`2px solid ${T.accentD}`,padding:"20px 16px",marginBottom:12,boxShadow:"0 2px 12px rgba(107,138,100,0.15)"}}>
           <div style={{display:"flex",gap:14,alignItems:"flex-start"}}>
             <div
               onClick={()=>setResearchConsent(!researchConsent)}
