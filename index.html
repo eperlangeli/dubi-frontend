@@ -383,6 +383,8 @@ const DUBI_BETA_COPY = {
     hero:"DUBI nasce da una scelta precisa: rendere la conoscenza nutrizionale accessibile, chiara e utile a tutti.",
     mission:"Il founder e il team hanno costruito DUBI per aiutare le persone a ritrovare un rapporto piu consapevole con alimentazione e benessere. In un campo spesso affollato da informazioni confuse o contraddittorie, vogliamo offrire orientamento, educazione e strumenti concreti a chi desidera vivere meglio e a chi attraversa un momento di difficolta.",
     subtitle:"Per questo il servizio e il tuo piano personalizzato sono offerti gratuitamente: adattamenti, lista della spesa, progressi e wearable inclusi.",
+    sportSourcesTitle:"Fonti sport integrate",
+    sportSourcesText:"Quando selezioni gli sport, DUBI usa linee guida su proteine, carboidrati, timing, recupero e integrazione sportiva.",
     cta:"Entra nel mio piano gratuito", note:"Nessuna carta richiesta. Nessun abbonamento. Tutte le funzionalita della beta sono incluse.",
     settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Tutto incluso", settingsNote:"Piano completo gratuito per i primi utenti beta.",
     features:["Piano nutrizionale personalizzato","Adattamenti automatici sui tuoi dati","Lista della spesa e alternative","Progressi, trend e wearable"]
@@ -393,6 +395,8 @@ const DUBI_BETA_COPY = {
     hero:"DUBI was born from a deliberate choice: making nutrition knowledge accessible, clear and useful to everyone.",
     mission:"The founder and the team built DUBI to help people develop a more informed relationship with nutrition and wellbeing. In a field often crowded with confusing or conflicting information, we want to offer guidance, education and practical tools to those who wish to live better and to those going through a difficult moment.",
     subtitle:"That is why the service and your personalized plan are offered free of charge: adaptations, shopping list, progress and wearables included.",
+    sportSourcesTitle:"Sport sources integrated",
+    sportSourcesText:"When you select sports, DUBI uses guidance on protein, carbohydrates, timing, recovery and sports supplementation.",
     cta:"Open my free plan", note:"No card required. No subscription. All beta features are included.",
     settingsTitle:"FREE BETA", settingsPlan:"DUBI Beta · Everything included", settingsNote:"Full plan free for early beta users.",
     features:["Personalized nutrition plan","Automatic adaptations from your data","Shopping list and alternatives","Progress, trends and wearables"]
@@ -471,6 +475,16 @@ const DUBI_BETA_COPY = {
   }
 };
 const getDubiBetaCopy = (lang) => DUBI_BETA_COPY[lang] || DUBI_BETA_COPY.en;
+const SPORT_SCIENCE_SOURCES = [
+  "ISSN Position Stand 2017",
+  "Thomas, Erdman & Burke 2016",
+  "Burke 2011",
+  "IOC Consensus / Maughan 2018",
+  "Antonio 2021 JISSN",
+  "Impey et al. · Fuel for the Work Required",
+  "Ivy & Portman · Nutrient Timing",
+  "Fullagar 2015"
+];
 
 const dubiHaptic = (type = "tap") => {
   try {
@@ -1310,6 +1324,10 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     aiGenerated: true,
     ingredientGenerated: true,
     ingredientPlan,
+    dailyAdaptation: ingredientPlan?.dailyAdaptation || ingredientPlan?.daily_adaptation || null,
+    baseTargets: ingredientPlan?.baseTargets || ingredientPlan?.base_targets || null,
+    adjustedTargets: ingredientPlan?.adjustedTargets || ingredientPlan?.adjusted_targets || null,
+    adaptationSignature: ingredientPlan?.adaptationSignature || ingredientPlan?.adaptation_signature || ingredientPlan?.dailyAdaptation?.signature || null,
     sports: normalizeSports(ingredientPlan?.sports, userData?.sport),
     sportGroups: Array.isArray(ingredientPlan?.sport_groups) ? ingredientPlan.sport_groups : [],
     sportProfile: ingredientPlan?.sport_profile || "none",
@@ -1317,7 +1335,11 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     giSummary: ingredientPlan?.gi_summary || null,
     pathologyFilter: ingredientPlan?.pathology_filter || null,
     profileSignature: getPlanProfileSignature(userData),
-    scienceTrace: ["DUBI ingredient-based engine", "USDA/CIQUAL/CREA/BLS mapped ingredient references where available"]
+    scienceTrace: [
+      "DUBI ingredient-based engine",
+      "USDA/CIQUAL/CREA/BLS mapped ingredient references where available",
+      ...(ingredientPlan?.dailyAdaptation?.scienceBasis || []).map(s => s.label).filter(Boolean)
+    ]
   };
 };
 
@@ -1613,7 +1635,10 @@ async function generateIngredientPlan(options = {}) {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ date: today })
+    body: JSON.stringify({
+      date: today,
+      ...(options.breakfastChoice ? { breakfastChoice: options.breakfastChoice, reason: options.reason || "breakfast_choice" } : {})
+    })
   });
 
   if (!genRes.ok) {
@@ -1644,6 +1669,67 @@ const fetchCurrentIngredientPlanFromBackend = async () => {
     console.error("Current ingredient plan load failed:", error);
     return null;
   }
+};
+
+const parseIsoDateLocal = (isoDate) => {
+  const [year, month, day] = String(isoDate || getTodayIsoDate()).split("-").map(Number);
+  return new Date(year || new Date().getFullYear(), (month || 1) - 1, day || 1);
+};
+
+const toIsoDateLocal = (date) => {
+  const d = new Date(date);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+};
+
+const addDaysIso = (isoDate, days) => {
+  const date = parseIsoDateLocal(isoDate);
+  date.setDate(date.getDate() + days);
+  return toIsoDateLocal(date);
+};
+
+const getWeekStartIsoDate = (baseDate = getTodayIsoDate()) => {
+  const date = parseIsoDateLocal(baseDate);
+  const mondayIndex = (date.getDay() + 6) % 7;
+  date.setDate(date.getDate() - mondayIndex);
+  return toIsoDateLocal(date);
+};
+
+const getCurrentWeekIsoDates = (baseDate = getTodayIsoDate()) => {
+  const weekStart = getWeekStartIsoDate(baseDate);
+  return Array.from({ length: 7 }, (_, index) => addDaysIso(weekStart, index));
+};
+
+const fetchIngredientPlanForDate = async (date, options = {}) => {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${date}`, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+
+  if (fetchRes.ok) return normalizeIngredientPlanPayload(await fetchRes.json());
+  if (!options.generateIfMissing) return null;
+
+  return await generateIngredientPlan({ date, reason: options.reason || "weekly_shopping_sync" });
+};
+
+const fetchWeeklyIngredientPlansFromBackend = async (userData, baseDate = getTodayIsoDate()) => {
+  const dates = getCurrentWeekIsoDates(baseDate);
+  const plans = [];
+
+  for (const date of dates) {
+    try {
+      const ingredientPlan = await fetchIngredientPlanForDate(date, { generateIfMissing: true });
+      plans.push(ingredientPlan ? mapIngredientPlanToFrontend(ingredientPlan, userData) : null);
+    } catch (error) {
+      console.warn("Weekly ingredient plan load failed:", date, error?.message || error);
+      plans.push(null);
+    }
+  }
+
+  return plans;
 };
 
 const generateAiPlanFromBackend = async (userData, options = {}) => {
@@ -10229,6 +10315,22 @@ function localizeSportTag(item, lang){
   const en = item.sportEN || item.sport;
   return maps[lang]?.[en] || en;
 }
+function sportScienceSourceCopy(lang, selectedSportsText = ""){
+  if (lang === "it") {
+    return {
+      title: "Fonti sport applicate al tuo profilo",
+      body: selectedSportsText
+        ? `Sport selezionati: ${selectedSportsText}. DUBI usa queste fonti per adattare proteine, carboidrati, timing dei pasti, recupero e integrazione in modo conservativo.`
+        : "Quando selezioni uno o piu sport, DUBI usa queste fonti per adattare proteine, carboidrati, timing dei pasti, recupero e integrazione in modo conservativo."
+    };
+  }
+  return {
+    title: "Sport sources applied to your profile",
+    body: selectedSportsText
+      ? `Selected sports: ${selectedSportsText}. DUBI uses these sources to adapt protein, carbohydrates, meal timing, recovery and supplementation conservatively.`
+      : "When you select one or more sports, DUBI uses these sources to adapt protein, carbohydrates, meal timing, recovery and supplementation conservatively."
+  };
+}
 function localizeIngredientInfo(info, lang){
   if (!info || lang === "it" || lang === "en") return info;
   const b = localTextBank(lang);
@@ -12009,7 +12111,9 @@ function getShoppingCategory(name) {
 
 function parseShoppingIngredient(item) {
   const display = formatFoodText(item).trim();
-  const match = display.match(/^(.+?)\s*-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)$/i);
+  const dashMatch = display.match(/^(.+?)\s*-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)$/i);
+  const parenMatch = display.match(/^(.+?)\s*\(\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)\s*\)$/i);
+  const match = dashMatch || parenMatch;
   const name = match ? match[1].trim() : display;
   const qty = match ? parseFloat(match[2].replace(',','.')) : 1;
   const rawUnit = match ? match[3].toLowerCase() : 'qb';
@@ -12213,7 +12317,108 @@ function getMealReasonText(meal, lang, userData) {
   return localizeScientificText(raw, lang);
 }
 
-function getPersonalizedShopping(userData, plan, appliedSwaps = {}) {
+function getVisibleMealEntriesForDay({ userData, plan, dayIndex = 0, times: providedTimes = null }) {
+  const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
+  const dayMeals = dietMeals[dayIndex] || dietMeals[0] || {};
+  const bfKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
+  const slots = getMealSlots(plan?.mealCount || 4);
+  const times = providedTimes || plan?.mealTimes || ["08:00","13:00","16:30","20:00"];
+  const aiMealList = getAiMealListForDay(plan, dayIndex, slots, times);
+
+  const fallbackMealEntries = slots.map((slot, index) => {
+    let meal;
+    if (slot.id === "colazione") meal = dayMeals[bfKey] || dayMeals.colazione_dolce;
+    else if (slot.id === "pranzo") meal = dayMeals.pranzo;
+    else if (slot.id === "cena") meal = dayMeals.cena;
+    else if (slot.id === "snack") meal = dayMeals.snack;
+    else if (slot.id === "snack_m") meal = dayMeals.snack_m;
+    else if (slot.id === "snack_n") meal = dayMeals.snack_n;
+
+    return {
+      ...slot,
+      time: times[index] || "--:--",
+      meal: meal || dayMeals.snack || { items: [], alts: [], macros: { cal: 0, p: 0, c: 0, f: 0 } },
+      workoutLabel: getWorkoutLabel(userData?.trainingTime, slot.id),
+      carbTargetPct: getCarbTargetPct(userData?.trainingTime, slot.id, userData?.sport),
+    };
+  });
+
+  const baseEntries = aiMealList
+    ? aiMealList.map((meal) => ({ ...meal, meal: meal.data }))
+    : fallbackMealEntries;
+
+  return baseEntries.map((entry) => ({
+    ...entry,
+    meal: adaptMealForUserProfile(entry.meal, entry.id, userData),
+  }));
+}
+
+const SHOPPING_CATEGORIES = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
+
+function addShoppingItemToTotals(totals, item) {
+  const parsed = parseShoppingIngredient(item);
+  if (!parsed.key) return;
+  if (!totals[parsed.key]) {
+    totals[parsed.key] = { dispName: parsed.name, total: 0, unit: parsed.unit, cat: parsed.cat };
+  }
+  totals[parsed.key].total += parsed.qty;
+}
+
+function shoppingTotalsToCategories(totals) {
+  const result = {};
+  SHOPPING_CATEGORIES.forEach(cat => { result[cat] = []; });
+
+  Object.values(totals)
+    .sort((a, b) => String(a.cat).localeCompare(String(b.cat)) || String(a.dispName).localeCompare(String(b.dispName)))
+    .forEach(({ dispName, total, unit, cat }) => {
+      const category = SHOPPING_CATEGORIES.includes(cat) ? cat : "Condimenti & Altro";
+      result[category].push(`${dispName}${formatShoppingQuantity(total, unit)}`);
+    });
+
+  SHOPPING_CATEGORIES.forEach(cat => { if (!result[cat]?.length) delete result[cat]; });
+  return result;
+}
+
+function getShoppingByDay(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
+  const weekDates = getCurrentWeekIsoDates();
+  const hasWeeklyPlans = Array.isArray(weeklyPlans) && weeklyPlans.some(Boolean);
+  const sourcePlans = hasWeeklyPlans
+    ? weeklyPlans.slice(0, 7)
+    : (plan?.ingredientPlan?.meals ? [plan] : Array.from({ length: 7 }, () => plan));
+
+  return sourcePlans.map((dayPlan, index) => {
+    const dayIndex = hasWeeklyPlans ? index : (sourcePlans.length === 1 ? (new Date().getDay() + 6) % 7 : index);
+    const entries = getVisibleMealEntriesForDay({ userData, plan: dayPlan || plan, dayIndex });
+    const totals = {};
+
+    entries.forEach((entry) => {
+      (entry.meal?.items || []).forEach((item, itemIndex) => {
+        const display = appliedSwaps?.[`${dayIndex}-${entry.id}-${itemIndex}`] || formatFoodText(item);
+        addShoppingItemToTotals(totals, display);
+      });
+    });
+
+    return {
+      dayIndex,
+      date: hasWeeklyPlans ? weekDates[index] : (sourcePlans.length === 1 ? getTodayIsoDate() : weekDates[index]),
+      meals: entries,
+      categories: shoppingTotalsToCategories(totals),
+    };
+  }).filter(day => Object.keys(day.categories || {}).length > 0);
+}
+
+function mergeShoppingDayBreakdown(days = []) {
+  const totals = {};
+  days.forEach(day => {
+    Object.values(day.categories || {}).flat().forEach(item => addShoppingItemToTotals(totals, item));
+  });
+  return shoppingTotalsToCategories(totals);
+}
+
+function getPersonalizedShopping(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
+  const dayBreakdown = getShoppingByDay(userData, plan, appliedSwaps, weeklyPlans);
+  if (dayBreakdown.length) return mergeShoppingDayBreakdown(dayBreakdown);
+
   if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
     const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
     const result = {};
@@ -12480,15 +12685,15 @@ function hasOwnedShoppingIngredient(userData, item) {
   }
 }
 
-function flattenShoppingItems(userData, plan, swaps) {
-  const shop = getPersonalizedShopping(userData, plan, swaps);
+function flattenShoppingItems(userData, plan, swaps, weeklyPlans = []) {
+  const shop = getPersonalizedShopping(userData, plan, swaps, weeklyPlans);
   return Object.values(shop).flat();
 }
 
-function findShoppingCoverage(userData, plan, swaps, ingredient) {
+function findShoppingCoverage(userData, plan, swaps, ingredient, weeklyPlans = []) {
   const base = shoppingItemBase(ingredient);
   if (!base) return { exists: false, checked: false, item: null };
-  const items = flattenShoppingItems(userData, plan, swaps);
+  const items = flattenShoppingItems(userData, plan, swaps, weeklyPlans);
   const item = items.find(entry => {
     const entryBase = shoppingItemBase(entry);
     return entryBase === base || entryBase.includes(base) || base.includes(entryBase);
@@ -12580,8 +12785,11 @@ const SRC_STUDI = [
   {org:"Willett et al., 2019",sub:"Lancet EAT Commission",note:"Salute e sostenibilità",noteEN:"Health and sustainability"},
   {org:"Academy of Nutrition, 2016",sub:"",note:"Diete vegetariane adeguate se pianificate",noteEN:"Vegetarian diets adequate if planned"},
   {org:"Craig & Mangels, 2009",sub:"AJCN",note:"Nutrienti critici nelle diete plant-based",noteEN:"Critical nutrients in plant-based diets"},
+  {org:"ISSN Position Stand — 2017",sub:"Journal of the International Society of Sports Nutrition",note:"Proteine per soggetti attivi: target giornaliero e distribuzione nei pasti principali per sostenere sintesi proteica e recupero.",noteEN:"Protein for active people: daily target and distribution across main meals to support protein synthesis and recovery.",sport:"Tutti gli sport",sportEN:"All sports",badge:"NEW"},
   {org:"Burke et al., 2011",sub:"Sports Medicine",note:"Carb loading per endurance athletes",noteEN:"Carb loading for endurance athletes"},
-  {org:"Ivy & Portman, 2004",sub:"",note:"Finestra anabolica e timing nutrienti",noteEN:"Anabolic window and nutrient timing"},
+  {org:"Impey et al. — Fuel for the Work Required",sub:"Sports Medicine",note:"Periodizzazione dei carboidrati in base allo scopo della sessione: piu disponibilita per lavori intensi, strategia controllata nei giorni leggeri.",noteEN:"Carbohydrate periodisation according to the purpose of the session: more availability for hard work, controlled strategy on lighter days.",sport:"Tutti gli sport",sportEN:"All sports",badge:"NEW"},
+  {org:"Ivy & Portman, 2004",sub:"Nutrient Timing",note:"Timing dei nutrienti intorno all'allenamento per supportare recupero, glicogeno e sintesi proteica.",noteEN:"Nutrient timing around training to support recovery, glycogen and protein synthesis.",sport:"Tutti gli sport",sportEN:"All sports"},
+  {org:"Fullagar et al., 2015",sub:"Sports Medicine",note:"Sonno e performance atletica: recupero, fatica e qualita del sonno come segnali da considerare prima di tagli calorici aggressivi.",noteEN:"Sleep and athletic performance: recovery, fatigue and sleep quality as signals to consider before aggressive calorie cuts.",sport:"Tutti gli sport",sportEN:"All sports",badge:"NEW"},
   {org:"Jakubowicz et al., 2013",sub:"Obesity",note:"Carboidrati mattina e sensibilità insulinica",noteEN:"Morning carbohydrates and insulin sensitivity"},
   // ── Nuove fonti integrate con calcolo deficit e proteine (Aprile 2026) ──
   {org:"Wishnofsky M — 1958",sub:"American Journal of Clinical Nutrition",note:"Regola delle 7700 kcal: 1 kg di grasso corporeo ≈ 7700 kcal di deficit. Base del calcolo del tasso di perdita settimanale.",noteEN:"The 7700 kcal rule: 1 kg of body fat ≈ 7700 kcal deficit. Foundation of weekly weight loss rate estimation.",badge:"NEW"},
@@ -12589,7 +12797,7 @@ const SRC_STUDI = [
   {org:"Barakat CI et al. — 2020",sub:"Strength & Conditioning Journal",note:"Ricomposizione corporea (recomp): deficit moderato 200–350 kcal + alto apporto proteico 1.6–2.4g/kg per perdere grasso e mantenere/guadagnare massa magra simultaneamente.",noteEN:"Body recomposition: moderate deficit 200–350 kcal + high protein 1.6–2.4g/kg to lose fat and maintain/gain lean mass simultaneously.",badge:"NEW"},
   // ── Fonti performance atletica ──
   {org:"Thomas DT, Erdman KA, Burke LM — 2016",sub:"Journal of the Academy of Nutrition and Dietetics",note:"Posizione ufficiale di AND, Dietitians of Canada e ACSM su nutrizione e performance atletica. Macro target, timing, idratazione per atleti.",noteEN:"Official position of AND, Dietitians of Canada and ACSM on nutrition and athletic performance. Macro targets, timing, hydration for athletes.",badge:"NEW"},
-  {org:"Maughan RJ et al. — 2018",sub:"British Journal of Sports Medicine · IOC Consensus Statement",note:"Dichiarazione di consenso del CIO su integratori alimentari e atleti d'élite. Protocolli di nutrizione periodizzata per la performance.",noteEN:"IOC consensus statement on dietary supplements and elite athletes. Periodised nutrition protocols for performance.",badge:"NEW"},
+  {org:"Maughan RJ et al. — 2018",sub:"British Journal of Sports Medicine · IOC Consensus Statement",note:"Consensus CIO su nutrizione da competizione e integratori: uso solo se evidence-based, sicuro e coerente con sport e obiettivo.",noteEN:"IOC consensus on competition nutrition and supplements: use only when evidence-based, safe and coherent with sport and goal.",badge:"NEW"},
   {org:"Antonio J et al. — 2021",sub:"Journal of the International Society of Sports Nutrition",note:"ISSN Position Stand su creatina, proteine e supplementazione per atleti di forza e potenza. Dose: 3-5g/die di creatina monoidrato.",noteEN:"ISSN Position Stand on creatine, protein and supplementation for strength and power athletes. Dose: 3-5g/day of creatine monohydrate.",badge:"NEW"},
   {org:"Helms ER, Aragon AA, Fitschen PJ — 2014",sub:"Journal of the International Society of Sports Nutrition",note:"Raccomandazioni evidence-based per atleti: deficit calorico moderato, proteine 2.3-3.1g/kg, frequenza dei pasti per ottimizzare la composizione corporea.",noteEN:"Evidence-based recommendations for athletes: moderate caloric deficit, protein 2.3-3.1g/kg, meal frequency for optimal body composition.",badge:"NEW"},
   {org:"Reale R, Slater G, Burke LM — 2017",sub:"International Journal of Sports Physiology and Performance",note:"Strategie di gestione del peso per sport da combattimento: riduzione acuta del peso con mantenimento della performance.",noteEN:"Weight management strategies for combat sports: acute weight reduction while maintaining performance.",badge:"NEW"},
@@ -13485,12 +13693,7 @@ function getAskDubiTodayMeals(plan, userData = {}) {
     else if (sl.id === "snack_n") meal = dayMeals.snack_n || dayMeals.snack;
     return {...sl, time: times[i] || "--:--", data: meal || dayMeals.snack || null};
   });
-  const preferredAiMealList = aiMealList?.map((meal) => {
-    if (meal.id !== "colazione" || !["dolce","salata"].includes(userData?.breakfastPref)) return meal;
-    const preferredBreakfast = dayMeals[breakfastKey] || meal.data;
-    return {...meal, data: preferredBreakfast};
-  });
-  const mealList = (preferredAiMealList || fallbackMealList)
+  const mealList = (aiMealList || fallbackMealList)
     .filter(meal => meal?.data)
     .map(meal => ({...meal, data: adaptMealForUserProfile(meal.data, meal.id, userData)}));
   const totals = mealList.reduce((acc, meal) => {
@@ -15131,6 +15334,17 @@ const WelcomeScreen = ({onStart}) => {
       <div style={{background:T.sel,border:`1px solid ${T.accent}`,borderRadius:20,padding:"15px 16px",marginTop:12}}>
         <p style={{fontSize:14,fontWeight:850,color:T.text,lineHeight:1.45,margin:0}}>{getDubiBetaCopy(lang).hero}</p>
         <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:"7px 0 0"}}>{getDubiBetaCopy(lang).subtitle}</p>
+      </div>
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:"13px 15px",marginTop:10}}>
+        <p style={{fontSize:11,fontWeight:900,color:T.accentD,letterSpacing:.65,textTransform:"uppercase",margin:"0 0 6px"}}>
+          {getDubiBetaCopy(lang).sportSourcesTitle || DUBI_BETA_COPY.en.sportSourcesTitle}
+        </p>
+        <p style={{fontSize:11,color:T.muted,lineHeight:1.5,margin:"0 0 8px"}}>
+          {getDubiBetaCopy(lang).sportSourcesText || DUBI_BETA_COPY.en.sportSourcesText}
+        </p>
+        <p style={{fontSize:10,color:T.text,lineHeight:1.55,margin:0,fontWeight:650}}>
+          {SPORT_SCIENCE_SOURCES.join(" · ")}
+        </p>
       </div>
     </div>
     <div>
@@ -17483,13 +17697,15 @@ const ResearchInviteCard = ({userData, setUserData}) => {
 const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOpenSettings}) => {
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
+  const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
+  const dailyAdaptation = plan?.dailyAdaptation || adaptationPlanMeta?.dailyAdaptation || adaptationPlanMeta?.daily_adaptation || null;
 
   const todayMealStatusStorageKey = React.useMemo(() => {
     const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
     const dateKey = new Date().toISOString().slice(0,10);
-    const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.calories || "plan";
+    const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.adaptationSignature || dailyAdaptation?.signature || plan?.calories || "plan";
     return `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
-  }, [userData?.dubiCode, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.calories]);
+  }, [userData?.dubiCode, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.adaptationSignature, dailyAdaptation?.signature, plan?.calories]);
   const [status,setStatus] = useState(() => {
     try { return JSON.parse(localStorage.getItem(todayMealStatusStorageKey) || "{}"); } catch(e) { return {}; }
   });
@@ -17786,12 +18002,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
     const adaptSkipped = planAdaptations.skipped.includes(sl.id);
     return {...sl, time: times[i]||"--:--", data: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct, adaptSkipped};
   });
-  const preferredAiMealList = aiMealList?.map((meal) => {
-    if (meal.id !== "colazione" || !["dolce","salata"].includes(userData?.breakfastPref)) return meal;
-    const preferredBreakfast = dayMeals[bfKey] || meal.data;
-    return {...meal, data: preferredBreakfast};
-  });
-  const mealList = (preferredAiMealList || fallbackMealList)
+  const mealList = (aiMealList || fallbackMealList)
     .map((meal) => {
       const replacement = planAdaptations.replacements?.[meal.id];
       const data = replacement?.data || replacement || adaptMealForUserProfile(meal.data, meal.id, userData);
@@ -17875,6 +18086,15 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
   const availableWearableMetrics = wearableMetrics.filter(metric => metric.available);
   const hasPartialWearableData = availableWearableMetrics.length > 0 && availableWearableMetrics.length < wearableMetrics.length;
   const ingredientPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
+  const adaptationDelta = dailyAdaptation?.deltas || {};
+  const adaptationDecision = Array.isArray(dailyAdaptation?.decisions)
+    ? dailyAdaptation.decisions.find(d => d.id !== "no_adaptation")
+    : null;
+  const adaptationDetail = dailyAdaptation?.applied
+    ? (lang === "it"
+      ? `Oggi: ${adaptationDelta.calories > 0 ? "+" : ""}${adaptationDelta.calories || 0} kcal, ${adaptationDelta.carbsG > 0 ? "+" : ""}${adaptationDelta.carbsG || 0}g carbo, ${adaptationDelta.proteinG > 0 ? "+" : ""}${adaptationDelta.proteinG || 0}g proteine. Confidenza: ${dailyAdaptation.confidence || "n/d"}. ${adaptationDecision?.label || ""}`.trim()
+      : `Today: ${adaptationDelta.calories > 0 ? "+" : ""}${adaptationDelta.calories || 0} kcal, ${adaptationDelta.carbsG > 0 ? "+" : ""}${adaptationDelta.carbsG || 0}g carbs, ${adaptationDelta.proteinG > 0 ? "+" : ""}${adaptationDelta.proteinG || 0}g protein. Confidence: ${dailyAdaptation.confidence || "n/a"}. ${adaptationDecision?.label || ""}`.trim())
+    : t("today.adapt.d");
   const giSummary = plan?.giSummary || ingredientPlanMeta?.gi_summary || null;
   const pathologyFilter = plan?.pathologyFilter || ingredientPlanMeta?.pathology_filter || null;
   const giCopy = GI_BADGE_COPY[lang] || GI_BADGE_COPY.en;
@@ -18437,7 +18657,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
         <Ico n="refresh" size={18} c={T.accentD} />
         <div>
           <p style={{fontSize:13,fontWeight:600,color:T.text,margin:"0 0 3px"}}>{t("today.adapt.t")}</p>
-          <p style={{fontSize:12,color:T.muted,margin:0,lineHeight:1.5}}>{t("today.adapt.d")}</p>
+          <p style={{fontSize:12,color:T.muted,margin:0,lineHeight:1.5}}>{adaptationDetail}</p>
         </div>
       </div>
 
@@ -18451,7 +18671,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,onOp
 // ═══════════════════════════════════════════════
 // WEEKLY SCREEN — per-day breakfast + alts per tutti
 // ═══════════════════════════════════════════════
-const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
+const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
   const { t, lang } = useT();
   const qCopy = getWeeklyQualityCopy(lang);
 
@@ -18486,34 +18706,9 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const _monthName = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"][new Date().getMonth()];
   const days = [0,1,2,3,4,5,6].map(i=>t("days.short."+i));
 
-  const weekMeals = optimizeWeeklyPlanQuality(getDietMeals(userData?.diet, null, userData?.allergies));
-  const dayMeals = weekMeals[selDay] || weekMeals[0];
-  const bfKey = userData.breakfastPref==="salata" ? "colazione_salata" : "colazione_dolce";
-
-  const slots = getMealSlots(plan.mealCount || 4);
-  const times = plan.mealTimes || ["08:00","13:00","16:30","20:00"];
-
-  const aiWeeklyMeals = getAiMealListForDay(plan, selDay, slots, times);
-  const fallbackMealEntries = slots.map((sl,i) => {
-    let meal;
-    if (sl.id==="colazione") meal = dayMeals[bfKey]||dayMeals.colazione_dolce;
-    else if (sl.id==="pranzo") meal = dayMeals.pranzo;
-    else if (sl.id==="cena") meal = dayMeals.cena;
-    else if (sl.id==="snack") meal = dayMeals.snack;
-    else if (sl.id==="snack_m") meal = dayMeals.snack_m;
-    else if (sl.id==="snack_n") meal = dayMeals.snack_n;
-    const wLabel = getWorkoutLabel(userData?.trainingTime, sl.id);
-    const carbPct = getCarbTargetPct(userData?.trainingTime, sl.id, userData?.sport);
-    return {...sl, time: times[i]||"--:--", meal: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct};
-  });
-  const preferredAiWeeklyMeals = aiWeeklyMeals?.map((meal) => {
-    if (meal.id !== "colazione" || !["dolce","salata"].includes(userData?.breakfastPref)) return meal;
-    const preferredBreakfast = dayMeals[bfKey] || meal.data;
-    return {...meal, data: preferredBreakfast};
-  });
-  const mealEntries = preferredAiWeeklyMeals
-    ? preferredAiWeeklyMeals.map(m => ({...m, meal: m.data}))
-    : fallbackMealEntries;
+  const selectedPlan = weeklyPlans?.[selDay] || plan;
+  const displayPlan = selectedPlan || plan;
+  const mealEntries = getVisibleMealEntriesForDay({ userData, plan: selectedPlan, dayIndex: selDay });
   const adjustedMealEntries = mealEntries.map(entry => ({
     ...entry,
     meal: {
@@ -18527,10 +18722,10 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
   const wBaseP   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.p||0),   0);
   const wBaseC   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.c||0),   0);
   const wBaseF   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.f||0),   0);
-  const wScaleK  = wBaseCal > 0 ? plan.calories / wBaseCal : 1;
-  const wScaleP  = wBaseP   > 0 ? plan.protein  / wBaseP   : wScaleK;
-  const wScaleC  = wBaseC   > 0 ? plan.carbs    / wBaseC   : wScaleK;
-  const wScaleF  = wBaseF   > 0 ? plan.fat      / wBaseF   : wScaleK;
+  const wScaleK  = wBaseCal > 0 ? displayPlan.calories / wBaseCal : 1;
+  const wScaleP  = wBaseP   > 0 ? displayPlan.protein  / wBaseP   : wScaleK;
+  const wScaleC  = wBaseC   > 0 ? displayPlan.carbs    / wBaseC   : wScaleK;
+  const wScaleF  = wBaseF   > 0 ? displayPlan.fat      / wBaseF   : wScaleK;
   const wScaleMx = (mx) => ({
     cal: Math.round(mx.cal * wScaleK),
     p:   Math.round(mx.p   * wScaleP),
@@ -18569,7 +18764,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
     const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
     const replacement = formatFoodText(newItem);
     const original = formatFoodText(oldItem);
-    const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement);
+    const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement, weeklyPlans);
     const alreadyAvailable = coverageBefore.exists || coverageBefore.checked || hasOwnedShoppingIngredient(userData, replacement);
 
     if (!alreadyAvailable) {
@@ -18640,7 +18835,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
 
       <div style={{padding:"56px 24px 20px"}}>
         <h2 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:26,fontWeight:700,color:T.text,margin:"0 0 4px"}}>{t("weekly.title")}</h2>
-        <p style={{fontSize:14,color:T.muted}}>{t("weekly.target",{kcal:plan.calories,p:plan.protein,n:plan.mealCount})}</p>
+        <p style={{fontSize:14,color:T.muted}}>{t("weekly.target",{kcal:displayPlan.calories,p:displayPlan.protein,n:displayPlan.mealCount})}</p>
       </div>
 
       {/* ── Banner stagionalità — svanisce dopo 30s, si riattiva ad ogni accesso ── */}
@@ -18683,7 +18878,7 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
 
       {/* Macro pills */}
       <div style={{display:"flex",gap:8,padding:"0 24px",marginBottom:20}}>
-        {[{l:"kcal",v:plan.calories,c:T.text},{l:t("macro.prot"),v:`${plan.protein}g`,c:T.accent},{l:t("macro.carb"),v:`${plan.carbs}g`,c:"#C9A87C"},{l:t("macro.fat"),v:`${plan.fat}g`,c:"#9A8FBF"}].map(m=>(
+          {[{l:"kcal",v:displayPlan.calories,c:T.text},{l:t("macro.prot"),v:`${displayPlan.protein}g`,c:T.accent},{l:t("macro.carb"),v:`${displayPlan.carbs}g`,c:"#C9A87C"},{l:t("macro.fat"),v:`${displayPlan.fat}g`,c:"#9A8FBF"}].map(m=>(
           <div key={m.l} style={{flex:1,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:"10px 4px",textAlign:"center"}}>
             <div style={{fontSize:15,fontWeight:700,color:m.c}}>{m.v}</div>
             <div style={{fontSize:10,color:T.muted}}>{m.l}</div>
@@ -18711,11 +18906,11 @@ const WeeklyScreen = ({userData,plan,swaps,setSwaps}) => {
       </div>
 
       {/* Carboidrati note */}
-      {plan.carbNote && (
+      {displayPlan.carbNote && (
         <div style={{margin:"0 24px 16px",padding:12,background:T.sel,borderRadius:12,border:`1px solid ${T.border}`}}>
           <div style={{display:"flex",alignItems:"flex-start",gap:7}}>
             <div style={{flexShrink:0,marginTop:1}}><Ico n="leaf2" size={13} c={T.accentD}/></div>
-            <p style={{fontSize:11,color:T.accentD,lineHeight:1.5,margin:0}}>{t(plan.carbNote)}</p>
+            <p style={{fontSize:11,color:T.accentD,lineHeight:1.5,margin:0}}>{t(displayPlan.carbNote)}</p>
           </div>
         </div>
       )}
@@ -19020,7 +19215,7 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
 
 const shoppingStorageKey = (userData) => `dubi_shopping_checked_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
 
-const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, onUnlinkPartner}) => {
+const ShoppingScreen = ({userData, plan, weeklyPlans = [], swaps, partnerProfile, onLinkPartner, onUnlinkPartner}) => {
   const { t, lang } = useT();
 
   const [checked, setChecked] = useState(() => {
@@ -19045,7 +19240,8 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
   }, [checked, userData?.dubiCode]);
 
   // ── Lista personalizzata per l'utente corrente ──
-  const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan, swaps), [userData, plan, swaps]);
+  const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan, swaps, weeklyPlans), [userData, plan, swaps, weeklyPlans]);
+  const shopByDay = React.useMemo(()=>getShoppingByDay(userData, plan, swaps, weeklyPlans), [userData, plan, swaps, weeklyPlans]);
 
   // ── Lista finale: merged se partner attivo, altrimenti solo la mia ──
   // Ogni entry è {item:string, tag:string|null}
@@ -19053,7 +19249,7 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
     if (partnerMode && partnerProfile?.userData && partnerProfile?.plan) {
       const partnerName = partnerProfile.userData.dubiCode || "Partner";
       const myName      = userData?.dubiCode || "Tu";
-      const partShop    = getPersonalizedShopping(partnerProfile.userData, partnerProfile.plan);
+      const partShop    = getPersonalizedShopping(partnerProfile.userData, partnerProfile.plan, {}, partnerProfile.weeklyPlans || []);
       return mergeShoppingLists(myShop, partShop, null, partnerName); // null tag = condiviso
     }
     // Solo io: wrap in {item, tag:null}
@@ -19207,6 +19403,95 @@ const ShoppingScreen = ({userData, plan, swaps, partnerProfile, onLinkPartner, o
         </div>
       </div>
 
+      {/* Ingredienti giorno per giorno */}
+      {shopByDay.length > 0 && (() => {
+        const copy = lang === "it"
+          ? {
+              title: "Freschi giorno per giorno",
+              sub: "Stessa fonte del piano: se compri giorno per giorno, parti da qui.",
+              meal: "pasti",
+              fallback: "Ingredienti del giorno"
+            }
+          : {
+              title: "Fresh day by day",
+              sub: "Same source as your plan: use this if you shop one day at a time.",
+              meal: "meals",
+              fallback: "Daily ingredients"
+            };
+        return (
+          <div style={{padding:"0 24px",marginBottom:18}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
+              <div style={{width:34,height:34,borderRadius:12,background:T.sel,border:`1px solid ${T.border}`,
+                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Ico n="bag" size={16} c={T.accentD}/>
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{fontSize:13,fontWeight:850,color:T.text,margin:"0 0 3px"}}>{copy.title}</p>
+                <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>{copy.sub}</p>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+              {shopByDay.map((day, idx) => {
+                const categories = Object.entries(day.categories || {});
+                const previewItems = categories.flatMap(([, items]) => items).slice(0, 7);
+                const date = day.date ? parseIsoDateLocal(day.date) : new Date();
+                const dayLabel = t(`days.short.${day.dayIndex ?? idx}`);
+                const dateLabel = `${date.getDate()}/${date.getMonth()+1}`;
+                return (
+                  <div key={`${day.date || idx}-${idx}`} style={{minWidth:245,maxWidth:270,background:T.card,border:`1.5px solid ${T.border}`,
+                    borderRadius:18,padding:14,boxShadow:"0 6px 18px rgba(35,33,29,.04)"}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:10}}>
+                      <div>
+                        <p style={{fontSize:15,fontWeight:850,color:T.text,margin:"0 0 2px",textTransform:"capitalize"}}>
+                          {dayLabel} <span style={{color:T.muted,fontWeight:650}}>{dateLabel}</span>
+                        </p>
+                        <p style={{fontSize:10,color:T.muted,margin:0}}>
+                          {(day.meals || []).length} {copy.meal}
+                        </p>
+                      </div>
+                      <span style={{fontSize:10,fontWeight:850,color:T.accentD,background:T.sel,border:`1px solid ${T.border}`,
+                        borderRadius:999,padding:"4px 8px",whiteSpace:"nowrap"}}>
+                        {previewItems.length}
+                      </span>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                      {categories.slice(0, 4).map(([cat, items]) => {
+                        const meta = SHOPPING_META[cat] || {icon:"bag",color:T.accent};
+                        return (
+                          <div key={cat}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                              <span style={{width:7,height:7,borderRadius:"50%",background:meta.color,display:"inline-block"}} />
+                              <span style={{fontSize:10,fontWeight:800,color:T.muted,textTransform:"uppercase",letterSpacing:.45}}>
+                                {(()=>{const m={"Proteine":"shop.cat.proteins","Cereali & Legumi":"shop.cat.grains","Verdure fresche":"shop.cat.veg","Frutta":"shop.cat.fruit","Grassi & Semi":"shop.cat.fats"};return t(m[cat]||cat)||cat;})()}
+                              </span>
+                            </div>
+                            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                              {items.slice(0, 3).map(item => {
+                                const display = splitShoppingDisplay(item);
+                                return (
+                                  <span key={item} style={{fontSize:10,color:T.text,background:T.bg,border:`1px solid ${T.border}`,
+                                    borderRadius:999,padding:"4px 7px",lineHeight:1.15}}>
+                                    {capitalizeFirst(localizeFood(display.name, lang))}
+                                    {display.quantity ? <span style={{color:T.accentD,fontWeight:800}}> · {display.quantity}</span> : null}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {previewItems.length === 0 && (
+                      <p style={{fontSize:12,color:T.muted,margin:0,lineHeight:1.5}}>{copy.fallback}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Banner consiglio macellaio */}
       <div style={{padding:"0 24px",marginBottom:16}}>
         <div style={{borderRadius:16,background:"#FFF8F0",border:"1.5px solid #E8C99A",padding:"14px 16px",display:"flex",gap:12,alignItems:"flex-start"}}>
@@ -19345,6 +19630,11 @@ const SourcesScreen = ({userData, lang: langProp}) => {
   const journals = ["ISSN","ACSM","The Lancet","NEJM","JAMA","Cell Metabolism","Nature","Cochrane","Circulation","JISSN"];
   const sectionStyle = {background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:18};
   const sectionTitleStyle = {fontFamily:"'Manrope','Inter',sans-serif",fontSize:17,fontWeight:800,color:T.text,margin:"0 0 14px"};
+  const selectedSports = normalizeSports(userData?.sports, userData?.sport);
+  const selectedSportsText = selectedSports.length
+    ? selectedSports.map(sport => formatSportLabel(sport, t)).join(" · ")
+    : "";
+  const sportSourceCopy = sportScienceSourceCopy(lang, selectedSportsText);
 
   return (
     <div style={{padding:"56px 24px calc(100px + env(safe-area-inset-bottom, 0px))"}}>
@@ -19356,6 +19646,25 @@ const SourcesScreen = ({userData, lang: langProp}) => {
       </header>
 
       <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <section style={{...sectionStyle,background:T.sel,border:`1px solid ${T.accent}`}}>
+          <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+            <div style={{width:38,height:38,borderRadius:13,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <Ico n="dumbbell" size={18} c={T.white}/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <h3 style={{fontFamily:"'Manrope','Inter',sans-serif",fontSize:16,fontWeight:850,color:T.text,margin:"0 0 6px"}}>
+                {sportSourceCopy.title}
+              </h3>
+              <p style={{fontSize:11,color:T.muted,lineHeight:1.55,margin:"0 0 9px"}}>
+                {sportSourceCopy.body}
+              </p>
+              <p style={{fontSize:10,color:T.text,lineHeight:1.55,margin:0,fontWeight:700}}>
+                {SPORT_SCIENCE_SOURCES.join(" · ")}
+              </p>
+            </div>
+          </div>
+        </section>
+
         <section style={sectionStyle}>
           <h3 style={sectionTitleStyle}>{t("src.inst.title")}</h3>
           <div style={{display:"flex",flexDirection:"column",gap:9}}>
@@ -22868,6 +23177,7 @@ function DUBIApp() {
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
   const [plan,setPlan] = useState(null);
+  const [weeklyPlans,setWeeklyPlans] = useState([]);
   const [activeTab,setActiveTab] = useState("today");
   // Tracking sessione + sezioni visitate (per il timing dell'invito ricerca)
   React.useEffect(() => {
@@ -22930,6 +23240,33 @@ function DUBIApp() {
     setActiveTab("today");
   }
 }, [phase]);
+  useEffect(() => {
+    if (phase !== "app" || !userData || !healthDataConsentGranted) {
+      setWeeklyPlans([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    fetchWeeklyIngredientPlansFromBackend(userData)
+      .then(plans => {
+        if (!cancelled && Array.isArray(plans) && plans.some(Boolean)) setWeeklyPlans(plans);
+      })
+      .catch(error => console.warn("Weekly plans sync failed:", error?.message || error));
+
+    return () => { cancelled = true; };
+  }, [
+    phase,
+    healthDataConsentGranted,
+    userData?.dubiCode,
+    userData?.email,
+    userData?.breakfastPref,
+    userData?.diet,
+    userData?.allergies,
+    userData?.goal,
+    userData?.weight,
+    userData?.workoutDays,
+    userData?.trainingTime
+  ]);
   useEffect(() => {
     const handlePointerDown = (event) => {
       const el = event.target?.closest?.("button,[role='button'],[data-haptic]");
@@ -23012,6 +23349,7 @@ const handleLogout = () => {
   clearSnapshot();
   setUserData(null);
   setPlan(null);
+  setWeeklyPlans([]);
   setActiveTab("today");
   setPhase("welcome");
 };
@@ -23295,9 +23633,9 @@ setPhase("app");
                 ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} onOpenSettings={()=>setActiveTab("settings")} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="weekly"   && (healthDataConsentGranted
-                ? <WeeklyScreen userData={userData} plan={plan} swaps={swaps} setSwaps={setSwaps} />
+                ? <WeeklyScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} swaps={swaps} setSwaps={setSwaps} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
-              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
+              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
               {activeTab==="settings" && (
   <SettingsScreen
