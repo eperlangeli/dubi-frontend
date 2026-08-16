@@ -52,7 +52,7 @@ for (const [label, ok, details] of checks) {
 }
 
 if (failed) {
-  console.log("\nRequired for Android debug builds: JDK 17+ and Android SDK platform 35.");
+  console.log("\nRequired for Android debug builds: JDK 21+ and Android SDK platform 35.");
   process.exit(1);
 }
 

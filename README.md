@@ -23,7 +23,7 @@ pnpm exec cap sync
 pnpm exec cap open android
 ```
 
-Android debug builds require a local JDK and Android SDK:
+Android debug builds require a local JDK 21+ and Android SDK:
 
 ```bash
 pnpm run check:mobile-env
