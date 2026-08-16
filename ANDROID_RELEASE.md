@@ -6,7 +6,7 @@ This document tracks the Android path from internal testing to Google Play.
 
 - Debug APK builds in GitHub Actions.
 - Release workflow can produce unsigned APK/AAB artifacts.
-- App id: `com.dubi.app`.
+- App id: `health.dubi.app`.
 - Version defaults: `versionName=0.1.0`, `versionCode=1`.
 
 ## Internal testing flow

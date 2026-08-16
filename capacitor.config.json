@@ -1,5 +1,5 @@
 {
-  "appId": "com.dubi.app",
+  "appId": "health.dubi.app",
   "appName": "DUBI",
   "webDir": "dist",
   "bundledWebRuntime": false,

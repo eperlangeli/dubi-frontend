@@ -1,4 +1,4 @@
-package com.dubi.app;
+package health.dubi.app;
 
 import static org.junit.Assert.assertEquals;
 

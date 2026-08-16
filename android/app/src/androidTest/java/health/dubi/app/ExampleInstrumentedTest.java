@@ -1,4 +1,4 @@
-package com.dubi.app;
+package health.dubi.app;
 
 import static org.junit.Assert.assertEquals;
 
@@ -14,6 +14,6 @@ public class ExampleInstrumentedTest {
     @Test
     public void useAppContext() {
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.dubi.app", appContext.getPackageName());
+        assertEquals("health.dubi.app", appContext.getPackageName());
     }
 }

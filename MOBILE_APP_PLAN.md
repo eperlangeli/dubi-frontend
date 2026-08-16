@@ -8,14 +8,19 @@ This repo now has a Capacitor app shell so the current static DUBI web app can b
 - Mobile shell: Capacitor packages the generated `dist` folder.
 - Backend: `https://dubi-backend.onrender.com`, with wearable routes already present.
 - Native bridge: `mobile-bridge.js` is the reserved integration point for native-only features.
+- Bundle id: `health.dubi.app`.
+- URL scheme: `dubi://`.
 
 ## Phase 1 - App shell
 
 - Done: build static assets into `dist`.
 - Done: add Capacitor config and native Android/iOS platform folders.
-- Done: configure app id `com.dubi.app`, app name, splash screen, status bar, and web asset sync.
+- Done: configure app id `health.dubi.app`, app name, splash screen, status bar, and web asset sync.
 - Done: add GitHub Actions workflow for Android debug APK builds.
 - Done: add Android release workflow for unsigned APK/AAB artifacts.
+- Done: switch native bundle id to `health.dubi.app`.
+- Done: add native `dubi://` URL scheme skeleton.
+- Done: add baseline iOS privacy manifest.
 - Pending local machine setup: Android debug build requires JDK 21, `JAVA_HOME`, and Android SDK.
 - Pending macOS setup: iOS build requires Xcode and CocoaPods.
 
@@ -24,6 +29,8 @@ This repo now has a Capacitor app shell so the current static DUBI web app can b
 - Move the frontend from CDN React/Babel to a bundled React/Vite build.
 - Keep the existing UX while reducing startup risk and improving offline behavior.
 - Add mobile-safe session handling and deep-link handling.
+- Move auth token storage behind a small async adapter, then use Capacitor Preferences in native builds.
+- Add staging/production API configuration before wider testing.
 
 ## Phase 3 - Monetization
 

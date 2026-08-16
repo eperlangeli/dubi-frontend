@@ -1,4 +1,4 @@
-package com.dubi.app;
+package health.dubi.app;
 
 import com.getcapacitor.BridgeActivity;
 
