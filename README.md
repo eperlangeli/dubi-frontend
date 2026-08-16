@@ -39,3 +39,5 @@ pnpm exec cap open ios
 The current mobile shell intentionally reuses the static app and production backend. Native HealthKit, Health Connect, push notifications, and subscriptions should be added through `mobile-bridge.js` plus Capacitor plugins, with entitlement checks enforced by the backend.
 
 The `Android Debug Build` GitHub Action can also produce a debug APK artifact from GitHub without relying on the local Windows Android setup.
+
+For release and Google Play preparation, see `ANDROID_RELEASE.md`.

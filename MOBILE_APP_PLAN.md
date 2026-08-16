@@ -15,6 +15,7 @@ This repo now has a Capacitor app shell so the current static DUBI web app can b
 - Done: add Capacitor config and native Android/iOS platform folders.
 - Done: configure app id `com.dubi.app`, app name, splash screen, status bar, and web asset sync.
 - Done: add GitHub Actions workflow for Android debug APK builds.
+- Done: add Android release workflow for unsigned APK/AAB artifacts.
 - Pending local machine setup: Android debug build requires JDK 21, `JAVA_HOME`, and Android SDK.
 - Pending macOS setup: iOS build requires Xcode and CocoaPods.
 
@@ -64,3 +65,4 @@ pnpm exec cap open ios
 - `android/gradlew.bat assembleDebug`: blocked locally by missing `JAVA_HOME` / local Java installation.
 - `pnpm run check:mobile-env`: use this before Android builds to verify JDK/SDK setup.
 - `.github/workflows/android-debug.yml`: can build and upload a debug APK from GitHub Actions after these mobile files are pushed.
+- `.github/workflows/android-release.yml`: can build unsigned Android release artifacts for store preparation.
