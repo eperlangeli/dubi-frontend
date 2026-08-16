@@ -1,0 +1,28 @@
+{
+  "name": "dubi-mobile-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DUBI static frontend packaged as a native mobile app with Capacitor.",
+  "scripts": {
+    "build:web": "node scripts/prepare-mobile-web.js",
+    "cap:sync": "node scripts/prepare-mobile-web.js && cap sync",
+    "cap:open:android": "node scripts/prepare-mobile-web.js && cap sync android && cap open android",
+    "cap:open:ios": "node scripts/prepare-mobile-web.js && cap sync ios && cap open ios",
+    "android:debug": "node scripts/prepare-mobile-web.js && cap sync android && cd android && gradlew assembleDebug",
+    "check:mobile-env": "node scripts/check-mobile-env.js",
+    "check": "node scripts/prepare-mobile-web.js --check"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.0.2",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/device": "^7.0.2",
+    "@capacitor/haptics": "^7.0.2",
+    "@capacitor/ios": "^7.4.3",
+    "@capacitor/splash-screen": "^7.0.2",
+    "@capacitor/status-bar": "^7.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3"
+  }
+}
