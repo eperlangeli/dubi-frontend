@@ -1,0 +1,45 @@
+{
+  "name": "dubi-mobile-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DUBI static frontend packaged as a native mobile app with Capacitor.",
+  "scripts": {
+    "build": "vite build",
+    "build:web": "node scripts/prepare-mobile-web.js",
+    "dev": "vite --host 0.0.0.0",
+    "preview": "vite preview --host 0.0.0.0",
+    "cap:sync": "node scripts/prepare-mobile-web.js && cap sync",
+    "cap:open:android": "node scripts/prepare-mobile-web.js && cap sync android && cap open android",
+    "cap:open:ios": "node scripts/prepare-mobile-web.js && cap sync ios && cap open ios",
+    "android:debug": "node scripts/prepare-mobile-web.js && cap sync android && cd android && gradlew assembleDebug",
+    "android:release": "node scripts/prepare-mobile-web.js && cap sync android && cd android && gradlew assembleRelease bundleRelease",
+    "android:encode-keystore": "node scripts/encode-android-keystore.mjs",
+    "check:mobile-env": "node scripts/check-mobile-env.js",
+    "check": "node scripts/prepare-mobile-web.js --check",
+    "generate:assets": "node scripts/generate-mobile-assets.mjs",
+    "build:web:production": "cross-env VITE_DUBI_APP_ENV=production node scripts/prepare-mobile-web.js",
+    "build:web:staging": "cross-env VITE_DUBI_APP_ENV=staging node scripts/prepare-mobile-web.js",
+    "check:config": "node scripts/validate-app-config.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.0.2",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/device": "^7.0.2",
+    "@capacitor/haptics": "^7.0.2",
+    "@capacitor/ios": "^7.4.3",
+    "@capacitor/keyboard": "^7.0.6",
+    "@capacitor/preferences": "7.0.0",
+    "@capacitor/splash-screen": "^7.0.2",
+    "@capacitor/status-bar": "^7.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "cross-env": "^10.1.0",
+    "sharp": "^0.35.3",
+    "vite": "^7.1.2"
+  }
+}

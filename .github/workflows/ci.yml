@@ -15,24 +15,39 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Check static app bundle
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Vite app bundle
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('index.html', 'utf8');
+          const app = fs.readFileSync('src/App.jsx', 'utf8');
           const required = [
-            'id="dubi-html"',
-            'function applyDir',
-            'FINAL_AUDIT_TRANSLATIONS',
-            'WearableProvider',
-            'AllergyChipPicker',
-            'SportChipPicker',
-            'authorizeWearableProviderInBackend'
+            ['index.html', html, 'id="dubi-html"'],
+            ['index.html', html, 'type="module" src="/src/main.jsx"'],
+            ['src/App.jsx', app, 'function applyDir'],
+            ['src/App.jsx', app, 'FINAL_AUDIT_TRANSLATIONS'],
+            ['src/App.jsx', app, 'WearableProvider'],
+            ['src/App.jsx', app, 'AllergyChipPicker'],
+            ['src/App.jsx', app, 'SportChipPicker'],
+            ['src/App.jsx', app, 'authorizeWearableProviderInBackend']
           ];
-          const missing = required.filter((needle) => !html.includes(needle));
+          const missing = required
+            .filter(([, content, needle]) => !content.includes(needle))
+            .map(([file, , needle]) => `${file}: ${needle}`);
           if (missing.length) {
             console.error('Missing required frontend markers:', missing.join(', '));
             process.exit(1);
           }
-          console.log('Frontend static smoke check passed.');
+          console.log('Frontend Vite smoke check passed.');
           NODE
+
+      - name: Build mobile web assets
+        run: pnpm run build:web

@@ -1,0 +1,75 @@
+apply plugin: 'com.android.application'
+
+def dubiReleaseKeystorePath = (project.findProperty("DUBI_ANDROID_KEYSTORE_PATH") ?: System.getenv("DUBI_ANDROID_KEYSTORE_PATH"))?.toString()
+def dubiReleaseStorePassword = (project.findProperty("DUBI_ANDROID_KEYSTORE_PASSWORD") ?: System.getenv("DUBI_ANDROID_KEYSTORE_PASSWORD"))?.toString()
+def dubiReleaseKeyAlias = (project.findProperty("DUBI_ANDROID_KEY_ALIAS") ?: System.getenv("DUBI_ANDROID_KEY_ALIAS"))?.toString()
+def dubiReleaseKeyPassword = (project.findProperty("DUBI_ANDROID_KEY_PASSWORD") ?: System.getenv("DUBI_ANDROID_KEY_PASSWORD"))?.toString()
+def hasDubiReleaseSigning = dubiReleaseKeystorePath && dubiReleaseStorePassword && dubiReleaseKeyAlias && dubiReleaseKeyPassword
+
+android {
+    namespace "health.dubi.app"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "health.dubi.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode = Integer.parseInt((project.findProperty("DUBI_VERSION_CODE") ?: "1").toString())
+        versionName = (project.findProperty("DUBI_VERSION_NAME") ?: "0.1.0").toString()
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (hasDubiReleaseSigning) {
+                storeFile file(dubiReleaseKeystorePath)
+                storePassword dubiReleaseStorePassword
+                keyAlias dubiReleaseKeyAlias
+                keyPassword dubiReleaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (hasDubiReleaseSigning) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.lifecycle("DUBI Android release signing is not configured. Release outputs will be unsigned.")
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
