@@ -18534,18 +18534,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
         <div style={{padding:"0 24px",marginBottom:16}}>
           <p style={{fontSize:11,color:T.accentD,margin:0,fontWeight:600}}>{wearableUiCopy.noData}</p>
         </div>
-      ) : (
-        <div style={{padding:"0 24px",marginBottom:16}}>
-          <button onClick={onOpenSettings}
-            style={{display:"inline-flex",alignItems:"center",gap:6,padding:"7px 12px",
-              borderRadius:10,background:"transparent",border:"1px dashed "+T.border,
-              cursor:"pointer",textDecoration:"none"}}>
-            <Ico n="link" size={12} c={T.muted}/>
-            <span style={{fontSize:11,color:T.muted}}>{t("wearable.connect.prompt")}</span>
-            <span style={{fontSize:11,color:T.accentD,fontWeight:700}}>→</span>
-          </button>
-        </div>
-      )}
+      ) : null}
 
       {/* ── Anomalia wearable — card contestuale ── */}
       {anomalyState && anomalyState !== "dismissed" && (
@@ -18647,13 +18636,6 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
           <Ico n="chev" size={16} c={T.muted} style={{marginLeft:"auto"}}/>
         </button>
       </div>
-
-      {/* Nota carboidrati */}
-      {plan.carbNote && (
-        <div style={{margin:"0 24px 18px",padding:"11px 14px",background:T.sel,borderRadius:12,border:`1px solid ${T.border}`}}>
-          <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:0}}>{t(plan.carbNote)}</p>
-        </div>
-      )}
 
       {/* Macros */}
       <div style={{margin:"0 24px 18px",padding:"18px 20px",background:T.card,border:"1px solid "+T.border,borderRadius:22,boxShadow:"0 2px 16px rgba(0,0,0,.04)"}}>

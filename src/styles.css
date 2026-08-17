@@ -42,17 +42,22 @@
     }
     #dubi-boot.hidden { opacity: 0; pointer-events: none; }
     .dubi-boot-logo {
-      font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: #0F0F0F;
+      font-family: 'Barlow Condensed', -apple-system, sans-serif;
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #0F0F0F;
     }
     .dubi-boot-logo span { color: #0F0F0F; }
     .dubi-boot-spinner {
-      width: 32px; height: 32px;
-      border: 3px solid #E7E2DA;
+      width: 28px; height: 28px;
+      border: 2.5px solid rgba(15,15,15,0.15);
       border-top-color: #0F0F0F;
       border-radius: 50%;
       animation: dubi-spin 0.8s linear infinite;
     }
     .dubi-boot-msg {
+      display: none;
       font-size: 13px; color: #9A9490; letter-spacing: 0.04em;
     }
     .dubi-boot-error {
