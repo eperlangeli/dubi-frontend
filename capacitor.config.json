@@ -10,14 +10,14 @@
     "SplashScreen": {
       "launchShowDuration": 1200,
       "launchAutoHide": true,
-      "backgroundColor": "#FAF9F7",
+      "backgroundColor": "#E8E4DC",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": false
     },
     "StatusBar": {
       "style": "LIGHT",
-      "backgroundColor": "#FAF9F7",
+      "backgroundColor": "#E8E4DC",
       "overlaysWebView": false
     },
     "Keyboard": {

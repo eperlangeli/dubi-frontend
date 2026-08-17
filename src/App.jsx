@@ -1,5 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
+import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
@@ -545,12 +546,17 @@ const getPlanProfileSignature = (userData = {}) => {
     parentalConsentVerifiedAt: data.parental_consent_verified_at ?? data.parentalConsentVerifiedAt ?? null
   };
 };
-const AUTH_TOKEN_KEY = "dubi_token";
+const AUTH_TOKEN_KEY = "dubi_auth_token";
+const LEGACY_AUTH_TOKEN_KEY = "dubi_token";
 const AUTH_EMAIL_KEY = "dubi_email";
 const authSession = {
   token: "",
   email: "",
   hydrated: false
+};
+
+const isNativeApp = () => {
+  try { return Capacitor.isNativePlatform(); } catch (error) { return false; }
 };
 
 const safeLocalStorageGet = (key) => {
@@ -568,22 +574,33 @@ const safeLocalStorageRemove = (key) => {
 const hydrateAuthSession = async () => {
   if (authSession.hydrated) return authSession;
 
-  const localToken = safeLocalStorageGet(AUTH_TOKEN_KEY);
+  const native = isNativeApp();
+  const localToken = native ? "" : (safeLocalStorageGet(AUTH_TOKEN_KEY) || safeLocalStorageGet(LEGACY_AUTH_TOKEN_KEY));
+  const legacyLocalToken = native ? safeLocalStorageGet(LEGACY_AUTH_TOKEN_KEY) : "";
   const localEmail = safeLocalStorageGet(AUTH_EMAIL_KEY);
 
   try {
-    const [{ value: storedToken }, { value: storedEmail }] = await Promise.all([
+    const [{ value: storedToken }, { value: legacyStoredToken }, { value: storedEmail }] = await Promise.all([
       Preferences.get({ key: AUTH_TOKEN_KEY }),
+      Preferences.get({ key: LEGACY_AUTH_TOKEN_KEY }),
       Preferences.get({ key: AUTH_EMAIL_KEY })
     ]);
 
-    authSession.token = storedToken || localToken || "";
+    authSession.token = storedToken || legacyStoredToken || localToken || legacyLocalToken || "";
     authSession.email = storedEmail || localEmail || "";
 
-    if (localToken && !storedToken) await Preferences.set({ key: AUTH_TOKEN_KEY, value: localToken });
+    if (authSession.token && !storedToken) await Preferences.set({ key: AUTH_TOKEN_KEY, value: authSession.token });
     if (localEmail && !storedEmail) await Preferences.set({ key: AUTH_EMAIL_KEY, value: localEmail });
+    if (legacyStoredToken) await Preferences.remove({ key: LEGACY_AUTH_TOKEN_KEY });
+    if (native) {
+      safeLocalStorageRemove(AUTH_TOKEN_KEY);
+      safeLocalStorageRemove(LEGACY_AUTH_TOKEN_KEY);
+    } else if (safeLocalStorageGet(LEGACY_AUTH_TOKEN_KEY)) {
+      safeLocalStorageSet(AUTH_TOKEN_KEY, authSession.token);
+      safeLocalStorageRemove(LEGACY_AUTH_TOKEN_KEY);
+    }
   } catch (error) {
-    authSession.token = localToken;
+    authSession.token = localToken || legacyLocalToken;
     authSession.email = localEmail;
   }
 
@@ -596,7 +613,13 @@ const saveAuthSession = async ({ token, email }) => {
   authSession.email = email || "";
   authSession.hydrated = true;
 
-  if (token) safeLocalStorageSet(AUTH_TOKEN_KEY, token);
+  if (isNativeApp()) {
+    safeLocalStorageRemove(AUTH_TOKEN_KEY);
+    safeLocalStorageRemove(LEGACY_AUTH_TOKEN_KEY);
+  } else if (token) {
+    safeLocalStorageSet(AUTH_TOKEN_KEY, token);
+    safeLocalStorageRemove(LEGACY_AUTH_TOKEN_KEY);
+  }
   if (email) safeLocalStorageSet(AUTH_EMAIL_KEY, email);
 
   try {
@@ -611,17 +634,19 @@ const clearAuthSession = async () => {
   authSession.hydrated = true;
 
   safeLocalStorageRemove(AUTH_TOKEN_KEY);
+  safeLocalStorageRemove(LEGACY_AUTH_TOKEN_KEY);
   safeLocalStorageRemove(AUTH_EMAIL_KEY);
 
   try {
     await Promise.all([
       Preferences.remove({ key: AUTH_TOKEN_KEY }),
+      Preferences.remove({ key: LEGACY_AUTH_TOKEN_KEY }),
       Preferences.remove({ key: AUTH_EMAIL_KEY })
     ]);
   } catch (error) {}
 };
 
-const getAuthToken = () => authSession.token || safeLocalStorageGet(AUTH_TOKEN_KEY);
+const getAuthToken = () => authSession.token || (isNativeApp() ? "" : (safeLocalStorageGet(AUTH_TOKEN_KEY) || safeLocalStorageGet(LEGACY_AUTH_TOKEN_KEY)));
 const getAuthEmail = () => authSession.email || safeLocalStorageGet(AUTH_EMAIL_KEY);
 
 const extractResetTokenFromUrl = (rawUrl) => {
