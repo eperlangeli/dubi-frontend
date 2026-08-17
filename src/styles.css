@@ -5,6 +5,7 @@
       --dubi-safe-bottom: env(safe-area-inset-bottom, 0px);
       --dubi-safe-left: env(safe-area-inset-left, 0px);
       --dubi-viewport-height: 100dvh;
+      --dubi-keyboard-height: 0px;
       --dubi-bottom-nav-offset: calc(16px + var(--dubi-safe-bottom));
       --dubi-bottom-nav-space: calc(100px + var(--dubi-safe-bottom));
     }
@@ -98,6 +99,22 @@
       animation: dubi-fade-up 0.34s cubic-bezier(.2,.8,.2,1) both;
       -webkit-overflow-scrolling: touch;
       scroll-behavior: smooth;
+      scroll-padding-bottom: calc(var(--dubi-bottom-nav-space) + var(--dubi-keyboard-height));
+    }
+    .dubi-keyboard-aware {
+      min-height: 100%;
+    }
+    .dubi-onboarding-scroll {
+      scroll-padding-top: calc(24px + var(--dubi-safe-top));
+      scroll-padding-bottom: calc(150px + var(--dubi-keyboard-height));
+    }
+    html[data-keyboard-open="true"] .dubi-onboarding-footer {
+      padding-bottom: 16px !important;
+    }
+    html[data-keyboard-open="true"] .dubi-bottom-nav {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(18px) !important;
     }
     .dubi-pressable {
       position: relative;

@@ -2,12 +2,68 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import { App as CapacitorApp } from "@capacitor/app";
+import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import "./styles.css";
 
 const { useState, useEffect, useCallback } = React;
 const API_BASE_URL = "https://dubi-backend.onrender.com";
+const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
+
+const setKeyboardHeight = (height = 0) => {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty("--dubi-keyboard-height", `${Math.max(0, Number(height) || 0)}px`);
+  document.documentElement.dataset.keyboardOpen = height > 0 ? "true" : "false";
+};
+
+const scrollFocusedInputIntoView = () => {
+  if (typeof document === "undefined") return;
+  const active = document.activeElement;
+  if (!active || !active.matches?.(KEYBOARD_SCROLL_SELECTOR)) return;
+  window.setTimeout(() => {
+    active.scrollIntoView?.({ block: "center", inline: "nearest", behavior: "smooth" });
+  }, 90);
+};
+
+const useNativeKeyboardInsets = () => {
+  useEffect(() => {
+    let disposed = false;
+    const handles = [];
+    const add = async (eventName, handler) => {
+      try {
+        const handle = await Keyboard.addListener(eventName, handler);
+        if (disposed) {
+          await handle.remove();
+        } else {
+          handles.push(handle);
+        }
+      } catch (_) {
+        // Web preview and unsupported contexts do not expose the native keyboard plugin.
+      }
+    };
+
+    add("keyboardWillShow", (info) => {
+      setKeyboardHeight(info?.keyboardHeight || 0);
+      scrollFocusedInputIntoView();
+    });
+    add("keyboardDidShow", (info) => {
+      setKeyboardHeight(info?.keyboardHeight || 0);
+      scrollFocusedInputIntoView();
+    });
+    add("keyboardWillHide", () => setKeyboardHeight(0));
+    add("keyboardDidHide", () => setKeyboardHeight(0));
+
+    document.addEventListener("focusin", scrollFocusedInputIntoView);
+
+    return () => {
+      disposed = true;
+      setKeyboardHeight(0);
+      document.removeEventListener("focusin", scrollFocusedInputIntoView);
+      handles.forEach((handle) => handle.remove?.());
+    };
+  }, []);
+};
 const DUBI_BETA_COPY = {
   it: {
     badge:"BETA GRATUITA", title:"Il tuo piano DUBI e pronto.",
@@ -12715,7 +12771,11 @@ const NumInput = ({label,unit,value,onChange,min,max}) => {
     }
   };
 
-  const handleFocus = () => { setFocused(true); inputRef.current?.select(); };
+  const handleFocus = () => {
+    setFocused(true);
+    inputRef.current?.select();
+    scrollFocusedInputIntoView();
+  };
   const handleBlur  = () => { setFocused(false); commit(raw); };
   const handleKey   = (e) => { if (e.key==="Enter") { e.preventDefault(); commit(raw); inputRef.current?.blur(); } };
 
@@ -12749,6 +12809,9 @@ const NumInput = ({label,unit,value,onChange,min,max}) => {
             ref={inputRef}
             type="number"
             inputMode="numeric"
+            pattern="[0-9]*"
+            enterKeyHint="done"
+            autoComplete="off"
             value={raw}
             onFocus={handleFocus}
             onBlur={handleBlur}
@@ -15851,6 +15914,7 @@ const PhysicalStep = ({d, u, onAutoNext, page}) => {
       <div>
         <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("phys.name")}</p>
         <input type="text" value={d.name||""}
+          onFocus={scrollFocusedInputIntoView}
           onChange={e=>u("name", e.target.value.slice(0,24))}
           placeholder={t("phys.name.ph")}
           style={{width:"100%",padding:"15px 16px",marginBottom:28,borderRadius:14,
@@ -15992,7 +16056,10 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
               border:`1.5px solid ${d.targetWeight?T.accent:T.border}`,borderRadius:14,padding:"10px 16px",transition:"border-color 0.2s"}}>
               <input
                 type="number" inputMode="decimal"
+                enterKeyHint="done"
+                autoComplete="off"
                 value={d.targetWeight||""}
+                onFocus={scrollFocusedInputIntoView}
                 onChange={e=>{ const v=e.target.value; if(v===""||(!isNaN(parseFloat(v))&&parseFloat(v)>0)) u("targetWeight",v); }}
                 placeholder="—"
                 style={{flex:1,fontSize:20,fontWeight:700,color:T.text,background:"none",border:"none",outline:"none",
@@ -16721,8 +16788,8 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
     {t("onb.backToSettings")}
   </button>
 )}
-    <div style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
-      <div style={{padding:"56px 24px 0",position:"relative"}}>
+    <div className="dubi-keyboard-aware" style={{background:T.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"calc(56px + env(safe-area-inset-top, 0px)) 24px 0",position:"relative"}}>
         <div style={{display:"flex",gap:3,marginBottom:28}}>
           {Array.from({length: TOTAL_PAGES}, (_,i) => (
             <div key={i} style={{flex:1,height:4,borderRadius:4,background:i<=currentAbsPage?T.accentD:T.border,transition:"background 0.4s"}} />
@@ -16737,7 +16804,7 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
           </div>
         )}
       </div>
-      <div style={{flex:1,padding:"24px 24px 130px",overflowY:"auto",overflowX:"hidden"}}>
+      <div className="dubi-onboarding-scroll" style={{flex:1,padding:"24px 24px calc(130px + var(--dubi-keyboard-height, 0px))",overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch"}}>
         <div
           key={`${step}-${subStep}`}
           style={{animation:`${slideDir==='right'?'dubiSlideInRight':'dubiSlideInLeft'} 0.28s cubic-bezier(0.4,0,0.2,1)`}}
@@ -16745,7 +16812,7 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
           {content[step]}
         </div>
       </div>
-      <div style={{padding:"16px 24px 40px",background:T.bg,borderTop:`1px solid ${T.border}`,position:"sticky",bottom:0}}>
+      <div className="dubi-onboarding-footer" style={{padding:"16px 24px calc(40px + env(safe-area-inset-bottom, 0px))",background:T.bg,borderTop:`1px solid ${T.border}`,position:"sticky",bottom:0}}>
         {betaAccessMessage && <p style={{fontSize:12,color:"#B91C1C",lineHeight:1.45,margin:"0 0 10px",fontWeight:700}}>{betaAccessMessage}</p>}
         {step===5 && (
           <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:"0 0 10px"}}>
@@ -23350,6 +23417,7 @@ const ResetPasswordScreen = ({ token, onComplete }) => {
 function DUBIApp() {
   const { lang } = useT();
   const { refreshSnapshot, clearSnapshot } = useWearable();
+  useNativeKeyboardInsets();
   const [resetToken, setResetToken] = useState(() => extractResetTokenFromUrl(window.location.href));
   const [phase,setPhase] = useState(() => resetToken ? "reset-password" : "checking");
   const [authStartMode, setAuthStartMode] = useState(null);

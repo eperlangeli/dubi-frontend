@@ -19,6 +19,12 @@
       "style": "LIGHT",
       "backgroundColor": "#FAF9F7",
       "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "native",
+      "style": "LIGHT",
+      "resizeOnFullScreen": true,
+      "autoBackdropColor": "dom"
     }
   }
 }
