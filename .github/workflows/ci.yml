@@ -31,7 +31,7 @@ jobs:
           const app = fs.readFileSync('src/App.jsx', 'utf8');
           const required = [
             ['index.html', html, 'id="dubi-html"'],
-            ['index.html', html, 'type="module" src="/src/App.jsx"'],
+            ['index.html', html, 'type="module" src="/src/main.jsx"'],
             ['src/App.jsx', app, 'function applyDir'],
             ['src/App.jsx', app, 'FINAL_AUDIT_TRANSLATIONS'],
             ['src/App.jsx', app, 'WearableProvider'],

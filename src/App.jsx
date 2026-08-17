@@ -1,12 +1,10 @@
 import React from "react";
-import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import "./styles.css";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -9910,7 +9908,7 @@ function applyDir(lang){
   root.setAttribute("dir", meta.dir);
 }
 
-function LangProvider({ children }){
+export function LangProvider({ children }){
   const [lang, setLang] = useState(detectInitialLang);
   useEffect(()=>{ try{ localStorage.setItem(LANG_KEY, lang); }catch(e){} applyDir(lang); }, [lang]);
   const t = useCallback((key, vars) => {
@@ -9934,7 +9932,7 @@ const WearableCtx = React.createContext({
   clearSnapshot: () => {}
 });
 
-function WearableProvider({ children }) {
+export function WearableProvider({ children }) {
   const [snapshot, setSnapshot] = React.useState(null);
   const [providers, setProviders] = React.useState([]);
   const [ready, setReady] = React.useState(false);
@@ -23943,7 +23941,7 @@ setPhase("app");
   );
 }
 
-function DUBIRoot() {
+export function DUBIRoot() {
   const params = new URLSearchParams(window.location.search);
   if (window.location.hostname === "127.0.0.1" && params.get("_trend_preview") === "1") {
     return <TrendScreen userData={{weight:76.5,height:175,age:35,is_minor:false,targetWeight:72}} plan={{goal:"fatLoss",calories:2100,tdee:2500}} lang="en" />;
@@ -23960,15 +23958,3 @@ function DUBIRoot() {
   }
   return <DUBIApp />;
 }
-
-    const root = createRoot(document.getElementById('root'));
-    root.render(<LangProvider><WearableProvider><DUBIRoot /></WearableProvider></LangProvider>);
-
-    // Nascondi schermata di boot non appena React ha montato il componente
-    window._dubiReady = true;
-    clearTimeout(window._dubiBootTimer);
-    const bootEl = document.getElementById('dubi-boot');
-    if (bootEl) {
-      bootEl.classList.add('hidden');
-      setTimeout(function() { bootEl.style.display = 'none'; }, 350);
-    }
