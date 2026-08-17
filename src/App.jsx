@@ -2841,7 +2841,7 @@ const PrivacyPolicyPage = () => {
   const copy = getLegalMeta("privacy", lang);
   const sx = getSettingsScreenCopy(lang);
   return (
-    <div style={{background:T.bg,minHeight:"100vh",padding:"42px 20px 48px",fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+    <div style={{background:T.bg,minHeight:"var(--dubi-viewport-height, 100vh)",padding:"calc(42px + env(safe-area-inset-top, 0px)) 20px calc(48px + env(safe-area-inset-bottom, 0px))",fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <div style={{maxWidth:720,margin:"0 auto"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22}}>
           <DUBILogo size={42} color={T.accentD}/>
@@ -2962,7 +2962,7 @@ const TermsPage = () => {
   const copy = getLegalMeta("terms", lang);
   const sx = getSettingsScreenCopy(lang);
   return (
-    <div style={{background:T.bg,minHeight:"100vh",padding:"42px 20px 48px",fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,sans-serif"}}>
+    <div style={{background:T.bg,minHeight:"var(--dubi-viewport-height, 100vh)",padding:"calc(42px + env(safe-area-inset-top, 0px)) 20px calc(48px + env(safe-area-inset-bottom, 0px))",fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <div style={{maxWidth:720,margin:"0 auto"}}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22}}>
           <DUBILogo size={42} color={T.accentD}/>
@@ -21048,7 +21048,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
 
   const slides = [
     // ── 0: COVER ──
-    <div key="cover" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"40px 32px",textAlign:"center"}}>
+    <div key="cover" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"var(--dubi-viewport-height, 100vh)",padding:"calc(40px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",textAlign:"center"}}>
       <p style={{fontSize:11,color:T.muted,letterSpacing:4,marginBottom:40,textTransform:"uppercase",fontWeight:600}}>{t("wrap.cover.label")}</p>
 
       <div style={{marginBottom:36}}>
@@ -21068,7 +21068,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
     </div>,
 
     // ── 1: NUMERI ──
-    <div key="nums" style={{padding:"80px 32px 40px",minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+    <div key="nums" style={{padding:"calc(80px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",minHeight:"var(--dubi-viewport-height, 100vh)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
       <p style={{fontSize:11,letterSpacing:2,color:T.accentD,textTransform:"uppercase",marginBottom:18,fontWeight:700}}>{t("wrap.months.label")}</p>
       <h2 style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:32,fontWeight:800,color:T.text,lineHeight:1.2,marginBottom:44,letterSpacing:-0.8}}>
         {t("wrap.months.h1")}<br/>{t("wrap.months.h2")}
@@ -21104,7 +21104,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
         ? `~${weeklyDisplay} kg/week · ACSM safe range 0.25–1.0 kg/week (Wishnofsky 1958)`
         : `~${weeklyDisplay} kg/settimana · range sicuro ACSM 0,25–1,0 kg/settimana (Wishnofsky 1958)`;
       return (
-        <div key="peso" style={{padding:"80px 32px 40px",minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+        <div key="peso" style={{padding:"calc(80px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",minHeight:"var(--dubi-viewport-height, 100vh)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
           <p style={{fontSize:11,letterSpacing:2,color:T.accentD,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>{t("wrap.weight.label")}</p>
           <div style={{marginBottom:8,display:"flex",alignItems:"flex-end",gap:8}}>
             <span style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:68,fontWeight:800,color:T.text,lineHeight:1,letterSpacing:-2}}>{sign}{displayKg}</span>
@@ -21129,7 +21129,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
     })(),
 
     // ── 3: PERFORMANCE ──
-    <div key="perf" style={{padding:"80px 32px 40px",minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+    <div key="perf" style={{padding:"calc(80px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",minHeight:"var(--dubi-viewport-height, 100vh)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
       <p style={{fontSize:11,letterSpacing:2,color:T.accentD,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>{t("wrap.perf.label")}</p>
       <h2 style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:28,fontWeight:800,color:T.text,lineHeight:1.25,marginBottom:28,letterSpacing:-0.6}}>
         {t("wrap.perf.h1")}<br/><span style={{color:T.accentD}}>{t("wrap.perf.h2")}</span>
@@ -21154,7 +21154,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
     </div>,
 
     // ── 4: TRAGUARDI ──
-    <div key="traguardi" style={{padding:"80px 32px 40px",minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+    <div key="traguardi" style={{padding:"calc(80px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",minHeight:"var(--dubi-viewport-height, 100vh)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
       <p style={{fontSize:11,letterSpacing:2,color:T.accentD,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>{t("wrap.achievements.label")}</p>
       <h2 style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:28,fontWeight:800,color:T.text,lineHeight:1.25,marginBottom:28,letterSpacing:-0.6}}>
         {t("wrap.achievements.h1")}<br/><span style={{color:T.accentD}}>{t("wrap.achievements.h2")}</span>
@@ -21180,7 +21180,7 @@ const WrapScreen = ({userData, plan, onClose}) => {
     </div>,
 
     // ── 5: CONDIVIDI ──
-    <div key="share" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"60px 32px 40px",minHeight:"100vh",textAlign:"center"}}>
+    <div key="share" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"calc(60px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",minHeight:"var(--dubi-viewport-height, 100vh)",textAlign:"center"}}>
       <div style={{width:110,height:110,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:32,
         background:T.card,border:`1.5px solid ${T.accent}`}}>
         <Ico n="star2" size={48} c={T.accentD}/>
@@ -22613,7 +22613,7 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
     };
   }, [getProgress]);
   return (
-    <aside className="dubi-desktop-sidebar" style={{gridColumn:1,flexDirection:"column",height:"100vh",position:"sticky",top:0,background:"#DEDAD1",borderRight:`1px solid ${T.border}`,padding:"28px 22px",gap:22}}>
+    <aside className="dubi-desktop-sidebar" style={{gridColumn:1,flexDirection:"column",height:"var(--dubi-viewport-height, 100vh)",position:"sticky",top:0,background:"#DEDAD1",borderRight:`1px solid ${T.border}`,padding:"28px 22px",gap:22}}>
       <div>
         <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,color:T.text,fontFamily:"'Barlow Condensed',sans-serif"}}>DUBI</div>
         <p style={{fontSize:12,color:T.muted,marginTop:4,lineHeight:1.4,fontFamily:"'Barlow',sans-serif",letterSpacing:"0.04em",textTransform:"uppercase"}}>{t("sidebar.tagline")}</p>
@@ -22675,8 +22675,8 @@ const BottomNav = ({active,onChange}) => {
   return (
     <div className="dubi-bottom-nav" style={{
       position:'fixed',
-      bottom:'calc(16px + env(safe-area-inset-bottom,0px))',
-      left:collapsed?'16px':'50%',
+      bottom:'var(--dubi-bottom-nav-offset, calc(16px + env(safe-area-inset-bottom, 0px)))',
+      left:collapsed?'calc(16px + env(safe-area-inset-left, 0px))':'50%',
       transform:collapsed?'none':'translateX(-50%)',
       transition:'all 0.4s cubic-bezier(0.34,1.3,0.64,1)',
       zIndex:100,
@@ -22695,6 +22695,7 @@ const BottomNav = ({active,onChange}) => {
         <div style={{
           background:'#fff',borderRadius:999,
           padding:'6px',display:'flex',gap:2,
+          maxWidth:'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))',
           boxShadow:'0 4px 24px rgba(0,0,0,0.12),0 1px 4px rgba(0,0,0,0.06)',
         }}>
           {DUBI_NAV_TABS.map(tab=>{
@@ -22743,8 +22744,8 @@ const ConsentScreen = ({userData, onAccept, onDecline}) => {
   const hasOAuthWearable = Boolean(getOAuthWearableProvider(userData) && userData?.wearableConsent);
 
   return (
-    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:40}}>
-      <div style={{padding:"56px 20px 0"}}>
+    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:"calc(40px + env(safe-area-inset-bottom, 0px))"}}>
+      <div style={{padding:"calc(56px + env(safe-area-inset-top, 0px)) 20px 0"}}>
         <div style={{width:56,height:56,borderRadius:16,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8E4DC" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -22983,8 +22984,8 @@ const WearableConnectScreen = ({userData, onSkip}) => {
   };
 
   return (
-    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:40}}>
-      <div style={{padding:"56px 20px 0"}}>
+    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:"calc(40px + env(safe-area-inset-bottom, 0px))"}}>
+      <div style={{padding:"calc(56px + env(safe-area-inset-top, 0px)) 20px 0"}}>
         <div style={{width:56,height:56,borderRadius:16,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16}}>
           <Ico n="heart" size={28} c="#fff"/>
         </div>
@@ -23179,8 +23180,8 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
   }
 
   return (
-    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:40}}>
-      <div style={{padding:"56px 20px 0"}}>
+    <div style={{background:T.bg,minHeight:"100%",overflowY:"auto",paddingBottom:"calc(40px + env(safe-area-inset-bottom, 0px))"}}>
+      <div style={{padding:"calc(56px + env(safe-area-inset-top, 0px)) 20px 0"}}>
         <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:"0 0 16px",display:"flex",alignItems:"center",gap:6}}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           <span style={{fontSize:13,color:T.muted}}>{AUTH_COPY[lang]?.back || AUTH_COPY.en.back}</span>
@@ -23683,14 +23684,14 @@ setPhase("app");
   }, [phase, isFirstAccess]);
 
   return (
-    <div style={{fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,sans-serif",background:"#E8E4DF",minHeight:"100vh",display:"flex",justifyContent:"center"}}>
+    <div style={{fontFamily:"'Barlow',-apple-system,BlinkMacSystemFont,sans-serif",background:"#E8E4DF",minHeight:"var(--dubi-viewport-height, 100vh)",display:"flex",justifyContent:"center"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
         button,input,textarea{font-family:'Barlow',-apple-system,sans-serif;}
         ::-webkit-scrollbar{display:none;}
       `}</style>
-      <div className={`dubi-app-shell ${phase==="app" ? "dubi-app-shell--app" : ""}`} style={{width:"100%",maxWidth:"var(--dubi-shell-max, 430px)",background:T.bg,minHeight:"100vh",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
+      <div className={`dubi-app-shell ${phase==="app" ? "dubi-app-shell--app" : ""}`} style={{width:"100%",maxWidth:"var(--dubi-shell-max, 430px)",background:T.bg,minHeight:"var(--dubi-viewport-height, 100vh)",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
         {phase==="reset-password" && (
           <ResetPasswordScreen
             token={resetToken}
@@ -23837,7 +23838,7 @@ setPhase("app");
         {phase==="app" && (
           <>
             <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
-            <div className="dubi-screen-motion" style={{height:"100vh",overflowY:"auto",position:"relative"}}>
+            <div className="dubi-screen-motion" style={{height:"var(--dubi-viewport-height, 100vh)",overflowY:"auto",position:"relative"}}>
               {activeTab==="today"    && (healthDataConsentGranted
                 ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}

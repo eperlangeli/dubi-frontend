@@ -1,4 +1,13 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --dubi-safe-top: env(safe-area-inset-top, 0px);
+      --dubi-safe-right: env(safe-area-inset-right, 0px);
+      --dubi-safe-bottom: env(safe-area-inset-bottom, 0px);
+      --dubi-safe-left: env(safe-area-inset-left, 0px);
+      --dubi-viewport-height: 100dvh;
+      --dubi-bottom-nav-offset: calc(16px + var(--dubi-safe-bottom));
+      --dubi-bottom-nav-space: calc(100px + var(--dubi-safe-bottom));
+    }
     html { scroll-behavior: smooth; }
     body {
       background: #E8E4DC;
@@ -8,8 +17,13 @@
       overscroll-behavior-y: none;
       -webkit-font-smoothing: antialiased;
       text-rendering: geometricPrecision;
+      min-height: 100vh;
+      min-height: var(--dubi-viewport-height);
     }
-    #root { min-height: 100vh; }
+    #root {
+      min-height: 100vh;
+      min-height: var(--dubi-viewport-height);
+    }
 
     /* ── Schermata di caricamento — visibile finché React non renderizza ── */
     @keyframes slideDown {
@@ -140,6 +154,8 @@
     }
     .dubi-app-shell {
       --dubi-shell-max: 430px;
+      min-height: 100vh;
+      min-height: var(--dubi-viewport-height);
     }
     .dubi-desktop-sidebar {
       display: none;
@@ -149,6 +165,7 @@
     }
     .dubi-loading-screen {
       min-height: 100vh;
+      min-height: var(--dubi-viewport-height);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -209,6 +226,7 @@
         display: grid;
         grid-template-columns: 280px minmax(0, 1fr);
         min-height: 100vh;
+        min-height: var(--dubi-viewport-height);
       }
       .dubi-desktop-sidebar {
         display: flex;
@@ -219,6 +237,7 @@
       .dubi-app-shell--app .dubi-screen-motion {
         grid-column: 2;
         height: 100vh;
+        height: var(--dubi-viewport-height);
         overflow-y: auto;
       }
       .dubi-app-shell--app .dubi-screen-motion > div {
