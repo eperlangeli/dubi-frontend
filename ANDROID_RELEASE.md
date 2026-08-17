@@ -41,6 +41,14 @@ The release workflow expects these GitHub Actions secrets:
 - `DUBI_ANDROID_KEY_ALIAS`: upload key alias.
 - `DUBI_ANDROID_KEY_PASSWORD`: key password.
 
+After creating the upload keystore locally, encode it for GitHub Secrets with:
+
+```bash
+pnpm run android:encode-keystore -- /absolute/path/to/dubi-upload-key.jks
+```
+
+Copy the printed value into `DUBI_ANDROID_KEYSTORE_BASE64`.
+
 Google Play App Signing should be enabled in Play Console. The GitHub keystore is the upload key, not the final app signing key managed by Google.
 
 Local signed release builds can use the same Gradle properties:

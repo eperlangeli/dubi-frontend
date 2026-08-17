@@ -13,6 +13,7 @@
     "cap:open:ios": "node scripts/prepare-mobile-web.js && cap sync ios && cap open ios",
     "android:debug": "node scripts/prepare-mobile-web.js && cap sync android && cd android && gradlew assembleDebug",
     "android:release": "node scripts/prepare-mobile-web.js && cap sync android && cd android && gradlew assembleRelease bundleRelease",
+    "android:encode-keystore": "node scripts/encode-android-keystore.mjs",
     "check:mobile-env": "node scripts/check-mobile-env.js",
     "check": "node scripts/prepare-mobile-web.js --check",
     "generate:assets": "node scripts/generate-mobile-assets.mjs",

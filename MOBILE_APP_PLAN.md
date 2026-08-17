@@ -18,7 +18,7 @@ This repo now has a Capacitor app shell so the current static DUBI web app can b
 - Done: add Capacitor config and native Android/iOS platform folders.
 - Done: configure app id `health.dubi.app`, app name, splash screen, status bar, and web asset sync.
 - Done: add GitHub Actions workflow for Android debug APK builds.
-- Done: add Android release workflow for unsigned APK/AAB artifacts.
+- Done: add Android release workflow for signed APK/AAB artifacts through GitHub Secrets.
 - Done: switch native bundle id to `health.dubi.app`.
 - Done: add native `dubi://` URL scheme skeleton.
 - Done: add baseline iOS privacy manifest.
@@ -27,12 +27,12 @@ This repo now has a Capacitor app shell so the current static DUBI web app can b
 
 ## Phase 2 - Product hardening
 
-- Move the frontend from CDN React/Babel to a bundled React/Vite build.
-- Keep the existing UX while reducing startup risk and improving offline behavior.
-- Add mobile-safe session handling and deep-link handling.
-- Move auth token storage behind a small async adapter, then use Capacitor Preferences in native builds.
-- Add staging/production API configuration before wider testing.
+- Done: move the frontend from CDN React/Babel to a bundled React/Vite build.
+- Done: keep the existing UX while reducing startup risk and improving offline behavior.
+- Done: add mobile-safe session handling and deep-link handling.
+- Done: move auth token storage behind a small async adapter and use Capacitor Preferences in native builds.
 - Done: add staging/production API configuration with build-time validation.
+- Done: split the native app bootstrap into a small Vite entry chunk.
 
 ## Phase 3 - Monetization
 
@@ -74,4 +74,4 @@ pnpm exec cap open ios
 - `android/gradlew.bat assembleDebug`: blocked locally by missing `JAVA_HOME` / local Java installation.
 - `pnpm run check:mobile-env`: use this before Android builds to verify JDK/SDK setup.
 - `.github/workflows/android-debug.yml`: can build and upload a debug APK from GitHub Actions after these mobile files are pushed.
-- `.github/workflows/android-release.yml`: can build unsigned Android release artifacts for store preparation.
+- `.github/workflows/android-release.yml`: can build signed Android release artifacts after release signing secrets are configured.

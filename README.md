@@ -54,3 +54,5 @@ The current mobile shell intentionally reuses the static app and production back
 The `Android Debug Build` GitHub Action can also produce a debug APK artifact from GitHub without relying on the local Windows Android setup.
 
 For release and Google Play preparation, see `ANDROID_RELEASE.md`.
+
+For the full Android/iOS beta and store-readiness checklist, see `STORE_RELEASE_CHECKLIST.md`.
