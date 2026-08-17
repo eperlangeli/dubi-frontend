@@ -1,0 +1,293 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: #E8E4DC;
+      font-family: 'Barlow', -apple-system, sans-serif;
+      color-scheme: light;
+      forced-color-adjust: none;
+      overscroll-behavior-y: none;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
+    }
+    #root { min-height: 100vh; }
+
+    /* ── Schermata di caricamento — visibile finché React non renderizza ── */
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #dubi-boot {
+      position: fixed; inset: 0;
+      background: #E8E4DC;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px;
+      z-index: 9999;
+      transition: opacity 0.3s ease;
+    }
+    #dubi-boot.hidden { opacity: 0; pointer-events: none; }
+    .dubi-boot-logo {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: #0F0F0F;
+    }
+    .dubi-boot-logo span { color: #0F0F0F; }
+    .dubi-boot-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #E7E2DA;
+      border-top-color: #0F0F0F;
+      border-radius: 50%;
+      animation: dubi-spin 0.8s linear infinite;
+    }
+    .dubi-boot-msg {
+      font-size: 13px; color: #9A9490; letter-spacing: 0.04em;
+    }
+    .dubi-boot-error {
+      font-size: 13px; color: #c0392b; text-align: center;
+      max-width: 280px; line-height: 1.5; display: none;
+    }
+    html[dir="rtl"] body { direction: rtl; }
+    html[dir="rtl"] button,
+    html[dir="rtl"] input,
+    html[dir="rtl"] textarea,
+    html[dir="rtl"] select { text-align: start !important; }
+    html[dir="rtl"] .dubi-desktop-sidebar {
+      border-right: none !important;
+      border-left: 1px solid #E7E2DA !important;
+    }
+    @keyframes dubi-spin { to { transform: rotate(360deg); } }
+
+    /* Rimuove le frecce/spinner dai campi numerici in tutti i browser */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+    button {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      transition: transform 0.18s cubic-bezier(.2,.8,.2,1), box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+    }
+    button:not(:disabled):active { transform: scale(0.975); }
+    button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(107, 138, 100, 0.18), 0 12px 28px rgba(43,43,43,0.08);
+    }
+    input, textarea, select {
+      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #0F0F0F !important;
+      box-shadow: 0 0 0 4px rgba(107, 138, 100, 0.14);
+    }
+    .dubi-card {
+      transition: transform 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .dubi-screen-motion {
+      animation: dubi-fade-up 0.34s cubic-bezier(.2,.8,.2,1) both;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+    .dubi-pressable {
+      position: relative;
+      overflow: hidden;
+      transform: translateZ(0);
+    }
+    .dubi-pressable::after {
+      content: "";
+      position: absolute;
+      inset: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(107, 138, 100, 0.13);
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.36s ease, opacity 0.36s ease;
+    }
+    .dubi-pressable:active::after {
+      transform: translate(-50%, -50%) scale(24);
+      opacity: 1;
+      transition-duration: 0.12s;
+    }
+    .dubi-chat-bubble {
+      animation: dubi-bubble-in 0.24s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .dubi-success-pop {
+      animation: dubi-success-pop 0.32s cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes dubi-fade-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dubi-bubble-in {
+      from { opacity: 0; transform: translateY(8px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes dubi-success-pop {
+      0% { transform: scale(.92); opacity: .4; }
+      60% { transform: scale(1.04); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @media (hover:hover) {
+      button:not(:disabled):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(43, 43, 43, 0.08);
+      }
+      .dubi-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 30px rgba(43, 43, 43, 0.06);
+        border-color: #D8D1C8;
+      }
+    }
+    .dubi-app-shell {
+      --dubi-shell-max: 430px;
+    }
+    .dubi-desktop-sidebar {
+      display: none;
+    }
+    .dubi-bottom-nav {
+      display: block;
+    }
+    .dubi-loading-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(107,138,100,.12), transparent 34%),
+        #E8E4DC;
+      color: #0F0F0F;
+      padding: 32px;
+    }
+    .dubi-loading-card {
+      width: min(320px, 100%);
+      border: 1px solid #E7E2DA;
+      border-radius: 28px;
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 24px 70px rgba(43,43,43,.08);
+      padding: 30px 24px;
+      text-align: center;
+    }
+    .dubi-loading-logo {
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+    .dubi-loading-logo span { color: #0F0F0F; }
+    .dubi-loading-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: #EEE9E2;
+      overflow: hidden;
+      margin: 22px 0 12px;
+    }
+    .dubi-loading-bar span {
+      display: block;
+      height: 100%;
+      width: 42%;
+      border-radius: inherit;
+      background: #0F0F0F;
+      animation: dubi-loading-slide 1.15s ease-in-out infinite;
+    }
+    @keyframes dubi-loading-slide {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(260%); }
+    }
+    @media (min-width: 768px) and (max-width: 1199px) {
+      .dubi-app-shell {
+        --dubi-shell-max: 720px;
+      }
+      .dubi-bottom-nav {
+        max-width: var(--dubi-shell-max) !important;
+      }
+    }
+    @media (min-width: 1200px) {
+      .dubi-app-shell.dubi-app-shell--app {
+        --dubi-shell-max: none;
+        width: 100% !important;
+        max-width: none !important;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      .dubi-desktop-sidebar {
+        display: flex;
+      }
+      .dubi-bottom-nav {
+        display: none !important;
+      }
+      .dubi-app-shell--app .dubi-screen-motion {
+        grid-column: 2;
+        height: 100vh;
+        overflow-y: auto;
+      }
+      .dubi-app-shell--app .dubi-screen-motion > div {
+        max-width: 920px;
+        margin: 0 auto;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    .dubi-legal-content {
+      color: #0F0F0F;
+      font-size: 13px;
+      line-height: 1.62;
+      overflow-wrap: anywhere;
+    }
+    .dubi-legal-content h2 {
+      margin: 0 0 12px;
+      font-family: 'Barlow Condensed',-apple-system,sans-serif;
+      font-size: 23px;
+      line-height: 1.14;
+      letter-spacing: -0.5px;
+      color: #0F0F0F;
+    }
+    .dubi-legal-content h3 {
+      margin: 18px 0 7px;
+      font-size: 13px;
+      font-weight: 900;
+      color: #0F0F0F;
+    }
+    .dubi-legal-content p {
+      margin: 0 0 10px;
+      color: #5F5A56;
+    }
+    .dubi-legal-content ul {
+      margin: 0 0 12px 18px;
+      padding: 0;
+      color: #5F5A56;
+    }
+    .dubi-legal-content li {
+      margin: 5px 0;
+    }
+    .dubi-legal-content a {
+      color: #0F0F0F;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .dubi-legal-consent-card {
+      background: #DEDAD1;
+      border: 1px solid #E7E2DA;
+      border-radius: 16px;
+      padding: 18px 16px;
+      margin-bottom: 12px;
+    }
+    @keyframes dubiSlideInRight {
+      from { transform: translateX(36px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    @keyframes dubiSlideInLeft {
+      from { transform: translateX(-36px); opacity: 0; }
+      to   { transform: translateX(0);     opacity: 1; }
+    }
+    @keyframes dubiConfettiFall {
+      0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }

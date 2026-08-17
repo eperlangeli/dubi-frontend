@@ -4,7 +4,10 @@
   "private": true,
   "description": "DUBI static frontend packaged as a native mobile app with Capacitor.",
   "scripts": {
+    "build": "vite build",
     "build:web": "node scripts/prepare-mobile-web.js",
+    "dev": "vite --host 0.0.0.0",
+    "preview": "vite preview --host 0.0.0.0",
     "cap:sync": "node scripts/prepare-mobile-web.js && cap sync",
     "cap:open:android": "node scripts/prepare-mobile-web.js && cap sync android && cap open android",
     "cap:open:ios": "node scripts/prepare-mobile-web.js && cap sync ios && cap open ios",
@@ -21,9 +24,13 @@
     "@capacitor/haptics": "^7.0.2",
     "@capacitor/ios": "^7.4.3",
     "@capacitor/splash-screen": "^7.0.2",
-    "@capacitor/status-bar": "^7.0.2"
+    "@capacitor/status-bar": "^7.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.3"
+    "@capacitor/cli": "^7.4.3",
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.1.2"
   }
 }
