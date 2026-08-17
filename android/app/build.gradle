@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def dubiReleaseKeystorePath = (project.findProperty("DUBI_ANDROID_KEYSTORE_PATH") ?: System.getenv("DUBI_ANDROID_KEYSTORE_PATH"))?.toString()
+def dubiReleaseStorePassword = (project.findProperty("DUBI_ANDROID_KEYSTORE_PASSWORD") ?: System.getenv("DUBI_ANDROID_KEYSTORE_PASSWORD"))?.toString()
+def dubiReleaseKeyAlias = (project.findProperty("DUBI_ANDROID_KEY_ALIAS") ?: System.getenv("DUBI_ANDROID_KEY_ALIAS"))?.toString()
+def dubiReleaseKeyPassword = (project.findProperty("DUBI_ANDROID_KEY_PASSWORD") ?: System.getenv("DUBI_ANDROID_KEY_PASSWORD"))?.toString()
+def hasDubiReleaseSigning = dubiReleaseKeystorePath && dubiReleaseStorePassword && dubiReleaseKeyAlias && dubiReleaseKeyPassword
+
 android {
     namespace "health.dubi.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -16,8 +22,23 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasDubiReleaseSigning) {
+                storeFile file(dubiReleaseKeystorePath)
+                storePassword dubiReleaseStorePassword
+                keyAlias dubiReleaseKeyAlias
+                keyPassword dubiReleaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasDubiReleaseSigning) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.lifecycle("DUBI Android release signing is not configured. Release outputs will be unsigned.")
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

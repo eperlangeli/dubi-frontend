@@ -15,6 +15,11 @@ on:
 jobs:
   android-release:
     runs-on: ubuntu-latest
+    env:
+      DUBI_ANDROID_KEYSTORE_BASE64: ${{ secrets.DUBI_ANDROID_KEYSTORE_BASE64 }}
+      DUBI_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.DUBI_ANDROID_KEYSTORE_PASSWORD }}
+      DUBI_ANDROID_KEY_ALIAS: ${{ secrets.DUBI_ANDROID_KEY_ALIAS }}
+      DUBI_ANDROID_KEY_PASSWORD: ${{ secrets.DUBI_ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -50,18 +55,39 @@ jobs:
           sed -i 's/\r$//' android/gradlew
           chmod +x android/gradlew
 
-      - name: Build release APK and AAB
+      - name: Validate release signing secrets
+        shell: bash
+        run: |
+          missing=0
+          for name in DUBI_ANDROID_KEYSTORE_BASE64 DUBI_ANDROID_KEYSTORE_PASSWORD DUBI_ANDROID_KEY_ALIAS DUBI_ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required for signed Android release builds"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Decode release keystore
+        shell: bash
+        run: |
+          printf '%s' "$DUBI_ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/dubi-upload-key.jks
+
+      - name: Build signed release APK and AAB
         working-directory: android
         run: >
           ./gradlew --no-daemon
           -PDUBI_VERSION_NAME=${{ inputs.version_name }}
           -PDUBI_VERSION_CODE=${{ inputs.version_code }}
+          -PDUBI_ANDROID_KEYSTORE_PATH=app/dubi-upload-key.jks
+          -PDUBI_ANDROID_KEYSTORE_PASSWORD="${DUBI_ANDROID_KEYSTORE_PASSWORD}"
+          -PDUBI_ANDROID_KEY_ALIAS="${DUBI_ANDROID_KEY_ALIAS}"
+          -PDUBI_ANDROID_KEY_PASSWORD="${DUBI_ANDROID_KEY_PASSWORD}"
           assembleRelease bundleRelease
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dubi-android-release-unsigned
+          name: dubi-android-release-signed
           path: |
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
+            android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
