@@ -5,10 +5,10 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
+import { API_BASE_URL } from "./config.js";
 import "./styles.css";
 
 const { useState, useEffect, useCallback } = React;
-const API_BASE_URL = "https://dubi-backend.onrender.com";
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
 
 const setKeyboardHeight = (height = 0) => {

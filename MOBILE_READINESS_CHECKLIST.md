@@ -2,15 +2,9 @@
 
 ## Must be handled before wider beta
 
-- Babel standalone to Vite bundled build.
-- Native session storage through `@capacitor/preferences`.
-- Staging/production environment configuration.
-- Reset-password and email-verification deep link handling.
-- iOS safe-area audit for every screen with bottom navigation or fixed controls.
-- iOS keyboard testing for onboarding, login, password reset, and numeric inputs.
-- Production icons and splash assets.
 - Android release signing and Google Play internal testing.
 - iOS signing, TestFlight, and App Store Connect setup.
+- Performance bundle/code-splitting pass for faster native startup.
 
 ## Done in the current shell
 
@@ -19,7 +13,14 @@
 - URL scheme skeleton: `dubi://`.
 - Android debug APK workflow.
 - Android release artifact workflow.
-- Baseline iOS `PrivacyInfo.xcprivacy`.
+- Vite bundled build.
+- Native session storage through `@capacitor/preferences`.
+- Reset-password deep link handling.
+- iOS safe-area audit for bottom navigation and fixed controls.
+- Native keyboard handling for onboarding and numeric inputs.
+- Production icons and splash assets.
+- Staging/production environment configuration.
+- iOS `PrivacyInfo.xcprivacy` with current data-use declarations.
 
 ## Asset targets
 

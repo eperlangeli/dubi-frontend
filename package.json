@@ -15,7 +15,10 @@
     "android:release": "node scripts/prepare-mobile-web.js && cap sync android && cd android && gradlew assembleRelease bundleRelease",
     "check:mobile-env": "node scripts/check-mobile-env.js",
     "check": "node scripts/prepare-mobile-web.js --check",
-    "generate:assets": "node scripts/generate-mobile-assets.mjs"
+    "generate:assets": "node scripts/generate-mobile-assets.mjs",
+    "build:web:production": "cross-env VITE_DUBI_APP_ENV=production node scripts/prepare-mobile-web.js",
+    "build:web:staging": "cross-env VITE_DUBI_APP_ENV=staging node scripts/prepare-mobile-web.js",
+    "check:config": "node scripts/validate-app-config.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
@@ -34,6 +37,7 @@
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
     "@vitejs/plugin-react": "^5.0.0",
+    "cross-env": "^10.1.0",
     "sharp": "^0.35.3",
     "vite": "^7.1.2"
   }

@@ -49,10 +49,28 @@ function injectMobileBridge(html) {
 }
 
 function buildWithVite() {
+  const validateScript = path.join(root, "scripts", "validate-app-config.js");
+  const validateResult = spawnSync(process.execPath, [validateScript], {
+    cwd: root,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      VITE_DUBI_APP_ENV: process.env.VITE_DUBI_APP_ENV || "production"
+    }
+  });
+
+  if (validateResult.status !== 0) {
+    throw new Error(`DUBI config validation failed with exit code ${validateResult.status}`);
+  }
+
   const viteScript = path.join(root, "node_modules", "vite", "bin", "vite.js");
   const result = spawnSync(process.execPath, [viteScript, "build"], {
     cwd: root,
-    stdio: "inherit"
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      VITE_DUBI_APP_ENV: process.env.VITE_DUBI_APP_ENV || "production"
+    }
   });
 
   if (result.status !== 0) {
