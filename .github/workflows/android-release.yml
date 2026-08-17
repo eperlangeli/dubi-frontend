@@ -72,17 +72,35 @@ jobs:
         run: |
           printf '%s' "$DUBI_ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/dubi-upload-key.jks
 
+      - name: Verify release keystore
+        shell: bash
+        run: |
+          keytool -list \
+            -keystore android/app/dubi-upload-key.jks \
+            -storepass "$DUBI_ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$DUBI_ANDROID_KEY_ALIAS" \
+            >/dev/null
+
       - name: Build signed release APK and AAB
         working-directory: android
-        run: >
-          ./gradlew --no-daemon
-          -PDUBI_VERSION_NAME=${{ inputs.version_name }}
-          -PDUBI_VERSION_CODE=${{ inputs.version_code }}
-          -PDUBI_ANDROID_KEYSTORE_PATH=app/dubi-upload-key.jks
-          -PDUBI_ANDROID_KEYSTORE_PASSWORD="${DUBI_ANDROID_KEYSTORE_PASSWORD}"
-          -PDUBI_ANDROID_KEY_ALIAS="${DUBI_ANDROID_KEY_ALIAS}"
-          -PDUBI_ANDROID_KEY_PASSWORD="${DUBI_ANDROID_KEY_PASSWORD}"
-          assembleRelease bundleRelease
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --no-daemon \
+            -PDUBI_VERSION_NAME=${{ inputs.version_name }} \
+            -PDUBI_VERSION_CODE=${{ inputs.version_code }} \
+            -PDUBI_ANDROID_KEYSTORE_PATH=app/dubi-upload-key.jks \
+            -PDUBI_ANDROID_KEYSTORE_PASSWORD="${DUBI_ANDROID_KEYSTORE_PASSWORD}" \
+            -PDUBI_ANDROID_KEY_ALIAS="${DUBI_ANDROID_KEY_ALIAS}" \
+            -PDUBI_ANDROID_KEY_PASSWORD="${DUBI_ANDROID_KEY_PASSWORD}" \
+            assembleRelease bundleRelease 2>&1 | tee ../release-gradle-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Gradle release failure summary"
+            grep -n -B 20 -A 140 -E "FAILURE:|What went wrong|Execution failed|Could not|Caused by:|BUILD FAILED|Keystore|keystore|password|alias" ../release-gradle-build.log || true
+            echo "::endgroup::"
+          fi
+          exit "$status"
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -91,3 +109,10 @@ jobs:
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload release Gradle build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dubi-release-gradle-build-log
+          path: release-gradle-build.log
