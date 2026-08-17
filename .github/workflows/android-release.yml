@@ -89,7 +89,7 @@ jobs:
           ./gradlew --no-daemon \
             -PDUBI_VERSION_NAME=${{ inputs.version_name }} \
             -PDUBI_VERSION_CODE=${{ inputs.version_code }} \
-            -PDUBI_ANDROID_KEYSTORE_PATH=app/dubi-upload-key.jks \
+            -PDUBI_ANDROID_KEYSTORE_PATH=dubi-upload-key.jks \
             -PDUBI_ANDROID_KEYSTORE_PASSWORD="${DUBI_ANDROID_KEYSTORE_PASSWORD}" \
             -PDUBI_ANDROID_KEY_ALIAS="${DUBI_ANDROID_KEY_ALIAS}" \
             -PDUBI_ANDROID_KEY_PASSWORD="${DUBI_ANDROID_KEY_PASSWORD}" \
