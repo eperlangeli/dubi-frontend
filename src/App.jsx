@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
+import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import "./styles.css";
 
@@ -489,9 +490,84 @@ const getPlanProfileSignature = (userData = {}) => {
     parentalConsentVerifiedAt: data.parental_consent_verified_at ?? data.parentalConsentVerifiedAt ?? null
   };
 };
-const getAuthToken = () => {
-  return localStorage.getItem("dubi_token") || "";
+const AUTH_TOKEN_KEY = "dubi_token";
+const AUTH_EMAIL_KEY = "dubi_email";
+const authSession = {
+  token: "",
+  email: "",
+  hydrated: false
 };
+
+const safeLocalStorageGet = (key) => {
+  try { return localStorage.getItem(key) || ""; } catch (error) { return ""; }
+};
+
+const safeLocalStorageSet = (key, value) => {
+  try { localStorage.setItem(key, value); } catch (error) {}
+};
+
+const safeLocalStorageRemove = (key) => {
+  try { localStorage.removeItem(key); } catch (error) {}
+};
+
+const hydrateAuthSession = async () => {
+  if (authSession.hydrated) return authSession;
+
+  const localToken = safeLocalStorageGet(AUTH_TOKEN_KEY);
+  const localEmail = safeLocalStorageGet(AUTH_EMAIL_KEY);
+
+  try {
+    const [{ value: storedToken }, { value: storedEmail }] = await Promise.all([
+      Preferences.get({ key: AUTH_TOKEN_KEY }),
+      Preferences.get({ key: AUTH_EMAIL_KEY })
+    ]);
+
+    authSession.token = storedToken || localToken || "";
+    authSession.email = storedEmail || localEmail || "";
+
+    if (localToken && !storedToken) await Preferences.set({ key: AUTH_TOKEN_KEY, value: localToken });
+    if (localEmail && !storedEmail) await Preferences.set({ key: AUTH_EMAIL_KEY, value: localEmail });
+  } catch (error) {
+    authSession.token = localToken;
+    authSession.email = localEmail;
+  }
+
+  authSession.hydrated = true;
+  return authSession;
+};
+
+const saveAuthSession = async ({ token, email }) => {
+  authSession.token = token || "";
+  authSession.email = email || "";
+  authSession.hydrated = true;
+
+  if (token) safeLocalStorageSet(AUTH_TOKEN_KEY, token);
+  if (email) safeLocalStorageSet(AUTH_EMAIL_KEY, email);
+
+  try {
+    if (token) await Preferences.set({ key: AUTH_TOKEN_KEY, value: token });
+    if (email) await Preferences.set({ key: AUTH_EMAIL_KEY, value: email });
+  } catch (error) {}
+};
+
+const clearAuthSession = async () => {
+  authSession.token = "";
+  authSession.email = "";
+  authSession.hydrated = true;
+
+  safeLocalStorageRemove(AUTH_TOKEN_KEY);
+  safeLocalStorageRemove(AUTH_EMAIL_KEY);
+
+  try {
+    await Promise.all([
+      Preferences.remove({ key: AUTH_TOKEN_KEY }),
+      Preferences.remove({ key: AUTH_EMAIL_KEY })
+    ]);
+  } catch (error) {}
+};
+
+const getAuthToken = () => authSession.token || safeLocalStorageGet(AUTH_TOKEN_KEY);
+const getAuthEmail = () => authSession.email || safeLocalStorageGet(AUTH_EMAIL_KEY);
 
 const calculateAgeFromBirthDate = (birthDate) => {
   if (!birthDate) return null;
@@ -1261,7 +1337,7 @@ const getRuntimeCopy = (key, vars, requestedLang) => {
 
 
 async function generateIngredientPlan(options = {}) {
-  const token = localStorage.getItem("dubi_token");
+  const token = getAuthToken();
   if (!token) throw new Error("missing_token");
   const today = options.date || getTodayIsoDate();
 
@@ -12308,7 +12384,7 @@ function getAdjustedMealMacros(dayIndex, mealKey, meal, swaps) {
 }
 
 function ownedShoppingKey(userData) {
-  return `dubi_shopping_owned_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
+  return `dubi_shopping_owned_${userData?.dubiCode || getAuthEmail() || "guest"}`;
 }
 
 function rememberOwnedShoppingIngredient(userData, item) {
@@ -14310,7 +14386,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
 // ── ASK DUBI MODAL — conversazione multi-turno ──
 const ASK_DUBI_HISTORY_LIMIT = 16;
 const getAskDubiHistoryKey = (userData) =>
-  `dubi_ask_threads_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
+  `dubi_ask_threads_${userData?.dubiCode || getAuthEmail() || "guest"}`;
 
 const loadAskDubiThreads = (userData) => {
   try {
@@ -15384,11 +15460,11 @@ const RejectionScreen = ({ onBack }) => {
   const copy = getAuthCopy(lang);
 
   // Default to "login" if there is already a saved token or saved email, otherwise "register"
-  const hasExistingSession = !!(localStorage.getItem("dubi_token") || localStorage.getItem("dubi_email"));
+  const hasExistingSession = !!(getAuthToken() || getAuthEmail());
   const [mode, setMode] = useState(initialMode || (hasExistingSession ? "login" : "register"));
 
   // Pre-fill email only for login mode
-  const [email, setEmail] = useState(mode === "login" ? (localStorage.getItem("dubi_email") || "") : "");
+  const [email, setEmail] = useState(mode === "login" ? getAuthEmail() : "");
   const [password, setPassword] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [error, setError] = useState("");
@@ -15403,7 +15479,7 @@ const RejectionScreen = ({ onBack }) => {
     setBirthDate("");
     // Pre-fill email only when switching to login
     if (newMode === "login") {
-      setEmail(localStorage.getItem("dubi_email") || "");
+      setEmail(getAuthEmail());
     } else if (newMode === "register") {
       setEmail("");
     }
@@ -15457,8 +15533,7 @@ const RejectionScreen = ({ onBack }) => {
       }
 
       if (data.token) {
-        localStorage.setItem("dubi_token", data.token);
-        localStorage.setItem("dubi_email", email);
+        await saveAuthSession({ token: data.token, email });
 
         const user = data.user || await getCurrentUserFromBackend(data.token);
         const consentStatus = user?.parental_consent_status || user?.parentalConsentStatus || "not_required";
@@ -17183,7 +17258,7 @@ const ConsentRevokedPlanScreen = ({onOpenConsentSettings}) => {
 function migrateTodayStatus(oldPlan, newPlan, userData) {
   try {
     if (!oldPlan || !newPlan) return;
-    const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
+    const userKey = userData?.dubiCode || getAuthEmail() || "guest";
     const dateKey = new Date().toISOString().slice(0,10);
     const makeKey = (p) => {
       const pk = p?.aiEnginePlan?.generatedAt || p?.generatedAt || p?.calories || "plan";
@@ -17815,7 +17890,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const dailyAdaptation = plan?.dailyAdaptation || adaptationPlanMeta?.dailyAdaptation || adaptationPlanMeta?.daily_adaptation || null;
 
   const todayMealStatusStorageKey = React.useMemo(() => {
-    const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
+    const userKey = userData?.dubiCode || getAuthEmail() || "guest";
     const dateKey = new Date().toISOString().slice(0,10);
     const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.adaptationSignature || dailyAdaptation?.signature || plan?.calories || "plan";
     return `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
@@ -19294,7 +19369,7 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
   );
 };
 
-const shoppingStorageKey = (userData) => `dubi_shopping_checked_${userData?.dubiCode || localStorage.getItem("dubi_email") || "guest"}`;
+const shoppingStorageKey = (userData) => `dubi_shopping_checked_${userData?.dubiCode || getAuthEmail() || "guest"}`;
 
 const ShoppingScreen = ({userData, plan, weeklyPlans = [], swaps, partnerProfile, onLinkPartner, onUnlinkPartner}) => {
   const { t, lang } = useT();
@@ -22489,7 +22564,7 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
 
   const getProgress = React.useCallback(() => {
     try {
-      const userKey = userData?.dubiCode || localStorage.getItem("dubi_email") || "guest";
+      const userKey = userData?.dubiCode || getAuthEmail() || "guest";
       const dateKey = new Date().toISOString().slice(0, 10);
       const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.calories || "plan";
       const storageKey = `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24)}`;
@@ -23187,7 +23262,7 @@ const ResetPasswordScreen = ({ token, onComplete }) => {
         return;
       }
 
-      localStorage.removeItem("dubi_token");
+      await clearAuthSession();
       window.history.replaceState({}, "", "/");
       setSuccess(true);
       window.setTimeout(onComplete, 1600);
@@ -23363,7 +23438,7 @@ function DUBIApp() {
   if (resetToken) return;
 
   const checkUserSession = async () => {
-    const token = localStorage.getItem("dubi_token");
+    const { token } = await hydrateAuthSession();
 
     if (!token) {
       setPhase(localStorage.getItem("dubi_terms_accepted") ? "welcome" : "terms");
@@ -23407,8 +23482,7 @@ function DUBIApp() {
       }
 
       if (response.status === 401) {
-        localStorage.removeItem("dubi_token");
-        localStorage.removeItem("dubi_email");
+        await clearAuthSession();
         setPhase("welcome");
         return;
       }
@@ -23426,9 +23500,8 @@ function DUBIApp() {
   const [showWrap,setShowWrap] = useState(false);
   const [isFirstAccess,setIsFirstAccess] = useState(true);
   const [safetyReview,setSafetyReview] = useState(null);
-const handleLogout = () => {
-  localStorage.removeItem("dubi_token");
-  localStorage.removeItem("dubi_email");
+const handleLogout = async () => {
+  await clearAuthSession();
   clearSnapshot();
   setUserData(null);
   setPlan(null);
