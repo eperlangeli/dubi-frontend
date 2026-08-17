@@ -50,4 +50,4 @@ jobs:
           NODE
 
       - name: Build mobile web assets
-        run: pnpm run check
+        run: pnpm run build:web
