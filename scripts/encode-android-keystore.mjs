@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const keystorePath = process.argv[2];
+const keystorePath = process.argv.find((arg, index) => index > 1 && arg !== "--");
 
 if (!keystorePath) {
   console.error("Usage: node scripts/encode-android-keystore.mjs <path-to-upload-key.jks>");
