@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
+import { App as CapacitorApp } from "@capacitor/app";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import "./styles.css";
@@ -568,6 +569,28 @@ const clearAuthSession = async () => {
 
 const getAuthToken = () => authSession.token || safeLocalStorageGet(AUTH_TOKEN_KEY);
 const getAuthEmail = () => authSession.email || safeLocalStorageGet(AUTH_EMAIL_KEY);
+
+const extractResetTokenFromUrl = (rawUrl) => {
+  if (!rawUrl) return "";
+
+  try {
+    const url = new URL(rawUrl, window.location.origin);
+    const token = url.searchParams.get("reset_token") || url.searchParams.get("token");
+    if (token) return token;
+
+    const pathTokenMatch = url.pathname.match(/\/reset-password\/([^/?#]+)/);
+    if (pathTokenMatch?.[1]) return decodeURIComponent(pathTokenMatch[1]);
+
+    if (url.protocol === "dubi:" && url.hostname === "reset-password") {
+      return url.searchParams.get("reset_token") || url.searchParams.get("token") || "";
+    }
+  } catch (error) {
+    const queryMatch = String(rawUrl).match(/[?&](?:reset_token|token)=([^&#]+)/);
+    if (queryMatch?.[1]) return decodeURIComponent(queryMatch[1]);
+  }
+
+  return "";
+};
 
 const calculateAgeFromBirthDate = (birthDate) => {
   if (!birthDate) return null;
@@ -23326,7 +23349,7 @@ const ResetPasswordScreen = ({ token, onComplete }) => {
 function DUBIApp() {
   const { lang } = useT();
   const { refreshSnapshot, clearSnapshot } = useWearable();
-  const [resetToken] = useState(() => new URLSearchParams(window.location.search).get("reset_token") || "");
+  const [resetToken, setResetToken] = useState(() => extractResetTokenFromUrl(window.location.href));
   const [phase,setPhase] = useState(() => resetToken ? "reset-password" : "checking");
   const [authStartMode, setAuthStartMode] = useState(null);
   const [authError, setAuthError] = useState("");
@@ -23338,6 +23361,35 @@ function DUBIApp() {
     try { return parseInt(localStorage.getItem("dubi_planning_day") ?? "0", 10); } catch(e) { return 0; }
   });
   // Tracking sessione + sezioni visitate (per il timing dell'invito ricerca)
+  useEffect(() => {
+    const openResetPassword = async (url) => {
+      const token = extractResetTokenFromUrl(url);
+      if (!token) return;
+
+      await clearAuthSession();
+      setResetToken(token);
+      setAuthStartMode("login");
+      setPhase("reset-password");
+
+      try {
+        window.history.replaceState({}, "", "/");
+      } catch (error) {}
+    };
+
+    openResetPassword(window.location.href);
+
+    let removeListener;
+    CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      openResetPassword(url);
+    }).then((listener) => {
+      removeListener = () => listener.remove();
+    }).catch(() => {});
+
+    return () => {
+      if (removeListener) removeListener();
+    };
+  }, []);
+
   React.useEffect(() => {
     try {
       const n = parseInt(localStorage.getItem("dubi_session_count") || "0", 10) + 1;
@@ -23385,7 +23437,8 @@ function DUBIApp() {
             const cache = await caches.open(name);
             const requests = await cache.keys();
             const sensitiveRequests = requests.filter(request => (
-              new URL(request.url).searchParams.has("reset_token")
+              new URL(request.url).searchParams.has("reset_token") ||
+              new URL(request.url).searchParams.has("token")
             ));
             return Promise.all(sensitiveRequests.map(request => cache.delete(request)));
           })))
