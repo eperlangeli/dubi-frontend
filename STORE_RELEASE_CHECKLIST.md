@@ -33,6 +33,7 @@ Google Play Console:
 - Pending: complete content rating questionnaire.
 - Pending: add privacy policy URL.
 - Pending: add store listing text and graphics.
+- Pending: for this personal developer account, complete Google closed testing with at least 12 opted-in testers for 14 consecutive days before requesting production access.
 
 Android store assets:
 
@@ -99,4 +100,8 @@ Do not submit public release until these are true:
 
 ## Working submission pack
 
-Use `GOOGLE_PLAY_SUBMISSION_PACK.md` for copy-ready Play Console text, Data safety notes, reviewer access notes, and asset tasks.
+Use `PLAY_CONSOLE_READY_PACK.md` for copy-ready Play Console text, Data safety notes, reviewer access notes, and asset tasks.
+
+Use `GOOGLE_PLAY_CLOSED_TEST_PLAN.md` to organize testers before production access.
+
+Use `APP_STORE_CONNECT_READY_PACK.md` for iOS/TestFlight copy and privacy answers.

@@ -172,4 +172,6 @@ Includes native Android shell, login persistence, onboarding, nutrition planning
 - Prepare screenshots from actual app UI.
 - Publish/update privacy policy with final contact details.
 - Complete Data safety, Health Apps declaration, App access, Ads, Content rating, and Target audience forms.
-- For a new personal developer account, plan closed testing with the required tester group before production access if Google requires it.
+- For this new personal developer account, plan closed testing with at least 12 opted-in testers for 14 consecutive days before requesting production access.
+
+For the latest copy-ready submission fields, use `PLAY_CONSOLE_READY_PACK.md`.
