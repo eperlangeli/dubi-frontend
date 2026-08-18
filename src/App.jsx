@@ -18443,6 +18443,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const consumptionPayloadSignature = JSON.stringify({date:todayDateKey, meals:consumptionMeals});
   const lastConsumptionPayloadRef = React.useRef("");
   const hasLoggedConsumptionRef = React.useRef(false);
+  const completedMealsCount = mealList.filter(meal => status[meal.id] === "done").length;
   React.useEffect(() => {
     if (consumptionPayloadSignature === lastConsumptionPayloadRef.current) return;
     const hasAnyConsumption = consumptionMeals.some(meal => meal.ingredients_consumed.length > 0);
@@ -18836,7 +18837,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
               {consumed.cal}
               <span style={{fontSize:13,fontWeight:400,color:T.muted,marginLeft:4}}>/ {plan.calories} kcal</span>
             </p>
-            <p style={{fontSize:11,color:T.muted,margin:"4px 0 0"}}>{t("today.mealsDone",{a:done.length,b:mealList.length})}</p>
+            <p style={{fontSize:11,color:T.muted,margin:"4px 0 0"}}>{t("today.mealsDone",{a:completedMealsCount,b:mealList.length})}</p>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
