@@ -18001,15 +18001,23 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
   const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
   const dailyAdaptation = plan?.dailyAdaptation || adaptationPlanMeta?.dailyAdaptation || adaptationPlanMeta?.daily_adaptation || null;
+  const todayDateKey = new Date().toISOString().slice(0,10);
 
   const todayMealStatusStorageKey = React.useMemo(() => {
     const userKey = userData?.dubiCode || getAuthEmail() || "guest";
-    const dateKey = new Date().toISOString().slice(0,10);
     const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.adaptationSignature || dailyAdaptation?.signature || plan?.calories || "plan";
-    return `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
-  }, [userData?.dubiCode, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.adaptationSignature, dailyAdaptation?.signature, plan?.calories]);
+    return `dubi_meal_status_${userKey}_${todayDateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
+  }, [userData?.dubiCode, todayDateKey, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.adaptationSignature, dailyAdaptation?.signature, plan?.calories]);
+  const todayIngredientStatusStorageKey = React.useMemo(() => {
+    const userKey = userData?.dubiCode || getAuthEmail() || "guest";
+    const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.adaptationSignature || dailyAdaptation?.signature || plan?.calories || "plan";
+    return `dubi_ing_checked_${userKey}_${todayDateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
+  }, [userData?.dubiCode, todayDateKey, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.adaptationSignature, dailyAdaptation?.signature, plan?.calories]);
   const [status,setStatus] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(todayMealStatusStorageKey) || "{}"); } catch(e) { return {}; }
+    try { return JSON.parse(safeLocalStorageGet(todayMealStatusStorageKey) || "{}"); } catch(e) { return {}; }
+  });
+  const [ingChecked,setIngChecked] = useState(() => {
+    try { return JSON.parse(safeLocalStorageGet(todayIngredientStatusStorageKey) || "{}"); } catch(e) { return {}; }
   });
   const [expanded,setExpanded] = useState(null);
   const [showWhy,setShowWhy] = useState({});
@@ -18023,15 +18031,26 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const [trainingMessage,setTrainingMessage] = useState("");
 
   React.useEffect(() => {
-    try { setStatus(JSON.parse(localStorage.getItem(todayMealStatusStorageKey) || "{}")); } catch(e) { setStatus({}); }
+    try { setStatus(JSON.parse(safeLocalStorageGet(todayMealStatusStorageKey) || "{}")); } catch(e) { setStatus({}); }
   }, [todayMealStatusStorageKey]);
 
   React.useEffect(() => {
     try {
-      localStorage.setItem(todayMealStatusStorageKey, JSON.stringify(status));
+      safeLocalStorageSet(todayMealStatusStorageKey, JSON.stringify(status));
       window.dispatchEvent(new CustomEvent("dubi-meal-status-change"));
     } catch(e) {}
   }, [todayMealStatusStorageKey, status]);
+
+  React.useEffect(() => {
+    try { setIngChecked(JSON.parse(safeLocalStorageGet(todayIngredientStatusStorageKey) || "{}")); } catch(e) { setIngChecked({}); }
+  }, [todayIngredientStatusStorageKey]);
+
+  React.useEffect(() => {
+    try {
+      safeLocalStorageSet(todayIngredientStatusStorageKey, JSON.stringify(ingChecked));
+      window.dispatchEvent(new CustomEvent("dubi-consumption-change"));
+    } catch(e) {}
+  }, [todayIngredientStatusStorageKey, ingChecked]);
 
   React.useEffect(() => {
     refreshSnapshot({ forceSync: true });
@@ -18331,6 +18350,114 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     c:   Math.round(Number(mx.c || 0)   * scaleC),
     f:   Math.round(Number(mx.f || 0)   * scaleF),
   });
+  const getConsumptionMealType = (mealId) => {
+    const id = String(mealId || "").toLowerCase();
+    if (id.includes("colazione") || id.includes("breakfast")) return "breakfast";
+    if (id.includes("pranzo") || id.includes("lunch")) return "lunch";
+    if (id.includes("cena") || id.includes("dinner")) return "dinner";
+    if (id.includes("pre_workout") || id.includes("pre-workout")) return "pre_workout";
+    if (id.includes("post_workout") || id.includes("post-workout")) return "post_workout";
+    return "snack";
+  };
+  const getDisplayMealItem = (mealId, item, index) => {
+    const swapKey = `${dayIdx}-${mealId}-${index}`;
+    return (swaps && swaps[swapKey]) ? swaps[swapKey] : item;
+  };
+  const getIngredientCheckKey = (mealId, item, index) => {
+    const display = splitIngredientDisplay(item);
+    const rawId = item?.ingredient_id || item?.id || item?.source_id || item?.food_id || display.full || display.name || index;
+    return `${mealId}:${index}:${String(rawId).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,64)}`;
+  };
+  const getIngredientPortionG = (item, display) => {
+    const direct = Number(item?.portion_g ?? item?.portionG ?? item?.grams ?? item?.quantity_g ?? item?.amount_g);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const parsed = String(display?.quantity || "").match(/(\d+(?:[,.]\d+)?)\s*g\b/i);
+    return parsed ? Number(parsed[1].replace(",",".")) : null;
+  };
+  const getIngredientConsumptionPayload = (mealId, item, index) => {
+    const display = splitIngredientDisplay(item);
+    const calories = Number(item?.calories || item?.cal || 0);
+    const protein = Number(item?.protein || item?.p || 0);
+    const carbs = Number(item?.carbs || item?.c || 0);
+    const fat = Number(item?.fats ?? item?.fat ?? item?.f ?? 0);
+    return {
+      ingredient_id: String(item?.ingredient_id || item?.id || item?.source_id || item?.food_id || `${mealId}-${index}`),
+      name: display.name || formatFoodText(item),
+      portion_g: getIngredientPortionG(item, display),
+      calories: Math.round(calories * scaleK),
+      protein: Math.round(protein * scaleP),
+      carbs: Math.round(carbs * scaleC),
+      fat: Math.round(fat * scaleF),
+    };
+  };
+  const setMealIngredientsChecked = (mealEntry, checked) => {
+    const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
+    setIngChecked(prev => {
+      const next = {...prev};
+      items.forEach((item, index) => {
+        const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+        const key = getIngredientCheckKey(mealEntry.id, displayItem, index);
+        if (checked) next[key] = true;
+        else delete next[key];
+      });
+      return next;
+    });
+  };
+  const consumptionMeals = mealList.map(mealEntry => {
+    const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
+    const ingredients = items.map((item, index) => {
+      const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+      const checkKey = getIngredientCheckKey(mealEntry.id, displayItem, index);
+      return ingChecked[checkKey]
+        ? getIngredientConsumptionPayload(mealEntry.id, displayItem, index)
+        : null;
+    }).filter(Boolean);
+    const total = ingredients.reduce((acc, item) => ({
+      calories: acc.calories + Number(item.calories || 0),
+      protein: acc.protein + Number(item.protein || 0),
+      carbs: acc.carbs + Number(item.carbs || 0),
+      fat: acc.fat + Number(item.fat || 0),
+    }), {calories:0, protein:0, carbs:0, fat:0});
+    return {
+      meal_type: getConsumptionMealType(mealEntry.id),
+      ingredients_consumed: ingredients,
+      total,
+    };
+  });
+  const consumptionPayloadSignature = JSON.stringify({date:todayDateKey, meals:consumptionMeals});
+  const lastConsumptionPayloadRef = React.useRef("");
+  const hasLoggedConsumptionRef = React.useRef(false);
+  React.useEffect(() => {
+    if (consumptionPayloadSignature === lastConsumptionPayloadRef.current) return;
+    const hasAnyConsumption = consumptionMeals.some(meal => meal.ingredients_consumed.length > 0);
+    if (!hasAnyConsumption && !hasLoggedConsumptionRef.current) {
+      lastConsumptionPayloadRef.current = consumptionPayloadSignature;
+      return;
+    }
+    const token = getAuthToken();
+    if (!token) return;
+    lastConsumptionPayloadRef.current = consumptionPayloadSignature;
+    const timer = setTimeout(() => {
+      Promise.all(consumptionMeals.map(meal => fetch(`${API_BASE_URL}/api/plan/consumption/log`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          date: todayDateKey,
+          meal_type: meal.meal_type,
+          ingredients_consumed: meal.ingredients_consumed,
+          total: meal.total,
+        }),
+      }))).then(() => {
+        hasLoggedConsumptionRef.current = hasAnyConsumption || hasLoggedConsumptionRef.current;
+      }).catch(error => {
+        console.warn("Daily consumption log failed:", error);
+      });
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [consumptionPayloadSignature, todayDateKey]);
   const getMealMacroAnomaly = (mx) => {
     if (!mx || !activeMealList.length) return null;
     const smx = scaleMx(mx);
@@ -18343,11 +18470,12 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     return checks.find(item => item.avg > 0 && (item.value > item.avg * 3 || item.value < item.avg / 3)) || null;
   };
 
-  const done = mealList.filter(m=>status[m.id]==="done");
-  const consumed = done.reduce((a,m)=>{
-    const mx = scaleMx(m.data.macros);
-    return {cal:a.cal+mx.cal, p:a.p+mx.p, f:a.f+mx.f, c:a.c+mx.c};
-  },{cal:0,p:0,f:0,c:0});
+  const consumed = consumptionMeals.reduce((a,m)=>({
+    cal: a.cal + Number(m.total.calories || 0),
+    p: a.p + Number(m.total.protein || 0),
+    f: a.f + Number(m.total.fat || 0),
+    c: a.c + Number(m.total.carbs || 0),
+  }),{cal:0,p:0,f:0,c:0});
   const today = new Date().toLocaleDateString((LANGUAGES.find(l=>l.code===lang)||LANGUAGES[0]).locale, {weekday:"long",day:"numeric",month:"long"});
   const latestWearable = wearableSnapshot?.latest || null;
   const wearableConnection = wearableSnapshot?.connection || null;
@@ -18832,14 +18960,15 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                   <div style={{borderTop:`1px solid ${T.border}`,paddingTop:12,marginBottom:14}}>
                     <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("today.ingredients")}</p>
                     {meal.items.map((item,i)=>{
-                      const _tSwapKey = `${dayIdx}-${mt.id}-${i}`;
-                      const _tDispItem = (swaps && swaps[_tSwapKey]) ? swaps[_tSwapKey] : item;
+                      const _tDispItem = getDisplayMealItem(mt.id, item, i);
                       const _tDisplay = splitIngredientDisplay(_tDispItem);
                       const _tName = _tDisplay.name;
                       const _tCalories = Number(_tDispItem?.calories || 0);
                       const _tProtein = Number(_tDispItem?.protein || 0);
                       const _tCarbs = Number(_tDispItem?.carbs || 0);
                       const _tFats = Number(_tDispItem?.fats ?? _tDispItem?.fat ?? 0);
+                      const _tCheckKey = getIngredientCheckKey(mt.id, _tDispItem, i);
+                      const _tChecked = Boolean(ingChecked[_tCheckKey]);
                       const _tMeta = [
                         _tDisplay.quantity,
                         _tCalories ? `${Math.round(_tCalories)} kcal` : "",
@@ -18847,13 +18976,17 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       ].filter(Boolean).join(" · ");
                       return (
                       <div key={i} onClick={()=>setIngModal(_tDispItem)}
-                        style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"6px 8px",borderRadius:10,cursor:"pointer",background:"transparent",border:`1px solid transparent`,transition:"all 0.15s"}}
+                        style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"6px 8px",borderRadius:10,cursor:"pointer",background:_tChecked?"rgba(107,138,100,0.08)":"transparent",border:`1px solid ${_tChecked?"rgba(107,138,100,0.24)":"transparent"}`,transition:"all 0.15s"}}
                         onMouseEnter={e=>{e.currentTarget.style.background=T.sel;e.currentTarget.style.borderColor=T.border;}}
-                        onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="transparent";}}>
-                        <div style={{width:5,height:5,borderRadius:"50%",background:T.accent,flexShrink:0}} />
+                        onMouseLeave={e=>{e.currentTarget.style.background=_tChecked?"rgba(107,138,100,0.08)":"transparent";e.currentTarget.style.borderColor=_tChecked?"rgba(107,138,100,0.24)":"transparent";}}>
+                        <button data-no-haptic="true" type="button" onClick={(e)=>{e.stopPropagation();dubiHaptic(_tChecked?"soft":"success");setIngChecked(prev=>{const next={...prev};if (_tChecked) delete next[_tCheckKey]; else next[_tCheckKey]=true;return next;});}}
+                          aria-label={_tChecked ? "Rimuovi ingrediente consumato" : "Segna ingrediente consumato"}
+                          style={{width:22,height:22,borderRadius:7,border:`1.5px solid ${_tChecked?T.accentD:T.border}`,background:_tChecked?T.accentD:T.bg,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0,cursor:"pointer",lineHeight:1}}>
+                          {_tChecked ? "✓" : ""}
+                        </button>
                         <div style={{flex:1,minWidth:0}}>
-                          <span style={{display:"block",fontSize:14,color:T.text}}>{capitalizeFirst(localizeFood(_tName, lang))}</span>
-                          {_tMeta && <span style={{display:"block",fontSize:10.5,color:T.muted,lineHeight:1.35,marginTop:2}}>{_tMeta}</span>}
+                          <span style={{display:"block",fontSize:14,color:_tChecked?T.muted:T.text,textDecoration:_tChecked?"line-through":"none"}}>{capitalizeFirst(localizeFood(_tName, lang))}</span>
+                          {_tMeta && <span style={{display:"block",fontSize:10.5,color:T.muted,lineHeight:1.35,marginTop:2,textDecoration:_tChecked?"line-through":"none"}}>{_tMeta}</span>}
                         </div>
                         <Ico n="chev" size={12} c={T.muted}/>
                       </div>
@@ -18898,7 +19031,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                     </div>
                   )}
                   <div style={{display:"flex",gap:8}}>
-                    <button data-no-haptic="true" onClick={()=>{dubiHaptic("success");setStatus(s=>({...s,[mt.id]:"done"}));setExpanded(null);}}
+                    <button data-no-haptic="true" onClick={()=>{dubiHaptic("success");setMealIngredientsChecked(mt, true);setStatus(s=>({...s,[mt.id]:"done"}));setExpanded(null);}}
                       style={{flex:1,padding:11,borderRadius:12,background:T.accentD,color:T.white,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                       <Ico n="check" size={16} c={T.bg}/> {t("today.done").replace(/^✓\s*/,"")}
                     </button>
@@ -18913,7 +19046,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       <textarea value={skipText[mt.id]||""} onChange={e=>setSkipText(s=>({...s,[mt.id]:e.target.value}))}
                         placeholder={t("today.skip.ph")}
                         style={{width:"100%",padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,fontSize:13,fontFamily:"inherit",resize:"none",minHeight:44,outline:"none",color:T.text}} />
-                      <button data-no-haptic="true" onClick={()=>{dubiHaptic("soft");setStatus(s=>({...s,[mt.id]:"skip"}));setExpanded(null);setShowSkipInput(null);}}
+                      <button data-no-haptic="true" onClick={()=>{dubiHaptic("soft");setMealIngredientsChecked(mt, false);setStatus(s=>({...s,[mt.id]:"skip"}));setExpanded(null);setShowSkipInput(null);}}
                         style={{width:"100%",marginTop:6,padding:10,borderRadius:10,background:T.card,border:`1px solid ${T.border}`,fontSize:13,color:T.text,cursor:"pointer"}}>
                         {t("today.skip.confirm")}
                       </button>
