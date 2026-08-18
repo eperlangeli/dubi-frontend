@@ -71,7 +71,7 @@ const DUBI_BETA_COPY = {
     mission:"Il founder e il team hanno costruito DUBI per aiutare le persone a ritrovare un rapporto piu consapevole con alimentazione e benessere. In un campo spesso affollato da informazioni confuse o contraddittorie, vogliamo offrire orientamento, educazione e strumenti concreti a chi desidera vivere meglio e a chi attraversa un momento di difficolta.",
     subtitle:"Per questo il servizio e il tuo piano personalizzato sono offerti gratuitamente: adattamenti, lista della spesa, progressi e wearable inclusi.",
     sportSourcesTitle:"Fonti sport integrate",
-    sportSourcesText:"Quando selezioni gli sport, DUBI usa linee guida su proteine, carboidrati, timing, recupero e integrazione sportiva.",
+    sportSourcesText:"Quando selezioni gli sport, DUBI usa linee guida su proteine, carboidrati, timing, recupero e nutrizione sportiva.",
     cta:"Entra nel mio piano gratuito", note:"Nessuna carta richiesta. Nessun abbonamento. Tutte le funzionalita della beta sono incluse.",
     settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Tutto incluso", settingsNote:"Piano completo gratuito per i primi utenti beta.",
     features:["Piano nutrizionale personalizzato","Adattamenti automatici sui tuoi dati","Lista della spesa e alternative","Progressi, trend e wearable"]
@@ -83,7 +83,7 @@ const DUBI_BETA_COPY = {
     mission:"The founder and the team built DUBI to help people develop a more informed relationship with nutrition and wellbeing. In a field often crowded with confusing or conflicting information, we want to offer guidance, education and practical tools to those who wish to live better and to those going through a difficult moment.",
     subtitle:"That is why the service and your personalized plan are offered free of charge: adaptations, shopping list, progress and wearables included.",
     sportSourcesTitle:"Sport sources integrated",
-    sportSourcesText:"When you select sports, DUBI uses guidance on protein, carbohydrates, timing, recovery and sports supplementation.",
+    sportSourcesText:"When you select sports, DUBI uses guidance on protein, carbohydrates, timing, recovery and sports nutrition guidance.",
     cta:"Open my free plan", note:"No card required. No subscription. All beta features are included.",
     settingsTitle:"FREE BETA", settingsPlan:"DUBI Beta · Everything included", settingsNote:"Full plan free for early beta users.",
     features:["Personalized nutrition plan","Automatic adaptations from your data","Shopping list and alternatives","Progress, trends and wearables"]
@@ -3083,7 +3083,7 @@ const TRANSLATIONS = {
   it: {
     // ── Welcome ──
     "welcome.tagline": "Data-Driven Understanding\ndi Body Intelligence",
-    "welcome.lead": "La prima dieta che <strong>si adatta da sola</strong>, in base ai dati reali del tuo corpo.",
+    "welcome.lead": "Orientamento nutrizionale evidence-based che <strong>si adatta ai tuoi dati</strong>, ogni giorno.",
     "welcome.start": "Inizia il percorso →",
     "welcome.start.short": "Inizia il percorso",
     "welcome.basis": "Basato su WHO · EFSA · Harvard · 40 studi peer-reviewed",
@@ -3552,12 +3552,12 @@ const TRANSLATIONS = {
 /* ─── EN ─── */
 TRANSLATIONS.en = {
   "welcome.tagline":"Data-Driven Understanding\nof Body Intelligence",
-  "welcome.lead":"The first diet that <strong>adapts itself</strong>, based on your body's real data.",
+  "welcome.lead":"Evidence-based nutrition guidance that <strong>adapts to your data</strong>, every day.",
   "welcome.start":"Start your journey →","welcome.start.short":"Start your journey",
   "welcome.basis":"Based on WHO · EFSA · Harvard · 40 peer-reviewed studies",
   "welcome.basis37":"Based on WHO · EFSA · Harvard · 40 peer-reviewed studies",
   "welcome.headline":"The diet that<br/><span style=\"color:#0F0F0F\">adapts itself.</span>",
-  "welcome.subhead":"Personalized nutrition plan based on your body's real data, wearable and goals.",
+  "welcome.subhead":"Evidence-based nutrition guidance, adapted to your body's real data, wearable and goals.",
   "welcome.lang":"Choose your language",
   "phys.name":"YOUR NAME","phys.name.ph":"Your name",
   "phys.male.short":"Male","phys.female.short":"Female",
@@ -15119,6 +15119,22 @@ const WelcomeTermsScreen = ({ onAccept }) => {
           {c.mid3}<span onClick={()=>setPrivacyOpen(true)} style={linkStyle}>{c.privacyLink}</span>
           {c.post}
         </p>
+        <div style={{background:T.sel,borderRadius:12,padding:"12px 14px",marginBottom:16,border:`1px solid ${T.border}`}}>
+          <p style={{fontSize:12,color:T.muted,textAlign:"center",lineHeight:1.6,margin:0}}>
+            {({
+              it:"⚕️ DUBI è uno strumento educativo. Non sostituisce un medico, dietista o nutrizionista.",
+              en:"⚕️ DUBI is an educational tool. It does not replace a doctor, dietitian or nutritionist.",
+              fr:"⚕️ DUBI est un outil éducatif. Il ne remplace pas un médecin, diététicien ou nutritionniste.",
+              es:"⚕️ DUBI es una herramienta educativa. No sustituye a un médico, dietista o nutricionista.",
+              de:"⚕️ DUBI ist ein Bildungswerkzeug. Es ersetzt keinen Arzt, Ernährungsberater oder Ernährungswissenschaftler.",
+              pt:"⚕️ DUBI é uma ferramenta educativa. Não substitui um médico, dietista ou nutricionista.",
+              zh:"⚕️ DUBI 是一款教育工具，不能替代医生、营养师或营养学家。",
+              ja:"⚕️ DUBIは教育ツールです。医師、栄養士、栄養専門家の代わりにはなりません。",
+              ru:"⚕️ DUBI — образовательный инструмент. Он не заменяет врача, диетолога или нутрициолога.",
+              ar:"⚕️ DUBI أداة تعليمية. لا تُغني عن الطبيب أو أخصائي التغذية.",
+            })[lang] || "⚕️ DUBI is an educational tool. It does not replace a doctor, dietitian or nutritionist."}
+          </p>
+        </div>
         <button
           onClick={()=>{
             localStorage.setItem("dubi_terms_accepted","1");
