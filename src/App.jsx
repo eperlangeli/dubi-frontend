@@ -6,6 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
+import { getMealDisplayModel } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -1059,7 +1060,7 @@ const ingredientMealsToArray = (plan = {}) => {
 };
 
 const normalizeIngredientItemForUi = (item = {}) => {
-  const grams = Number(item.portionG ?? item.grams ?? item.quantity ?? 0);
+  const grams = Number(item.portionG ?? item.portion_g ?? item.quantity_g ?? item.grams ?? item.quantity ?? 0);
   const fatValue = Number(item.fat ?? item.fats ?? 0);
   const name = item.name || item.display_name || item.displayName || item.source_food_name || item.label || "Ingrediente";
   return {
@@ -1077,18 +1078,27 @@ const normalizeIngredientItemForUi = (item = {}) => {
   };
 };
 
-const mapIngredientMealToUi = (meal, index, times) => {
+const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => {
   const mealType = meal.mealType || meal.meal_type || meal.type || `meal_${index}`;
   const meta = INGREDIENT_MEAL_META[mealType] || { id:mealType, label:meal.displayName?.it || mealType, icon:"fork" };
   const macros = meal.totalMacros || meal.macros || {};
   const ingredients = (meal.ingredients || []).map(normalizeIngredientItemForUi);
   const sourceIds = [...new Set(ingredients.map(i => i.source_id).filter(Boolean))];
   const sourceText = sourceIds.length ? `Fonti dati: ${sourceIds.join(", ")}` : "Fonti dati nutrizionali ufficiali DUBI.";
+  const engineVersion = meal.engine_version || meal.engineVersion || planEngineVersion || null;
+  const recipeName = meal.recipe_name || meal.recipeName || meal.name || null;
+  const authoringKey = meal.authoring_key || meal.authoringKey || null;
 
   return {
     ...meta,
     time: times[index] || "--:--",
     data: {
+      engineVersion,
+      engine_version: engineVersion,
+      recipeName,
+      recipe_name: recipeName,
+      authoringKey,
+      authoring_key: authoringKey,
       items: ingredients,
       alts: [],
       macros: {
@@ -1112,7 +1122,7 @@ const mapIngredientMealToUi = (meal, index, times) => {
 const getIngredientMealListForDay = (plan, times = []) => {
   const ingredientPlan = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
   if (!ingredientPlan?.meals) return null;
-  return ingredientMealsToArray(ingredientPlan).map((meal, index) => mapIngredientMealToUi(meal, index, times));
+  return ingredientMealsToArray(ingredientPlan).map((meal, index) => mapIngredientMealToUi(meal, index, times, ingredientPlan.engine_version || ingredientPlan.engineVersion || null));
 };
 
 const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
@@ -18907,6 +18917,8 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
           const meal = mt.data;
           const mealMacros = scaleMx(meal.macros);
           const macroAnomaly = getMealMacroAnomaly(meal.macros);
+          const fallbackMealLabel = mt.labelKey ? t(mt.labelKey) : (mt.label || t("meal."+mt.id));
+          const mealDisplay = getMealDisplayModel({ entry: mt, meal, fallbackLabel: fallbackMealLabel });
           return (
             <div key={mt.id} style={{marginBottom:10,background:st==="done"?T.sel:mt.isExtra?"rgba(107,138,100,0.07)":T.card,border:`1.5px solid ${mt.adaptSkipped?"#9A8FBF":mt.isExtra?T.accentD:st==="done"?T.accent:T.border}`,borderRadius:18,overflow:"hidden",opacity:st==="skip"?0.5:1,transition:"opacity 0.2s"}}>
               <button onClick={()=>setExpanded(isOpen?null:mt.id)}
@@ -18916,7 +18928,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                 </div>
                 <div style={{flex:1,textAlign:"left"}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:15,fontWeight:600,color:T.text}}>{mt.labelKey ? t(mt.labelKey) : (mt.label || t("meal."+mt.id))}</span>
+                    <span style={{fontSize:15,fontWeight:600,color:T.text}}>{mealDisplay.title}</span>
                     {mt.isExtra && (
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
                         background:"rgba(107,138,100,0.22)",color:T.accentD}}>
@@ -18942,7 +18954,9 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       </span>
                     )}
                   </div>
-                  <div style={{fontSize:12,color:T.muted}}>{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot</div>
+                  <div style={{fontSize:12,color:T.muted}}>
+                    {mealDisplay.subtitle ? `${mealDisplay.subtitle} · ` : ""}{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot
+                  </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   {st==="done"&&<div style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:999,background:T.accentD,color:T.white,fontSize:11,fontWeight:800,whiteSpace:"nowrap"}}><Ico n="check" size={11} c={T.white}/> {t("meal.eaten")}</div>}
@@ -19311,7 +19325,10 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
 
       {/* Meals con swap */}
       <div style={{padding:"0 24px"}}>
-        {adjustedMealEntries.map(({id:mKey,label,icon,time,meal,workoutLabel,carbTargetPct})=>(
+        {adjustedMealEntries.map((entry)=>{
+          const {id:mKey,label,icon,time,meal,workoutLabel,carbTargetPct} = entry;
+          const mealDisplay = getMealDisplayModel({ entry, meal, fallbackLabel: label });
+          return (
           <div key={mKey} style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${workoutLabel?T.accent:T.border}`,borderRadius:16}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,alignItems:"center"}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
@@ -19320,7 +19337,7 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
                 </div>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-                    <span style={{fontSize:14,fontWeight:600,color:T.text}}>{label}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:T.text}}>{mealDisplay.title}</span>
                     {workoutLabel && (
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
                         background:workoutLabel==="PRE"?"rgba(201,168,124,0.2)":"rgba(107,138,100,0.2)",
@@ -19330,7 +19347,7 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
                     )}
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                    <span style={{fontSize:12,color:T.muted}}>{time}</span>
+                    <span style={{fontSize:12,color:T.muted}}>{mealDisplay.subtitle ? `${mealDisplay.subtitle} · ` : ""}{time}</span>
                     {carbTargetPct && (
                       <span style={{fontSize:11,color:"#B8893A",fontWeight:600}}>{carbTargetPct}</span>
                     )}
@@ -19394,7 +19411,8 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
       {ingModal && <IngredientModal ingredient={ingModal} onClose={()=>setIngModal(null)}/>}
     </div>
