@@ -235,6 +235,38 @@ assert.equal(shouldFetchWeeklyPlanForDate({
   loadingPlanDates: failureLoading,
 }), false);
 
+const productionTopLevelResponse = {
+  date: "2026-09-15",
+  engine_version: "recipe_engine_v1",
+  generation_status: "SUCCESS",
+  meals: [
+    { meal_type: "breakfast", recipe_name: "Breakfast real V16", authoring_key: "v16_breakfast", ingredients: [{ name: "Breakfast component", quantity_g: 80 }] },
+    { meal_type: "lunch", recipe_name: "Lunch real V16", authoring_key: "v16_lunch", ingredients: [{ name: "Lunch component", quantity_g: 120 }] },
+    { meal_type: "snack", recipe_name: "Snack real V16", authoring_key: "v16_snack", ingredients: [{ name: "Snack component", quantity_g: 60 }] },
+    { meal_type: "dinner", recipe_name: "Dinner real V16", authoring_key: "v16_dinner", ingredients: [{ name: "Dinner component", quantity_g: 140 }] },
+  ],
+};
+const productionPlanCache = cacheWeeklyPlanFetchResult({}, "2026-09-15", {
+  planDate: "2026-09-15",
+  ingredientPlanDate: "2026-09-15",
+  ingredientPlan: productionTopLevelResponse,
+});
+const productionSelectedPlan = selectWeeklyPlanForDate({
+  weeklyPlans: productionPlanCache,
+  selectedDate: "2026-09-15",
+  currentPlan: staleLegacyCurrentPlan,
+  todayDate: "2026-09-14",
+});
+assert.equal(productionSelectedPlan.planDate, "2026-09-15");
+assert.equal(productionSelectedPlan.ingredientPlan, productionTopLevelResponse);
+assert.deepEqual(
+  productionSelectedPlan.ingredientPlan.meals.map((meal) => meal.meal_type),
+  ["breakfast", "lunch", "snack", "dinner"]
+);
+assert.equal(productionSelectedPlan.ingredientPlan.meals[1].recipe_name, "Lunch real V16");
+assert.equal(productionSelectedPlan.ingredientPlan.meals[1].ingredients[0].name, "Lunch component");
+assert.notDeepEqual(productionSelectedPlan, staleLegacyCurrentPlan);
+
 const missingFuturePlan = selectWeeklyPlanForDate({
   weeklyPlans: [],
   selectedDate: "2026-09-17",

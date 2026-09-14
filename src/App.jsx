@@ -10581,16 +10581,8 @@ const AI_SLOT_IDS = {
 };
 
 function getAiMealListForDay(plan, dayIdx, slots, times) {
-  // FIX sync piano settimanale ↔ lista spesa: il piano-ingredienti del backend
-  // è generato per OGGI — usarlo per tutti i giorni replicava il giorno corrente
-  // 7 volte, disallineando la settimana dalla spesa (che aggrega i 7 giorni AI).
-  // Ora: oggi → piano-ingredienti reale; altri giorni → struttura settimanale AI
-  // (la stessa fonte da cui nasce la lista della spesa).
-  const todayIdx = (new Date().getDay()+6)%7;
-  if (dayIdx === todayIdx) {
-    const ingredientMealList = getIngredientMealListForDay(plan, times);
-    if (ingredientMealList?.length) return ingredientMealList;
-  }
+  const ingredientMealList = getIngredientMealListForDay(plan, times);
+  if (ingredientMealList?.length) return ingredientMealList;
 
   const aiDay = plan?.aiEnginePlan?.mealStructure?.days?.[dayIdx];
   if (!aiDay?.meals?.length) return null;
