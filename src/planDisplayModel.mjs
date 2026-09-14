@@ -37,6 +37,13 @@ export function getMealDisplayModel({ entry, meal, fallbackLabel }) {
 }
 
 export function selectWeeklyPlanForDate({ weeklyPlans = [], selectedDate, currentPlan = null, todayDate = null }) {
+  if (weeklyPlans && !Array.isArray(weeklyPlans) && typeof weeklyPlans === "object") {
+    const byDate = weeklyPlans[selectedDate];
+    if (byDate) return byDate;
+    if (selectedDate && todayDate && selectedDate === todayDate) return currentPlan;
+    return null;
+  }
+
   const plans = Array.isArray(weeklyPlans) ? weeklyPlans.filter(Boolean) : [];
   const byDate = plans.find((candidate) => {
     const candidateDate =
@@ -53,4 +60,36 @@ export function selectWeeklyPlanForDate({ weeklyPlans = [], selectedDate, curren
   if (byDate) return byDate;
   if (selectedDate && todayDate && selectedDate === todayDate) return currentPlan;
   return null;
+}
+
+export function getWeeklyPlanDate(plan) {
+  return (
+    plan?.planDate ||
+    plan?.plan_date ||
+    plan?.date ||
+    plan?.ingredientPlanDate ||
+    plan?.ingredientPlan?.date ||
+    plan?.ingredientPlan?.plan_date ||
+    null
+  );
+}
+
+export function buildWeeklyPlanCache(weeklyPlans = [], currentPlan = null, todayDate = null) {
+  const cache = {};
+  if (Array.isArray(weeklyPlans)) {
+    weeklyPlans.filter(Boolean).forEach((plan) => {
+      const date = getWeeklyPlanDate(plan);
+      if (date) cache[date] = plan;
+    });
+  }
+  if (currentPlan && todayDate && !cache[todayDate]) {
+    cache[todayDate] = currentPlan;
+  }
+  return cache;
+}
+
+export function shouldFetchWeeklyPlanForDate({ weeklyPlanCache = {}, selectedDate, selectedPlan = null, loadingPlanDates = {} }) {
+  if (!selectedDate || selectedPlan) return false;
+  if (Object.prototype.hasOwnProperty.call(weeklyPlanCache || {}, selectedDate)) return false;
+  return !Boolean(loadingPlanDates?.[selectedDate]);
 }

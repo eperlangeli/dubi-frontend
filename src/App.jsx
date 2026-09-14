@@ -6,7 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import { getMealDisplayModel, selectWeeklyPlanForDate } from "./planDisplayModel.mjs";
+import { buildWeeklyPlanCache, getMealDisplayModel, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -19128,6 +19128,8 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
   const [swapNotif,setSwapNotif] = useState(null); // {from, to}
   const [shoppingPrompt,setShoppingPrompt] = useState(null);
   const [ingModal,setIngModal] = useState(null);
+  const [weeklyPlanCache,setWeeklyPlanCache] = useState({});
+  const [loadingPlanDates,setLoadingPlanDates] = useState({});
 
   // ── Banner stagionale — visibile ad ogni accesso, svanisce dopo 30s ──
   const [showSeasonBanner, setShowSeasonBanner] = useState(true);
@@ -19154,13 +19156,67 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
   const days = [0,1,2,3,4,5,6].map(i=>t("days.short."+i));
   const weekDates = getCurrentWeekIsoDates();
   const selectedDate = weekDates[selDay] || getTodayIsoDate();
+  const todayDate = getTodayIsoDate();
+
+  React.useEffect(() => {
+    const incomingCache = buildWeeklyPlanCache(weeklyPlans, plan, todayDate);
+    if (!Object.keys(incomingCache).length) return;
+    setWeeklyPlanCache(previous => ({...previous, ...incomingCache}));
+  }, [weeklyPlans, plan, todayDate]);
 
   const selectedPlan = selectWeeklyPlanForDate({
-    weeklyPlans,
+    weeklyPlans: weeklyPlanCache,
     selectedDate,
     currentPlan: plan,
-    todayDate: getTodayIsoDate()
+    todayDate
   });
+  const selectedDateLoading = Boolean(loadingPlanDates[selectedDate]);
+
+  React.useEffect(() => {
+    if (!shouldFetchWeeklyPlanForDate({
+      weeklyPlanCache,
+      selectedDate,
+      selectedPlan,
+      loadingPlanDates
+    })) return undefined;
+    let cancelled = false;
+    setLoadingPlanDates(previous => ({...previous, [selectedDate]: true}));
+
+    fetchIngredientPlanForDate(selectedDate)
+      .then((ingredientPlan) => {
+        if (cancelled) return;
+        setWeeklyPlanCache(previous => {
+          const next = {...previous};
+          if (ingredientPlan) {
+            const mappedPlan = mapIngredientPlanToFrontend(ingredientPlan, userData);
+            mappedPlan.planDate = selectedDate;
+            mappedPlan.ingredientPlanDate = selectedDate;
+            next[selectedDate] = mappedPlan;
+          } else {
+            next[selectedDate] = null;
+          }
+          return next;
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("Selected weekly plan load failed:", selectedDate, error?.message || error);
+          setWeeklyPlanCache(previous => ({...previous, [selectedDate]: null}));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingPlanDates(previous => {
+            const next = {...previous};
+            delete next[selectedDate];
+            return next;
+          });
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedDate, selectedPlan, weeklyPlanCache, loadingPlanDates, userData]);
+
   const displayPlan = selectedPlan || plan;
   const mealEntries = selectedPlan
     ? getVisibleMealEntriesForDay({ userData, plan: selectedPlan, dayIndex: selDay })
@@ -19344,6 +19400,11 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
 
       {/* Meals con swap */}
       <div style={{padding:"0 24px"}}>
+        {selectedDateLoading && (
+          <div style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${T.border}`,borderRadius:16,color:T.muted,fontSize:13}}>
+            Caricamento piano...
+          </div>
+        )}
         {adjustedMealEntries.map((entry)=>{
           const {id:mKey,label,icon,time,meal,workoutLabel,carbTargetPct} = entry;
           const mealDisplay = getMealDisplayModel({ entry, meal, fallbackLabel: label });

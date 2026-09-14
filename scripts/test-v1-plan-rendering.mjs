@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { getMealDisplayModel, selectWeeklyPlanForDate } from "../src/planDisplayModel.mjs";
+import {
+  buildWeeklyPlanCache,
+  getMealDisplayModel,
+  selectWeeklyPlanForDate,
+  shouldFetchWeeklyPlanForDate,
+} from "../src/planDisplayModel.mjs";
 
 const slotCases = [
   ["breakfast", "Colazione"],
@@ -90,6 +95,26 @@ const staleLegacyCurrentPlan = {
     },
   },
 };
+const initialCache = buildWeeklyPlanCache([weeklyPlans[0]], staleLegacyCurrentPlan, "2026-09-14");
+assert.equal(initialCache["2026-09-14"].planDate, "2026-09-14");
+assert.equal(shouldFetchWeeklyPlanForDate({
+  weeklyPlanCache: initialCache,
+  selectedDate: "2026-09-14",
+  selectedPlan: initialCache["2026-09-14"],
+  loadingPlanDates: {},
+}), false);
+assert.equal(shouldFetchWeeklyPlanForDate({
+  weeklyPlanCache: initialCache,
+  selectedDate: "2026-09-17",
+  selectedPlan: null,
+  loadingPlanDates: {},
+}), true);
+assert.equal(shouldFetchWeeklyPlanForDate({
+  weeklyPlanCache: initialCache,
+  selectedDate: "2026-09-17",
+  selectedPlan: null,
+  loadingPlanDates: {"2026-09-17": true},
+}), false);
 
 const thursdayPlan = selectWeeklyPlanForDate({
   weeklyPlans,
@@ -102,6 +127,14 @@ assert.equal(thursdayPlan.ingredientPlan.meals[0].recipe_name, "Thursday V16 rec
 assert.equal(thursdayPlan.ingredientPlan.meals[0].ingredients[0].name, "Thursday component");
 assert.notDeepEqual(thursdayPlan, staleLegacyCurrentPlan);
 
+const fetchedCache = {...initialCache, "2026-09-17": thursdayPlan};
+assert.equal(shouldFetchWeeklyPlanForDate({
+  weeklyPlanCache: fetchedCache,
+  selectedDate: "2026-09-17",
+  selectedPlan: thursdayPlan,
+  loadingPlanDates: {},
+}), false);
+
 const fridayPlan = selectWeeklyPlanForDate({
   weeklyPlans,
   selectedDate: "2026-09-18",
@@ -112,6 +145,21 @@ assert.equal(fridayPlan.planDate, "2026-09-18");
 assert.equal(fridayPlan.ingredientPlan.meals[0].recipe_name, "Friday V16 recipe");
 assert.equal(fridayPlan.ingredientPlan.meals[0].ingredients[0].name, "Friday component");
 assert.notEqual(fridayPlan.ingredientPlan.meals[0].recipe_name, thursdayPlan.ingredientPlan.meals[0].recipe_name);
+assert.equal(shouldFetchWeeklyPlanForDate({
+  weeklyPlanCache: fetchedCache,
+  selectedDate: "2026-09-18",
+  selectedPlan: null,
+  loadingPlanDates: {},
+}), true);
+
+const refetchedThursday = selectWeeklyPlanForDate({
+  weeklyPlans: fetchedCache,
+  selectedDate: "2026-09-17",
+  currentPlan: staleLegacyCurrentPlan,
+  todayDate: "2026-09-14",
+});
+assert.equal(refetchedThursday.ingredientPlan.meals[0].recipe_name, "Thursday V16 recipe");
+assert.equal(refetchedThursday.ingredientPlan.meals[0].ingredients[0].name, "Thursday component");
 
 const missingFuturePlan = selectWeeklyPlanForDate({
   weeklyPlans: [],
