@@ -28,8 +28,9 @@ export function getMealDisplayModel({ entry, meal, fallbackLabel }) {
 
   return {
     isV1,
-    title: isV1 ? recipeName : slotLabel,
-    subtitle: isV1 ? slotLabel : "",
+    title: slotLabel,
+    subtitle: "",
+    dishName: isV1 ? recipeName : "",
     authoringKey: authoringKey || null,
     recipeName: recipeName || null,
   };

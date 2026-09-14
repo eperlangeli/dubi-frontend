@@ -18954,9 +18954,12 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       </span>
                     )}
                   </div>
-                  <div style={{fontSize:12,color:T.muted}}>
-                    {mealDisplay.subtitle ? `${mealDisplay.subtitle} · ` : ""}{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot
-                  </div>
+                  <div style={{fontSize:12,color:T.muted}}>{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot</div>
+                  {mealDisplay.dishName && (
+                    <div style={{fontSize:12,color:T.text,marginTop:3,lineHeight:1.35,fontWeight:500}}>
+                      {mealDisplay.dishName}
+                    </div>
+                  )}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   {st==="done"&&<div style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:999,background:T.accentD,color:T.white,fontSize:11,fontWeight:800,whiteSpace:"nowrap"}}><Ico n="check" size={11} c={T.white}/> {t("meal.eaten")}</div>}
@@ -19347,11 +19350,16 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
                     )}
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                    <span style={{fontSize:12,color:T.muted}}>{mealDisplay.subtitle ? `${mealDisplay.subtitle} · ` : ""}{time}</span>
+                    <span style={{fontSize:12,color:T.muted}}>{time}</span>
                     {carbTargetPct && (
                       <span style={{fontSize:11,color:"#B8893A",fontWeight:600}}>{carbTargetPct}</span>
                     )}
                   </div>
+                  {mealDisplay.dishName && (
+                    <div style={{fontSize:12,color:T.text,marginTop:4,lineHeight:1.35,fontWeight:500}}>
+                      {mealDisplay.dishName}
+                    </div>
+                  )}
                 </div>
               </div>
               <span style={{fontSize:12,color:T.muted,flexShrink:0}}>{wScaleMx(meal.macros).cal} kcal</span>
