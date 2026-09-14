@@ -94,6 +94,10 @@ export function shouldFetchWeeklyPlanForDate({ weeklyPlanCache = {}, selectedDat
   return !Boolean(loadingPlanDates?.[selectedDate]);
 }
 
+export function getWeeklyPlanFetchDate(args) {
+  return shouldFetchWeeklyPlanForDate(args) ? args.selectedDate : null;
+}
+
 export function cacheWeeklyPlanFetchResult(weeklyPlanCache = {}, selectedDate, plan) {
   return {
     ...(weeklyPlanCache || {}),

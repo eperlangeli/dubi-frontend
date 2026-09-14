@@ -6,7 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
+import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -19171,6 +19171,49 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
     todayDate
   });
   const selectedDateLoading = Boolean(loadingPlanDates[selectedDate]);
+  const loadWeeklyPlanForDate = useCallback((date) => {
+    if (!date) return;
+    const fetchDate = getWeeklyPlanFetchDate({
+      weeklyPlanCache,
+      selectedDate: date,
+      selectedPlan: selectWeeklyPlanForDate({
+        weeklyPlans: weeklyPlanCache,
+        selectedDate: date,
+        currentPlan: plan,
+        todayDate
+      }),
+      loadingPlanDates
+    });
+    if (!fetchDate) return;
+
+    setLoadingPlanDates(previous => ({...previous, [fetchDate]: true}));
+
+    fetchIngredientPlanForDate(fetchDate)
+      .then((ingredientPlan) => {
+        setWeeklyPlanCache(previous => {
+          if (ingredientPlan) {
+            const mappedPlan = mapIngredientPlanToFrontend(ingredientPlan, userData);
+            mappedPlan.planDate = fetchDate;
+            mappedPlan.ingredientPlanDate = fetchDate;
+            return cacheWeeklyPlanFetchResult(previous, fetchDate, mappedPlan);
+          }
+          return cacheWeeklyPlanFetchResult(previous, fetchDate, null);
+        });
+      })
+      .catch((error) => {
+        console.warn("Selected weekly plan load failed:", fetchDate, error?.message || error);
+        setWeeklyPlanCache(previous => cacheWeeklyPlanFetchResult(previous, fetchDate, null));
+      })
+      .finally(() => {
+        setLoadingPlanDates(previous => finishWeeklyPlanLoading(previous, fetchDate));
+      });
+  }, [weeklyPlanCache, plan, todayDate, loadingPlanDates, userData]);
+
+  const handleSelectWeeklyDay = useCallback((index) => {
+    const date = weekDates[index] || getTodayIsoDate();
+    setSelDay(index);
+    loadWeeklyPlanForDate(date);
+  }, [weekDates, loadWeeklyPlanForDate]);
 
   React.useEffect(() => {
     if (!shouldFetchWeeklyPlanForDate({
@@ -19373,7 +19416,7 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
         {days.map((d,i)=>{
           const date=parseIsoDateLocal(weekDates[i]);
           return (
-            <button key={d} onClick={()=>setSelDay(i)}
+            <button key={d} onClick={()=>handleSelectWeeklyDay(i)}
               style={{minWidth:46,padding:"8px 4px",borderRadius:14,background:selDay===i?T.text:(i===todayIdx?T.sel:T.card),border:`1px solid ${selDay===i?T.text:T.border}`,cursor:"pointer",textAlign:"center"}}>
               <div style={{fontSize:10,color:selDay===i?"#AAA":T.muted,marginBottom:3}}>{d}</div>
               <div style={{fontSize:15,fontWeight:600,color:selDay===i?T.bg:T.text}}>{date.getDate()}</div>

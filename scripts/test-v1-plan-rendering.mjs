@@ -4,6 +4,7 @@ import {
   cacheWeeklyPlanFetchResult,
   finishWeeklyPlanLoading,
   getMealDisplayModel,
+  getWeeklyPlanFetchDate,
   selectWeeklyPlanForDate,
   shouldFetchWeeklyPlanForDate,
 } from "../src/planDisplayModel.mjs";
@@ -111,12 +112,24 @@ assert.equal(shouldFetchWeeklyPlanForDate({
   selectedPlan: null,
   loadingPlanDates: {},
 }), true);
+assert.equal(getWeeklyPlanFetchDate({
+  weeklyPlanCache: initialCache,
+  selectedDate: "2026-09-17",
+  selectedPlan: null,
+  loadingPlanDates: {},
+}), "2026-09-17");
 assert.equal(shouldFetchWeeklyPlanForDate({
   weeklyPlanCache: initialCache,
   selectedDate: "2026-09-17",
   selectedPlan: null,
   loadingPlanDates: {"2026-09-17": true},
 }), false);
+assert.equal(getWeeklyPlanFetchDate({
+  weeklyPlanCache: initialCache,
+  selectedDate: "2026-09-17",
+  selectedPlan: null,
+  loadingPlanDates: {"2026-09-17": true},
+}), null);
 
 const thursdayPlan = selectWeeklyPlanForDate({
   weeklyPlans,
@@ -140,6 +153,12 @@ assert.equal(shouldFetchWeeklyPlanForDate({
   selectedPlan: thursdayPlan,
   loadingPlanDates: {},
 }), false);
+assert.equal(getWeeklyPlanFetchDate({
+  weeklyPlanCache: fetchedCache,
+  selectedDate: "2026-09-17",
+  selectedPlan: thursdayPlan,
+  loadingPlanDates: {},
+}), null);
 
 const fridayPlan = selectWeeklyPlanForDate({
   weeklyPlans,
@@ -157,6 +176,43 @@ assert.equal(shouldFetchWeeklyPlanForDate({
   selectedPlan: null,
   loadingPlanDates: {},
 }), true);
+assert.equal(getWeeklyPlanFetchDate({
+  weeklyPlanCache: fetchedCache,
+  selectedDate: "2026-09-18",
+  selectedPlan: null,
+  loadingPlanDates: {},
+}), "2026-09-18");
+
+const clickFetches = [];
+let clickCache = {...initialCache};
+for (const selectedDate of ["2026-09-15", "2026-09-16", "2026-09-18"]) {
+  const selectedPlan = selectWeeklyPlanForDate({
+    weeklyPlans: clickCache,
+    selectedDate,
+    currentPlan: staleLegacyCurrentPlan,
+    todayDate: "2026-09-14",
+  });
+  const fetchDate = getWeeklyPlanFetchDate({
+    weeklyPlanCache: clickCache,
+    selectedDate,
+    selectedPlan,
+    loadingPlanDates: {},
+  });
+  clickFetches.push(fetchDate);
+  clickCache = cacheWeeklyPlanFetchResult(clickCache, selectedDate, makeV1Plan(selectedDate, `${selectedDate} V16 recipe`, `${selectedDate} component`));
+}
+assert.deepEqual(clickFetches, ["2026-09-15", "2026-09-16", "2026-09-18"]);
+assert.equal(getWeeklyPlanFetchDate({
+  weeklyPlanCache: clickCache,
+  selectedDate: "2026-09-16",
+  selectedPlan: selectWeeklyPlanForDate({
+    weeklyPlans: clickCache,
+    selectedDate: "2026-09-16",
+    currentPlan: staleLegacyCurrentPlan,
+    todayDate: "2026-09-14",
+  }),
+  loadingPlanDates: {},
+}), null);
 
 const refetchedThursday = selectWeeklyPlanForDate({
   weeklyPlans: fetchedCache,
