@@ -35,3 +35,22 @@ export function getMealDisplayModel({ entry, meal, fallbackLabel }) {
     recipeName: recipeName || null,
   };
 }
+
+export function selectWeeklyPlanForDate({ weeklyPlans = [], selectedDate, currentPlan = null, todayDate = null }) {
+  const plans = Array.isArray(weeklyPlans) ? weeklyPlans.filter(Boolean) : [];
+  const byDate = plans.find((candidate) => {
+    const candidateDate =
+      candidate?.planDate ||
+      candidate?.plan_date ||
+      candidate?.date ||
+      candidate?.ingredientPlanDate ||
+      candidate?.ingredientPlan?.date ||
+      candidate?.ingredientPlan?.plan_date ||
+      null;
+    return candidateDate === selectedDate;
+  });
+
+  if (byDate) return byDate;
+  if (selectedDate && todayDate && selectedDate === todayDate) return currentPlan;
+  return null;
+}

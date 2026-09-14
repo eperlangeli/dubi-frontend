@@ -6,7 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import { getMealDisplayModel } from "./planDisplayModel.mjs";
+import { getMealDisplayModel, selectWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -1546,7 +1546,14 @@ const fetchWeeklyIngredientPlansFromBackend = async (userData, baseDate = getTod
   for (const date of dates) {
     try {
       const ingredientPlan = await fetchIngredientPlanForDate(date, { generateIfMissing: true });
-      plans.push(ingredientPlan ? mapIngredientPlanToFrontend(ingredientPlan, userData) : null);
+      if (ingredientPlan) {
+        const mappedPlan = mapIngredientPlanToFrontend(ingredientPlan, userData);
+        mappedPlan.planDate = date;
+        mappedPlan.ingredientPlanDate = date;
+        plans.push(mappedPlan);
+      } else {
+        plans.push(null);
+      }
     } catch (error) {
       console.warn("Weekly ingredient plan load failed:", date, error?.message || error);
       plans.push(null);
@@ -19145,10 +19152,19 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
   const _sb = _seasonBannerText[lang] || _seasonBannerText.it;
   const _monthName = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"][new Date().getMonth()];
   const days = [0,1,2,3,4,5,6].map(i=>t("days.short."+i));
+  const weekDates = getCurrentWeekIsoDates();
+  const selectedDate = weekDates[selDay] || getTodayIsoDate();
 
-  const selectedPlan = weeklyPlans?.[selDay] || plan;
+  const selectedPlan = selectWeeklyPlanForDate({
+    weeklyPlans,
+    selectedDate,
+    currentPlan: plan,
+    todayDate: getTodayIsoDate()
+  });
   const displayPlan = selectedPlan || plan;
-  const mealEntries = getVisibleMealEntriesForDay({ userData, plan: selectedPlan, dayIndex: selDay });
+  const mealEntries = selectedPlan
+    ? getVisibleMealEntriesForDay({ userData, plan: selectedPlan, dayIndex: selDay })
+    : [];
   const adjustedMealEntries = mealEntries.map(entry => ({
     ...entry,
     meal: {
@@ -19305,7 +19321,7 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
       {/* Day selector */}
       <div style={{display:"flex",gap:6,padding:"0 24px",marginBottom:12,overflowX:"auto"}}>
         {days.map((d,i)=>{
-          const date=new Date(); date.setDate(date.getDate()+(i-todayIdx));
+          const date=parseIsoDateLocal(weekDates[i]);
           return (
             <button key={d} onClick={()=>setSelDay(i)}
               style={{minWidth:46,padding:"8px 4px",borderRadius:14,background:selDay===i?T.text:(i===todayIdx?T.sel:T.card),border:`1px solid ${selDay===i?T.text:T.border}`,cursor:"pointer",textAlign:"center"}}>
