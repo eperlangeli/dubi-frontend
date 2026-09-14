@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   buildWeeklyPlanCache,
+  cacheWeeklyPlanFetchResult,
+  finishWeeklyPlanLoading,
   getMealDisplayModel,
   selectWeeklyPlanForDate,
   shouldFetchWeeklyPlanForDate,
@@ -128,6 +130,10 @@ assert.equal(thursdayPlan.ingredientPlan.meals[0].ingredients[0].name, "Thursday
 assert.notDeepEqual(thursdayPlan, staleLegacyCurrentPlan);
 
 const fetchedCache = {...initialCache, "2026-09-17": thursdayPlan};
+const successCache = cacheWeeklyPlanFetchResult(initialCache, "2026-09-17", thursdayPlan);
+const successLoading = finishWeeklyPlanLoading({"2026-09-17": true}, "2026-09-17");
+assert.equal(successCache["2026-09-17"].ingredientPlan.meals[0].recipe_name, "Thursday V16 recipe");
+assert.deepEqual(successLoading, {});
 assert.equal(shouldFetchWeeklyPlanForDate({
   weeklyPlanCache: fetchedCache,
   selectedDate: "2026-09-17",
@@ -160,6 +166,18 @@ const refetchedThursday = selectWeeklyPlanForDate({
 });
 assert.equal(refetchedThursday.ingredientPlan.meals[0].recipe_name, "Thursday V16 recipe");
 assert.equal(refetchedThursday.ingredientPlan.meals[0].ingredients[0].name, "Thursday component");
+
+const failureCache = cacheWeeklyPlanFetchResult(initialCache, "2026-09-20", null);
+const failureLoading = finishWeeklyPlanLoading({"2026-09-20": true}, "2026-09-20");
+assert.equal(Object.prototype.hasOwnProperty.call(failureCache, "2026-09-20"), true);
+assert.equal(failureCache["2026-09-20"], null);
+assert.deepEqual(failureLoading, {});
+assert.equal(shouldFetchWeeklyPlanForDate({
+  weeklyPlanCache: failureCache,
+  selectedDate: "2026-09-20",
+  selectedPlan: null,
+  loadingPlanDates: failureLoading,
+}), false);
 
 const missingFuturePlan = selectWeeklyPlanForDate({
   weeklyPlans: [],

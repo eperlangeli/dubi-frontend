@@ -6,7 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import { buildWeeklyPlanCache, getMealDisplayModel, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
+import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -19186,36 +19186,30 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
       .then((ingredientPlan) => {
         if (cancelled) return;
         setWeeklyPlanCache(previous => {
-          const next = {...previous};
           if (ingredientPlan) {
             const mappedPlan = mapIngredientPlanToFrontend(ingredientPlan, userData);
             mappedPlan.planDate = selectedDate;
             mappedPlan.ingredientPlanDate = selectedDate;
-            next[selectedDate] = mappedPlan;
+            return cacheWeeklyPlanFetchResult(previous, selectedDate, mappedPlan);
           } else {
-            next[selectedDate] = null;
+            return cacheWeeklyPlanFetchResult(previous, selectedDate, null);
           }
-          return next;
         });
       })
       .catch((error) => {
         if (!cancelled) {
           console.warn("Selected weekly plan load failed:", selectedDate, error?.message || error);
-          setWeeklyPlanCache(previous => ({...previous, [selectedDate]: null}));
+          setWeeklyPlanCache(previous => cacheWeeklyPlanFetchResult(previous, selectedDate, null));
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setLoadingPlanDates(previous => {
-            const next = {...previous};
-            delete next[selectedDate];
-            return next;
-          });
+          setLoadingPlanDates(previous => finishWeeklyPlanLoading(previous, selectedDate));
         }
       });
 
     return () => { cancelled = true; };
-  }, [selectedDate, selectedPlan, weeklyPlanCache, loadingPlanDates, userData]);
+  }, [selectedDate, selectedPlan, weeklyPlanCache, userData]);
 
   const displayPlan = selectedPlan || plan;
   const mealEntries = selectedPlan

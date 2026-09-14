@@ -93,3 +93,16 @@ export function shouldFetchWeeklyPlanForDate({ weeklyPlanCache = {}, selectedDat
   if (Object.prototype.hasOwnProperty.call(weeklyPlanCache || {}, selectedDate)) return false;
   return !Boolean(loadingPlanDates?.[selectedDate]);
 }
+
+export function cacheWeeklyPlanFetchResult(weeklyPlanCache = {}, selectedDate, plan) {
+  return {
+    ...(weeklyPlanCache || {}),
+    [selectedDate]: plan || null,
+  };
+}
+
+export function finishWeeklyPlanLoading(loadingPlanDates = {}, selectedDate) {
+  const next = {...(loadingPlanDates || {})};
+  delete next[selectedDate];
+  return next;
+}
