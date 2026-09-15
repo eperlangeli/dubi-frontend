@@ -12214,11 +12214,13 @@ function shoppingTotalsToCategories(totals) {
 function getShoppingByDay(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
   const weekDates = getCurrentWeekIsoDates();
   const hasWeeklyPlans = Array.isArray(weeklyPlans) && weeklyPlans.some(Boolean);
+  const hasIngredientPlanSource = (sourcePlan) => Boolean(sourcePlan?.ingredientPlan?.meals || sourcePlan?.meals);
   const sourcePlans = hasWeeklyPlans
     ? weeklyPlans.slice(0, 7)
-    : (plan?.ingredientPlan?.meals ? [plan] : Array.from({ length: 7 }, () => plan));
+    : (hasIngredientPlanSource(plan) ? [plan] : []);
 
   return sourcePlans.map((dayPlan, index) => {
+    if (!hasIngredientPlanSource(dayPlan)) return null;
     const dayIndex = hasWeeklyPlans ? index : (sourcePlans.length === 1 ? (new Date().getDay() + 6) % 7 : index);
     const entries = getVisibleMealEntriesForDay({ userData, plan: dayPlan || plan, dayIndex });
     const totals = {};
@@ -12236,7 +12238,7 @@ function getShoppingByDay(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
       meals: entries,
       categories: shoppingTotalsToCategories(totals),
     };
-  }).filter(day => Object.keys(day.categories || {}).length > 0);
+  }).filter(day => day && Object.keys(day.categories || {}).length > 0);
 }
 
 function mergeShoppingDayBreakdown(days = []) {
@@ -12250,6 +12252,7 @@ function mergeShoppingDayBreakdown(days = []) {
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
   const dayBreakdown = getShoppingByDay(userData, plan, appliedSwaps, weeklyPlans);
   if (dayBreakdown.length) return mergeShoppingDayBreakdown(dayBreakdown);
+  return {};
 
   if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
     const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
@@ -16407,28 +16410,6 @@ const PreferencesStep = ({d, u, page}) => {
         </button>
       ))}
 
-      {/* Intensita dieta */}
-      <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{tx("pref.intensity","INTENSITA DELLA DIETA")}</p>
-      {[{
-        id:"gentle",
-        l:tx("pref.intensity.gentle","Graduale e sostenibile"),
-        ds:tx("pref.intensity.gentle.d","Piu gusto, porzioni meno aggressive e massima aderenza nelle prime settimane.")
-      },{
-        id:"balanced",
-        l:tx("pref.intensity.balanced","Bilanciata"),
-        ds:tx("pref.intensity.balanced.d","Deficit o surplus moderato, buono equilibrio tra risultati e costanza.")
-      },{
-        id:"focused",
-        l:tx("pref.intensity.focused","Piu precisa"),
-        ds:tx("pref.intensity.focused.d","Approccio piu rigoroso per chi e gia abituato a seguire una dieta.")
-      }].map(x=>(
-        <button key={x.id} onClick={()=>u("dietIntensity",x.id)}
-          style={{width:"100%",display:"flex",justifyContent:"space-between",alignItems:"center",padding:14,marginBottom:8,borderRadius:14,border:`1.5px solid ${d.dietIntensity===x.id?T.accent:T.border}`,background:d.dietIntensity===x.id?T.sel:T.card,cursor:"pointer"}}>
-          <div style={{textAlign:"left"}}><div style={{fontSize:14,fontWeight:600,color:T.text}}>{x.l}</div><div style={{fontSize:12,color:T.muted,marginTop:2,lineHeight:1.4}}>{x.ds}</div></div>
-          {d.dietIntensity===x.id&&<div style={{width:22,height:22,borderRadius:7,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="check" size={12} c={T.bg}/></div>}
-        </button>
-      ))}
-
       {/* Allergie */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.allergies")}</p>
       <AllergyChipPicker value={d.allergies} onChange={v=>u("allergies",v)} />
@@ -18449,10 +18430,35 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
       total,
     };
   });
+  const ingredientCompletionItems = mealList
+    .filter(m => !planAdaptations.skipped.includes(m.id))
+    .flatMap(mealEntry => {
+      const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
+      return items.map((item, index) => {
+        const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+        return {
+          mealId: mealEntry.id,
+          checkKey: getIngredientCheckKey(mealEntry.id, displayItem, index),
+        };
+      });
+    });
+  const totalRelevantItems = ingredientCompletionItems.length;
+  const completedRelevantItems = ingredientCompletionItems.filter(item => ingChecked[item.checkKey]).length;
+  const isMealComplete = (mealEntry) => {
+    const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
+    if (!items.length) return status[mealEntry.id] === "done";
+    return items.every((item, index) => {
+      const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+      return ingChecked[getIngredientCheckKey(mealEntry.id, displayItem, index)];
+    });
+  };
+  const completionPct = totalRelevantItems > 0
+    ? completedRelevantItems / totalRelevantItems
+    : (mealList.length ? mealList.filter(isMealComplete).length / mealList.length : 0);
   const consumptionPayloadSignature = JSON.stringify({date:todayDateKey, meals:consumptionMeals});
   const lastConsumptionPayloadRef = React.useRef("");
   const hasLoggedConsumptionRef = React.useRef(false);
-  const completedMealsCount = mealList.filter(meal => status[meal.id] === "done").length;
+  const completedMealsCount = mealList.filter(meal => status[meal.id] === "done" || isMealComplete(meal)).length;
   React.useEffect(() => {
     if (consumptionPayloadSignature === lastConsumptionPayloadRef.current) return;
     const hasAnyConsumption = consumptionMeals.some(meal => meal.ingredients_consumed.length > 0);
@@ -18821,7 +18827,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
         <div style={{display:"flex",alignItems:"center",gap:18,marginBottom:18}}>
           {/* Anello calorie SVG */}
           {(() => {
-            const pct = Math.min(1, consumed.cal / Math.max(1, plan.calories));
+            const pct = Math.min(1, Math.max(0, completionPct));
             const r = 28, stroke = 5, cx = 33, cy = 33;
             const circ = 2 * Math.PI * r;
             const dash = circ * pct;
