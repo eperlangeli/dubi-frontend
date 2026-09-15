@@ -6,7 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import { getIngredientMacroContribution, macroProgressPercent } from "./planConsumptionModel.mjs";
+import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent } from "./planConsumptionModel.mjs";
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -18418,12 +18418,30 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
       return next;
     });
   };
+  const ingredientCompletionItems = mealList
+    .filter(m => !planAdaptations.skipped.includes(m.id))
+    .flatMap(mealEntry => {
+      const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
+      return items.map((item, index) => {
+        const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+        return {
+          ...displayItem,
+          mealId: mealEntry.id,
+          checkKey: getIngredientCheckKey(mealEntry.id, displayItem, index),
+        };
+      });
+    });
+  const effectiveCompletedKeys = effectiveCompletedIngredientKeys({
+    items: ingredientCompletionItems,
+    explicitCompleted: ingChecked,
+    mealStatus: status,
+  });
   const consumptionMeals = mealList.map(mealEntry => {
     const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
     const ingredients = items.map((item, index) => {
       const displayItem = getDisplayMealItem(mealEntry.id, item, index);
       const checkKey = getIngredientCheckKey(mealEntry.id, displayItem, index);
-      return ingChecked[checkKey]
+      return effectiveCompletedKeys.has(checkKey)
         ? getIngredientConsumptionPayload(mealEntry.id, displayItem, index)
         : null;
     }).filter(Boolean);
@@ -18439,35 +18457,23 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
       total,
     };
   });
-  const ingredientCompletionItems = mealList
-    .filter(m => !planAdaptations.skipped.includes(m.id))
-    .flatMap(mealEntry => {
-      const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
-      return items.map((item, index) => {
-        const displayItem = getDisplayMealItem(mealEntry.id, item, index);
-        return {
-          mealId: mealEntry.id,
-          checkKey: getIngredientCheckKey(mealEntry.id, displayItem, index),
-        };
-      });
-    });
   const totalRelevantItems = ingredientCompletionItems.length;
-  const completedRelevantItems = ingredientCompletionItems.filter(item => ingChecked[item.checkKey]).length;
+  const completedRelevantItems = ingredientCompletionItems.filter(item => effectiveCompletedKeys.has(item.checkKey)).length;
   const isMealComplete = (mealEntry) => {
     const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
     if (!items.length) return status[mealEntry.id] === "done";
     return items.every((item, index) => {
       const displayItem = getDisplayMealItem(mealEntry.id, item, index);
-      return ingChecked[getIngredientCheckKey(mealEntry.id, displayItem, index)];
+      return effectiveCompletedKeys.has(getIngredientCheckKey(mealEntry.id, displayItem, index));
     });
   };
-  const completionPct = totalRelevantItems > 0
-    ? completedRelevantItems / totalRelevantItems
-    : (mealList.length ? mealList.filter(isMealComplete).length / mealList.length : 0);
   const consumptionPayloadSignature = JSON.stringify({date:todayDateKey, meals:consumptionMeals});
   const lastConsumptionPayloadRef = React.useRef("");
   const hasLoggedConsumptionRef = React.useRef(false);
   const completedMealsCount = mealList.filter(meal => status[meal.id] === "done" || isMealComplete(meal)).length;
+  const completionPct = mealList.length
+    ? completedMealsCount / mealList.length
+    : (totalRelevantItems > 0 ? completedRelevantItems / totalRelevantItems : 0);
   React.useEffect(() => {
     if (consumptionPayloadSignature === lastConsumptionPayloadRef.current) return;
     const hasAnyConsumption = consumptionMeals.some(meal => meal.ingredients_consumed.length > 0);
@@ -18968,12 +18974,12 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       </span>
                     )}
                   </div>
-                  <div style={{fontSize:12,color:T.muted}}>{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot</div>
                   {mealDisplay.dishName && (
-                    <div style={{fontSize:12,color:T.text,marginTop:3,lineHeight:1.35,fontWeight:500}}>
+                    <div style={{fontSize:12,color:T.text,marginTop:3,lineHeight:1.35,fontWeight:600}}>
                       {mealDisplay.dishName}
                     </div>
                   )}
+                  <div style={{fontSize:12,color:T.muted,marginTop:mealDisplay.dishName?3:0}}>{mt.time} · {mealMacros.cal} kcal · {mealMacros.p}g prot</div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   {st==="done"&&<div style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:999,background:T.accentD,color:T.white,fontSize:11,fontWeight:800,whiteSpace:"nowrap"}}><Ico n="check" size={11} c={T.white}/> {t("meal.eaten")}</div>}

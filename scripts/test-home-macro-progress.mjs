@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  effectiveCompletedIngredientKeys,
   getIngredientMacroContribution,
   macroProgressPercent,
   sumCompletedIngredientMacros,
@@ -60,5 +61,44 @@ assert.deepEqual(
   { calories: 350, protein: 12.3, carbs: 56.8, fat: 9, fiber: 2.2 },
   "V1/API alias fields normalize to the same macro contribution shape"
 );
+
+const breakfastItems = [
+  { checkKey: "breakfast:0:egg", mealId: "breakfast", protein: 15, carbs: 20, fat: 8, calories: 210 },
+];
+const lunchItems = [
+  { checkKey: "lunch:0:chicken", mealId: "lunch", protein: 35, carbs: 0, fat: 3, calories: 170 },
+  { checkKey: "lunch:1:rice", mealId: "lunch", protein: 6, carbs: 60, fat: 1, calories: 280 },
+];
+const dinnerItems = [
+  { checkKey: "dinner:0:cod", mealId: "dinner", protein: 28, carbs: 0, fat: 2, calories: 130 },
+];
+const dayItems = [...breakfastItems, ...lunchItems, { checkKey: "snack:0:fruit", mealId: "snack", protein: 1, carbs: 25, fat: 0, calories: 100 }, ...dinnerItems];
+
+const twoDoneMealKeys = effectiveCompletedIngredientKeys({
+  items: dayItems,
+  explicitCompleted: {},
+  mealStatus: { breakfast: "done", lunch: "done" },
+});
+const twoDoneMeals = sumCompletedIngredientMacros(dayItems, twoDoneMealKeys);
+const twoDoneMealCount = ["breakfast", "lunch", "snack", "dinner"].filter((mealId) => (
+  { breakfast: "done", lunch: "done" }[mealId] === "done"
+)).length;
+assert.equal(twoDoneMealKeys.size, 3, "two completed meals mark their ingredients effectively complete");
+assert.equal(macroProgressPercent(twoDoneMealCount, 4), 50, "meal completion circle can show 2/4 while macros use effective ingredients");
+assert.equal(twoDoneMeals.protein, 56, "meal-level Mangiato contributes breakfast and lunch macros without ingredient checkbox writes");
+
+const lunchOnlyKeys = effectiveCompletedIngredientKeys({
+  items: dayItems,
+  explicitCompleted: {},
+  mealStatus: { breakfast: "skip", lunch: "done" },
+});
+assert.equal(sumCompletedIngredientMacros(dayItems, lunchOnlyKeys).protein, 41, "unmarking breakfast removes its effective macro contribution");
+
+const mixedKeys = effectiveCompletedIngredientKeys({
+  items: dayItems,
+  explicitCompleted: { "lunch:0:chicken": true },
+  mealStatus: { lunch: "done" },
+});
+assert.equal(sumCompletedIngredientMacros(dayItems, mixedKeys).protein, 41, "meal done plus explicit ingredient completion does not double count");
 
 console.log("Home macro progress tests passed");

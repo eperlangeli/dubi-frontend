@@ -26,6 +26,23 @@ export const sumCompletedIngredientMacros = (items = [], completedKeys = new Set
   }, { calories: 0, protein: 0, carbs: 0, fat: 0 })
 );
 
+export const effectiveCompletedIngredientKeys = ({
+  items = [],
+  explicitCompleted = {},
+  mealStatus = {},
+} = {}) => {
+  const completed = new Set();
+
+  items.forEach((item) => {
+    if (!item?.checkKey) return;
+    if (explicitCompleted[item.checkKey] || mealStatus[item.mealId] === 'done') {
+      completed.add(item.checkKey);
+    }
+  });
+
+  return completed;
+};
+
 export const macroProgressPercent = (consumed, target) => {
   const targetValue = toNumber(target);
   if (targetValue <= 0) return 0;
