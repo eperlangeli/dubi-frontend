@@ -6,6 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
+import { getIngredientMacroContribution, macroProgressPercent } from "./planConsumptionModel.mjs";
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -1060,22 +1061,30 @@ const ingredientMealsToArray = (plan = {}) => {
 };
 
 const normalizeIngredientItemForUi = (item = {}) => {
-  const grams = Number(item.portionG ?? item.portion_g ?? item.quantity_g ?? item.grams ?? item.quantity ?? 0);
-  const fatValue = Number(item.fat ?? item.fats ?? 0);
-  const name = item.name || item.display_name || item.displayName || item.source_food_name || item.label || "Ingrediente";
+  const grams = Number(item.portionG ?? item.portion_g ?? item.selected_quantity_g ?? item.scaled_quantity_g ?? item.quantity_g ?? item.grams ?? item.quantity ?? 0);
+  const macros = getIngredientMacroContribution(item);
+  const name = item.name || item.ingredient_name || item.display_name || item.displayName || item.source_food_name || item.label || "Ingrediente";
   return {
     ...item,
     name,
     quantity: grams ? Math.round(grams) : undefined,
     unit: grams ? "g" : undefined,
-    calories: Math.round(Number(item.calories || 0)),
-    protein: Math.round(Number(item.protein || 0) * 10) / 10,
-    carbs: Math.round(Number(item.carbs || 0) * 10) / 10,
-    fats: Math.round(fatValue * 10) / 10,
-    fiber: Math.round(Number(item.fiber || 0) * 10) / 10,
+    calories: macros.calories,
+    protein: macros.protein,
+    carbs: macros.carbs,
+    fats: macros.fat,
+    fiber: macros.fiber,
     source_id: item.source_id || item.sourceId || null,
     source_confidence: item.source_confidence ?? item.sourceConfidence ?? null
   };
+};
+
+const workoutRelationLabel = (relation) => {
+  const value = String(relation || "").toLowerCase();
+  if (!value) return null;
+  if (value.includes("pre_workout")) return "PRE";
+  if (value.includes("post_workout")) return "POST";
+  return null;
 };
 
 const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => {
@@ -1088,6 +1097,7 @@ const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => 
   const engineVersion = meal.engine_version || meal.engineVersion || planEngineVersion || null;
   const recipeName = meal.recipe_name || meal.recipeName || meal.name || null;
   const authoringKey = meal.authoring_key || meal.authoringKey || null;
+  const workoutRelation = meal.workout_relation || meal.workoutRelation || null;
 
   return {
     ...meta,
@@ -1099,6 +1109,8 @@ const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => 
       recipe_name: recipeName,
       authoringKey,
       authoring_key: authoringKey,
+      workoutRelation,
+      workout_relation: workoutRelation,
       items: ingredients,
       alts: [],
       macros: {
@@ -1113,7 +1125,7 @@ const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => 
       practical: meal.practical || null,
       ingredientMeal: meal
     },
-    workoutLabel: mealType === "pre_workout" ? "PRE" : mealType === "post_workout" ? "POST" : null,
+    workoutLabel: workoutRelationLabel(workoutRelation) || (mealType === "pre_workout" ? "PRE" : mealType === "post_workout" ? "POST" : null),
     carbTargetPct: null,
     adaptSkipped: false
   };
@@ -12731,7 +12743,7 @@ const MacroBar = ({label,current,max,color}) => (
       <span style={{fontSize:12,color:T.text,fontWeight:500}}>{current}g <span style={{color:T.muted,fontWeight:400}}>/ {max}g</span></span>
     </div>
     <div style={{height:5,background:T.border,borderRadius:3,overflow:"hidden"}}>
-      <div style={{height:"100%",width:`${Math.min(100,(current/max)*100)}%`,background:color,borderRadius:3,transition:"width 0.6s ease"}} />
+      <div style={{height:"100%",width:`${macroProgressPercent(current, max)}%`,background:color,borderRadius:3,transition:"width 0.6s ease"}} />
     </div>
   </div>
 );
@@ -18382,18 +18394,15 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   };
   const getIngredientConsumptionPayload = (mealId, item, index) => {
     const display = splitIngredientDisplay(item);
-    const calories = Number(item?.calories || item?.cal || 0);
-    const protein = Number(item?.protein || item?.p || 0);
-    const carbs = Number(item?.carbs || item?.c || 0);
-    const fat = Number(item?.fats ?? item?.fat ?? item?.f ?? 0);
+    const macros = getIngredientMacroContribution(item);
     return {
       ingredient_id: String(item?.ingredient_id || item?.id || item?.source_id || item?.food_id || `${mealId}-${index}`),
       name: display.name || formatFoodText(item),
       portion_g: getIngredientPortionG(item, display),
-      calories: Math.round(calories * scaleK),
-      protein: Math.round(protein * scaleP),
-      carbs: Math.round(carbs * scaleC),
-      fat: Math.round(fat * scaleF),
+      calories: macros.calories,
+      protein: macros.protein,
+      carbs: macros.carbs,
+      fat: macros.fat,
     };
   };
   const setMealIngredientsChecked = (mealEntry, checked) => {
