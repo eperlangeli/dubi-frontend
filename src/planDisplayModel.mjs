@@ -11,6 +11,13 @@ export function isRecipeEngineV1Meal(meal) {
   );
 }
 
+export function getExplicitWorkoutLabel(relation) {
+  const value = String(relation || "").trim().toUpperCase();
+  if (value === "PRE") return "PRE";
+  if (value === "POST") return "POST";
+  return null;
+}
+
 export function getMealDisplayModel({ entry, meal, fallbackLabel }) {
   const recipeName =
     meal?.recipeName ||
@@ -23,6 +30,12 @@ export function getMealDisplayModel({ entry, meal, fallbackLabel }) {
     meal?.authoring_key ||
     meal?.ingredientMeal?.authoring_key ||
     "";
+  const workoutLabel = getExplicitWorkoutLabel(
+    meal?.workoutRelation ||
+    meal?.workout_relation ||
+    meal?.ingredientMeal?.workout_relation ||
+    null
+  );
   const slotLabel = fallbackLabel || entry?.label || entry?.id || "";
   const isV1 = isRecipeEngineV1Meal(meal) && Boolean(authoringKey) && Boolean(recipeName);
 
@@ -33,6 +46,8 @@ export function getMealDisplayModel({ entry, meal, fallbackLabel }) {
     dishName: isV1 ? recipeName : "",
     authoringKey: authoringKey || null,
     recipeName: recipeName || null,
+    workoutLabel,
+    workoutBadgeText: workoutLabel === "PRE" ? "PRE WORKOUT" : workoutLabel === "POST" ? "POST WORKOUT" : null,
   };
 }
 

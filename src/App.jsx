@@ -7,7 +7,7 @@ import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
 import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent, toggleIngredientCompletion } from "./planConsumptionModel.mjs";
-import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
+import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getExplicitWorkoutLabel, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -1155,13 +1155,7 @@ const normalizeIngredientItemForUi = (item = {}) => {
 };
 
 const workoutRelationLabel = (relation) => {
-  const value = String(relation || "").toLowerCase();
-  if (!value) return null;
-  if (value === "pre") return "PRE";
-  if (value === "post") return "POST";
-  if (value.includes("pre_workout")) return "PRE";
-  if (value.includes("post_workout")) return "POST";
-  return null;
+  return getExplicitWorkoutLabel(relation);
 };
 
 const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => {
@@ -1202,7 +1196,7 @@ const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => 
       practical: meal.practical || null,
       ingredientMeal: meal
     },
-    workoutLabel: workoutRelationLabel(workoutRelation) || (mealType === "pre_workout" ? "PRE" : mealType === "post_workout" ? "POST" : null),
+    workoutLabel: workoutRelationLabel(workoutRelation),
     carbTargetPct: null,
     adaptSkipped: false
   };
@@ -10705,7 +10699,7 @@ function getAiMealListForDay(plan, dayIdx, slots, times) {
         practical: meal.practical || null,
         aiMeal: meal
       },
-      workoutLabel: meal.mealType === "pre_workout" ? "PRE" : meal.mealType === "post_workout" ? "POST" : null,
+      workoutLabel: workoutRelationLabel(meal.workout_relation || meal.workoutRelation || null),
       carbTargetPct: null,
       adaptSkipped: false
     };
@@ -10729,29 +10723,6 @@ function carbNote(sport, goal) {
 // ═══════════════════════════════════════════════
 // WORKOUT MEAL TIMING HELPERS
 // ═══════════════════════════════════════════════
-function getWorkoutLabel(trainingTime, mealId) {
-  const normalizedTime = normalizeTrainingTime(trainingTime);
-  const normalizedMeal = {
-    breakfast: "colazione",
-    snack_morning: "snack_m",
-    lunch: "pranzo",
-    snack_afternoon: "snack",
-    dinner: "cena",
-    snack_evening: "snack_n"
-  }[mealId] || mealId;
-  const map = {
-    morning:{pre:"colazione",post:"snack_m"},
-    lunch:{pre:"snack_m",post:"pranzo"},
-    afternoon:{pre:"pranzo",post:"snack"},
-    evening:{pre:"snack",post:"cena"},
-  };
-  const wp = map[normalizedTime];
-  if (!wp) return null;
-  if (wp.pre===normalizedMeal) return "PRE";
-  if (wp.post===normalizedMeal) return "POST";
-  return null;
-}
-
 function getCarbTargetPct(trainingTime, mealId, sport) {
   const isEndurance = /corsa|ciclismo|nuoto|triathlon|maratona|running|bici/i.test(sport||"");
   const normalizedTime = normalizeTrainingTime(trainingTime);
@@ -12259,7 +12230,7 @@ function getVisibleMealEntriesForDay({ userData, plan, dayIndex = 0, times: prov
       ...slot,
       time: times[index] || "--:--",
       meal: meal || dayMeals.snack || { items: [], alts: [], macros: { cal: 0, p: 0, c: 0, f: 0 } },
-      workoutLabel: getWorkoutLabel(userData?.trainingTime, slot.id),
+      workoutLabel: null,
       carbTargetPct: getCarbTargetPct(userData?.trainingTime, slot.id, userData?.sport),
     };
   });
@@ -18413,10 +18384,9 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     else if (sl.id==="snack") meal = dayMeals.snack;
     else if (sl.id==="snack_m") meal = dayMeals.snack_m;
     else if (sl.id==="snack_n") meal = dayMeals.snack_n;
-    const wLabel = getWorkoutLabel(userData?.trainingTime, sl.id);
     const carbPct = getCarbTargetPct(userData?.trainingTime, sl.id, userData?.sport);
     const adaptSkipped = planAdaptations.skipped.includes(sl.id);
-    return {...sl, time: times[i]||"--:--", data: meal || dayMeals.snack, workoutLabel: wLabel, carbTargetPct: carbPct, adaptSkipped};
+    return {...sl, time: times[i]||"--:--", data: meal || dayMeals.snack, workoutLabel: null, carbTargetPct: carbPct, adaptSkipped};
   });
   const mealList = (aiMealList || fallbackMealList)
     .map((meal) => {
@@ -19038,11 +19008,11 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                         {t("today.badge.removed")}
                       </span>
                     )}
-                    {mt.workoutLabel && (
+                    {mealDisplay.workoutLabel && (
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
-                        background:mt.workoutLabel==="PRE"?"rgba(201,168,124,0.18)":"rgba(107,138,100,0.18)",
-                        color:mt.workoutLabel==="PRE"?"#B8893A":T.accentD}}>
-                        {mt.workoutLabel==="PRE"?t("today.preWorkout"):t("today.postWorkout")}
+                        background:mealDisplay.workoutLabel==="PRE"?"rgba(201,168,124,0.18)":"rgba(107,138,100,0.18)",
+                        color:mealDisplay.workoutLabel==="PRE"?"#B8893A":T.accentD}}>
+                        {mealDisplay.workoutBadgeText}
                       </span>
                     )}
                     {mt.carbTargetPct && (
@@ -19534,30 +19504,26 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
           </div>
         )}
         {adjustedMealEntries.map((entry)=>{
-          const {id:mKey,label,icon,time,meal,workoutLabel,carbTargetPct} = entry;
+          const {id:mKey,label,icon,time,meal,carbTargetPct} = entry;
           const mealDisplay = getMealDisplayModel({ entry, meal, fallbackLabel: label });
+          const displayWorkoutLabel = mealDisplay.workoutLabel;
+          const weeklyMacros = wScaleMx(meal.macros);
           return (
-          <div key={mKey} style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${workoutLabel?T.accent:T.border}`,borderRadius:16}}>
+          <div key={mKey} style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${displayWorkoutLabel?T.accent:T.border}`,borderRadius:16}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,alignItems:"center"}}>
               <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
-                <div style={{width:34,height:34,borderRadius:10,background:workoutLabel?T.accentD+"18":T.bg,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${workoutLabel?T.accent:T.border}`,flexShrink:0}}>
-                  <Ico n={icon||"fork"} size={16} c={workoutLabel?T.accentD:T.muted}/>
+                <div style={{width:34,height:34,borderRadius:10,background:displayWorkoutLabel?T.accentD+"18":T.bg,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${displayWorkoutLabel?T.accent:T.border}`,flexShrink:0}}>
+                  <Ico n={icon||"fork"} size={16} c={displayWorkoutLabel?T.accentD:T.muted}/>
                 </div>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:14,fontWeight:600,color:T.text}}>{mealDisplay.title}</span>
-                    {workoutLabel && (
+                    {displayWorkoutLabel && (
                       <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
-                        background:workoutLabel==="PRE"?"rgba(201,168,124,0.2)":"rgba(107,138,100,0.2)",
-                        color:workoutLabel==="PRE"?"#B8893A":T.accentD}}>
-                        {workoutLabel==="PRE"?"PRE":"POST"}
+                        background:displayWorkoutLabel==="PRE"?"rgba(201,168,124,0.2)":"rgba(107,138,100,0.2)",
+                        color:displayWorkoutLabel==="PRE"?"#B8893A":T.accentD}}>
+                        {mealDisplay.workoutBadgeText}
                       </span>
-                    )}
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                    <span style={{fontSize:12,color:T.muted}}>{time}</span>
-                    {carbTargetPct && (
-                      <span style={{fontSize:11,color:"#B8893A",fontWeight:600}}>{carbTargetPct}</span>
                     )}
                   </div>
                   {mealDisplay.dishName && (
@@ -19565,9 +19531,14 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
                       {mealDisplay.dishName}
                     </div>
                   )}
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginTop:3,flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,color:T.muted}}>{time} · {weeklyMacros.cal} kcal · {weeklyMacros.p}g prot</span>
+                    {carbTargetPct && (
+                      <span style={{fontSize:11,color:"#B8893A",fontWeight:600}}>{carbTargetPct}</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <span style={{fontSize:12,color:T.muted,flexShrink:0}}>{wScaleMx(meal.macros).cal} kcal</span>
             </div>
             {meal.items.map((item,i)=>{
               const swapKey = `${selDay}-${mKey}-${i}`;

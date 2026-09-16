@@ -43,6 +43,8 @@ for (const [slotId, slotLabel] of slotCases) {
   assert.equal(todayDisplay.dishName, `${slotLabel} V16 recipe name`);
   assert.equal(todayDisplay.recipeName, `${slotLabel} V16 recipe name`);
   assert.equal(todayDisplay.authoringKey, `v16_${slotId}_recipe`);
+  assert.equal(todayDisplay.workoutLabel, null);
+  assert.equal(todayDisplay.workoutBadgeText, null);
   assert.equal(meal.items[0].name, `${slotLabel} component A`);
   assert.equal(meal.items[1].quantity, 60);
 
@@ -63,6 +65,54 @@ assert.equal(legacyDisplay.title, "Spuntino");
 assert.equal(legacyDisplay.dishName, "");
 assert.equal(legacyDisplay.recipeName, null);
 assert.equal(legacyDisplay.authoringKey, null);
+
+const preWorkoutDisplay = getMealDisplayModel({
+  entry: { id: "pre_workout", label: "Pre workout" },
+  meal: {
+    engineVersion: "recipe_engine_v1",
+    authoringKey: "v16_pre_workout_recipe",
+    recipeName: "Cream of rice with banana",
+    workout_relation: "PRE",
+    items: [{ name: "Crema di riso", quantity: 50, unit: "g" }],
+  },
+  fallbackLabel: "Pre workout",
+});
+assert.equal(preWorkoutDisplay.title, "Pre workout");
+assert.equal(preWorkoutDisplay.dishName, "Cream of rice with banana");
+assert.equal(preWorkoutDisplay.workoutLabel, "PRE");
+assert.equal(preWorkoutDisplay.workoutBadgeText, "PRE WORKOUT");
+
+const postWorkoutDisplay = getMealDisplayModel({
+  entry: { id: "post_workout", label: "Post workout" },
+  meal: {
+    engineVersion: "recipe_engine_v1",
+    authoringKey: "v16_post_workout_recipe",
+    recipeName: "Rice and cod bowl",
+    workoutRelation: "POST",
+    items: [{ name: "Merluzzo", quantity: 150, unit: "g" }],
+  },
+  fallbackLabel: "Post workout",
+});
+assert.equal(postWorkoutDisplay.title, "Post workout");
+assert.equal(postWorkoutDisplay.dishName, "Rice and cod bowl");
+assert.equal(postWorkoutDisplay.workoutLabel, "POST");
+assert.equal(postWorkoutDisplay.workoutBadgeText, "POST WORKOUT");
+
+const noneWorkoutDisplay = getMealDisplayModel({
+  entry: { id: "pre_workout", label: "Pre workout" },
+  meal: {
+    engineVersion: "recipe_engine_v1",
+    authoringKey: "v16_none_workout_recipe",
+    recipeName: "Plain snack",
+    workout_relation: "NONE",
+    items: [{ name: "Banana", quantity: 120, unit: "g" }],
+  },
+  fallbackLabel: "Pre workout",
+});
+assert.equal(noneWorkoutDisplay.title, "Pre workout");
+assert.equal(noneWorkoutDisplay.dishName, "Plain snack");
+assert.equal(noneWorkoutDisplay.workoutLabel, null);
+assert.equal(noneWorkoutDisplay.workoutBadgeText, null);
 
 const makeV1Plan = (date, recipeName, ingredientName) => ({
   planDate: date,
