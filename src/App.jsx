@@ -453,6 +453,71 @@ const formatSportList = (sports, legacySport, t) => {
 };
 const getTrainingTimeLabelLocalized = (value, t) => t(`training.timing.${normalizeTrainingTime(value)}`);
 
+const SPORT_INTERNAL_GROUPS = {
+  running:"endurance_continuous", cycling:"endurance_continuous", swimming:"endurance_continuous", triathlon:"endurance_continuous", rowing:"endurance_continuous", kayak:"endurance_continuous", nordic_ski:"endurance_continuous",
+  football:"intermittent_mixed", basketball:"intermittent_mixed", volleyball:"intermittent_mixed", tennis:"intermittent_mixed", padel:"intermittent_mixed", rugby:"intermittent_mixed", hockey:"intermittent_mixed", handball:"intermittent_mixed", baseball:"intermittent_mixed", alpine_ski:"intermittent_mixed", surf:"intermittent_mixed", fencing:"intermittent_mixed",
+  gym:"strength_power", crossfit:"strength_power", powerlifting:"strength_power", climbing:"strength_power", boxing:"strength_power", martial_arts:"strength_power", wrestling:"strength_power", judo:"strength_power", mma:"strength_power", gymnastics:"strength_power", sprint:"strength_power",
+  yoga:"wellness_skill", pilates:"wellness_skill", golf:"wellness_skill", archery:"wellness_skill", equestrian:"wellness_skill", dance:"wellness_skill"
+};
+const WEIGHT_CLASS_SPORTS = new Set(["boxing","martial_arts","wrestling","judo","mma"]);
+const durationToMinutes = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  const text = String(value);
+  const range = text.match(/(\d+)\s*-\s*(\d+)/);
+  if (range) return Math.round((Number(range[1]) + Number(range[2])) / 2);
+  const number = Number(text.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(number) && number > 0 ? Math.round(number) : null;
+};
+const sportEntryForContract = (sportId, customName = "") => {
+  const id = toCanonicalSport(sportId || customName);
+  const isCustom = Boolean(id && !SPORT_KEYS.includes(id)) || id === "other";
+  return {
+    sport_id: isCustom ? "custom" : id,
+    sport_name: isCustom ? (customName || sportId || "Custom sport") : id,
+    is_custom: isCustom,
+    custom_name: isCustom ? (customName || sportId || null) : null
+  };
+};
+const buildSportOnboardingContract = (data = {}) => {
+  const sports = normalizeSports(data.sports, data.sport);
+  const primaryId = sports[0] || "";
+  const primary = primaryId ? sportEntryForContract(primaryId, data.customSportName || data.custom_sport_name || "") : null;
+  const secondaries = sports.slice(1).map(id => sportEntryForContract(id));
+  const internalGroup = primary && !primary.is_custom ? SPORT_INTERNAL_GROUPS[primary.sport_id] || null : null;
+  const semanticStatus = !primary ? "UNKNOWN" : primary.is_custom ? "SEMANTIC_MAPPING_REQUIRED" : internalGroup ? "APPROVED" : "UNKNOWN";
+  const competitionParticipates = Boolean(data.competitionParticipates ?? data.competition_participates ?? data.goal === "competition");
+  const weightClassApplicable = Boolean(primary && WEIGHT_CLASS_SPORTS.has(primary.sport_id));
+  return {
+    contract_version: "nutrition_engine_onboarding_contract_v1",
+    sports: { primary, secondary: secondaries },
+    training: {
+      sessions_per_week: Number(data.workoutDays ?? data.workout_days ?? 0) || 0,
+      usual_duration_min: durationToMinutes(data.workoutDuration ?? data.workout_duration),
+      sessions: Array.isArray(data.trainingSessions ?? data.training_sessions) ? (data.trainingSessions ?? data.training_sessions) : [],
+      double_sessions: Boolean(data.doubleSessions ?? data.double_sessions ?? false)
+    },
+    competition: {
+      participates: competitionParticipates,
+      competition_date: data.competitionDate ?? data.competition_date ?? null,
+      competition_name: data.competitionName ?? data.competition_name ?? null
+    },
+    weight_class: {
+      applicable: weightClassApplicable,
+      current_weight_kg: Number(data.weight) || null,
+      target_class_kg: Number(data.targetClassKg ?? data.target_class_kg) || null,
+      mapping_status: weightClassApplicable ? "APPROVED" : "NOT_APPLICABLE"
+    },
+    sport_profile: {
+      profile_version: "nutrition_engine_sport_profile_v1",
+      internal_group: internalGroup,
+      modifiers: weightClassApplicable ? ["combat_or_weight_class_context"] : [],
+      semantic_mapping_status: semanticStatus,
+      professional_status: semanticStatus
+    }
+  };
+};
+
 const canonicalizeOnboardingForBackend = (data = {}) => {
   const sports = normalizeSports(data.sports, data.sport);
   return {
@@ -464,7 +529,8 @@ const canonicalizeOnboardingForBackend = (data = {}) => {
     sport: sports[0] || "",
     workoutIntensity: toCanonicalIntensity(data.workoutIntensity ?? data.workout_intensity),
     trainingTime: normalizeTrainingTime(data.trainingTime ?? data.training_time),
-    breakfastPref: toCanonicalBreakfast(data.breakfastPref ?? data.breakfast_pref)
+    breakfastPref: toCanonicalBreakfast(data.breakfastPref ?? data.breakfast_pref),
+    sportOnboardingContract: buildSportOnboardingContract({ ...data, sports, sport: sports[0] || "" })
   };
 };
 const getPlanProfileSignature = (userData = {}) => {
@@ -925,6 +991,15 @@ const saveOnboardingToBackend = async (data) => {
     wearable_provider: getPrimaryWearable(data),
     wearable_providers: getSelectedWearables(data),
     wearable_consent: Boolean(data.wearableConsent),
+    sport_onboarding_contract: canonicalData.sportOnboardingContract,
+    training_sessions: canonicalData.sportOnboardingContract.training.sessions,
+    competition: canonicalData.sportOnboardingContract.competition,
+    weight_class: canonicalData.sportOnboardingContract.weight_class,
+    sport_profile: canonicalData.sportOnboardingContract.sport_profile,
+    primary_sport_id: canonicalData.sportOnboardingContract.sports.primary?.sport_id || null,
+    secondary_sport_ids: canonicalData.sportOnboardingContract.sports.secondary.map(sport => sport.sport_id),
+    custom_sport_name: canonicalData.sportOnboardingContract.sports.primary?.custom_name || null,
+    double_sessions: canonicalData.sportOnboardingContract.training.double_sessions,
     terms_accepted: data.termsAccepted ?? data.terms ?? null,
     privacy_accepted: data.privacyAccepted ?? data.terms ?? null,
     health_data_consent: data.healthDataConsent ?? data.healthConsent ?? null,
