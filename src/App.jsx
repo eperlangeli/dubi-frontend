@@ -1157,6 +1157,8 @@ const normalizeIngredientItemForUi = (item = {}) => {
 const workoutRelationLabel = (relation) => {
   const value = String(relation || "").toLowerCase();
   if (!value) return null;
+  if (value === "pre") return "PRE";
+  if (value === "post") return "POST";
   if (value.includes("pre_workout")) return "PRE";
   if (value.includes("post_workout")) return "POST";
   return null;
