@@ -5,13 +5,39 @@ const toNumber = (value) => {
 
 const roundTenth = (value) => Math.round(toNumber(value) * 10) / 10;
 
+const pickMacro = (item, keys) => {
+  for (const source of [
+    item,
+    item?.macros,
+    item?.totalMacros,
+    item?.scaled_macros,
+    item?.selected_macros,
+    item?.nutrition,
+  ]) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null) return source[key];
+    }
+  }
+  return undefined;
+};
+
 export const getIngredientMacroContribution = (item = {}) => ({
-  calories: Math.round(toNumber(item.calories ?? item.cal ?? item.kcal)),
-  protein: roundTenth(item.protein ?? item.protein_g ?? item.p),
-  carbs: roundTenth(item.carbs ?? item.carbs_g ?? item.c),
-  fat: roundTenth(item.fats ?? item.fat ?? item.fat_g ?? item.f),
-  fiber: roundTenth(item.fiber ?? item.fiber_g),
+  calories: Math.round(toNumber(pickMacro(item, ['calories', 'cal', 'kcal']))),
+  protein: roundTenth(pickMacro(item, ['protein', 'protein_g', 'p'])),
+  carbs: roundTenth(pickMacro(item, ['carbs', 'carbs_g', 'c'])),
+  fat: roundTenth(pickMacro(item, ['fats', 'fat', 'fat_g', 'f'])),
+  fiber: roundTenth(pickMacro(item, ['fiber', 'fiber_g'])),
 });
+
+export const toggleIngredientCompletion = (explicitCompleted = {}, checkKey) => {
+  const key = String(checkKey || '');
+  if (!key) return { ...explicitCompleted };
+  const next = { ...explicitCompleted };
+  if (next[key]) delete next[key];
+  else next[key] = true;
+  return next;
+};
 
 export const sumCompletedIngredientMacros = (items = [], completedKeys = new Set()) => (
   items.reduce((acc, item) => {

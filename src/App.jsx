@@ -6,7 +6,7 @@ import { Keyboard } from "@capacitor/keyboard";
 import { Preferences } from "@capacitor/preferences";
 import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
-import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent } from "./planConsumptionModel.mjs";
+import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent, toggleIngredientCompletion } from "./planConsumptionModel.mjs";
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -19094,10 +19094,11 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       const _tDispItem = getDisplayMealItem(mt.id, item, i);
                       const _tDisplay = splitIngredientDisplay(_tDispItem);
                       const _tName = _tDisplay.name;
-                      const _tCalories = Number(_tDispItem?.calories || 0);
-                      const _tProtein = Number(_tDispItem?.protein || 0);
-                      const _tCarbs = Number(_tDispItem?.carbs || 0);
-                      const _tFats = Number(_tDispItem?.fats ?? _tDispItem?.fat ?? 0);
+                      const _tMacros = getIngredientMacroContribution(_tDispItem);
+                      const _tCalories = Number(_tMacros.calories || 0);
+                      const _tProtein = Number(_tMacros.protein || 0);
+                      const _tCarbs = Number(_tMacros.carbs || 0);
+                      const _tFats = Number(_tMacros.fat || 0);
                       const _tCheckKey = getIngredientCheckKey(mt.id, _tDispItem, i);
                       const _tChecked = Boolean(ingChecked[_tCheckKey]);
                       const _tMeta = [
@@ -19110,7 +19111,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                         style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"6px 8px",borderRadius:10,cursor:"pointer",background:_tChecked?"rgba(107,138,100,0.08)":"transparent",border:`1px solid ${_tChecked?"rgba(107,138,100,0.24)":"transparent"}`,transition:"all 0.15s"}}
                         onMouseEnter={e=>{e.currentTarget.style.background=T.sel;e.currentTarget.style.borderColor=T.border;}}
                         onMouseLeave={e=>{e.currentTarget.style.background=_tChecked?"rgba(107,138,100,0.08)":"transparent";e.currentTarget.style.borderColor=_tChecked?"rgba(107,138,100,0.24)":"transparent";}}>
-                        <button data-no-haptic="true" type="button" onClick={(e)=>{e.stopPropagation();dubiHaptic(_tChecked?"soft":"success");setIngChecked(prev=>{const next={...prev};if (_tChecked) delete next[_tCheckKey]; else next[_tCheckKey]=true;return next;});}}
+                        <button data-no-haptic="true" type="button" onClick={(e)=>{e.stopPropagation();dubiHaptic(_tChecked?"soft":"success");setIngChecked(prev=>toggleIngredientCompletion(prev,_tCheckKey));}}
                           aria-label={_tChecked ? "Rimuovi ingrediente consumato" : "Segna ingrediente consumato"}
                           style={{width:22,height:22,borderRadius:7,border:`1.5px solid ${_tChecked?T.accentD:T.border}`,background:_tChecked?T.accentD:T.bg,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0,cursor:"pointer",lineHeight:1}}>
                           {_tChecked ? "✓" : ""}

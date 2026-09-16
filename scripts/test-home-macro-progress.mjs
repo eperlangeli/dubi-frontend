@@ -4,6 +4,7 @@ import {
   getIngredientMacroContribution,
   macroProgressPercent,
   sumCompletedIngredientMacros,
+  toggleIngredientCompletion,
 } from "../src/planConsumptionModel.mjs";
 
 const chicken = {
@@ -60,6 +61,44 @@ assert.deepEqual(
   getIngredientMacroContribution({ protein_g: 12.34, carbs_g: 56.78, fat_g: 9.01, fiber_g: 2.22, kcal: 350.4 }),
   { calories: 350, protein: 12.3, carbs: 56.8, fat: 9, fiber: 2.2 },
   "V1/API alias fields normalize to the same macro contribution shape"
+);
+
+const v1NestedIngredient = {
+  checkKey: "snack:0:291",
+  mealId: "snack",
+  ingredient_id: 291,
+  ingredient_name: "Hummus",
+  selected_quantity_g: 70,
+  macros: {
+    kcal: 116.2,
+    protein_g: 5.6,
+    carbs_g: 10.1,
+    fat_g: 6.3,
+  },
+};
+let realClickState = {};
+realClickState = toggleIngredientCompletion(realClickState, v1NestedIngredient.checkKey);
+const clickedKeys = effectiveCompletedIngredientKeys({
+  items: [v1NestedIngredient],
+  explicitCompleted: realClickState,
+  mealStatus: {},
+});
+assert.equal(realClickState[v1NestedIngredient.checkKey], true, "real ingredient click stores the exact completion key");
+assert.deepEqual(
+  sumCompletedIngredientMacros([v1NestedIngredient], clickedKeys),
+  { calories: 116, protein: 5.6, carbs: 10.1, fat: 6.3 },
+  "real Home click path immediately adds nested V1 ingredient macros"
+);
+realClickState = toggleIngredientCompletion(realClickState, v1NestedIngredient.checkKey);
+const unclickedKeys = effectiveCompletedIngredientKeys({
+  items: [v1NestedIngredient],
+  explicitCompleted: realClickState,
+  mealStatus: {},
+});
+assert.deepEqual(
+  sumCompletedIngredientMacros([v1NestedIngredient], unclickedKeys),
+  { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  "unclicking the same ingredient immediately removes its macro contribution"
 );
 
 const breakfastItems = [
