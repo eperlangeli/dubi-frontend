@@ -20,7 +20,8 @@
     "generate:assets": "node scripts/generate-mobile-assets.mjs",
     "build:web:production": "cross-env VITE_DUBI_APP_ENV=production node scripts/prepare-mobile-web.js",
     "build:web:staging": "cross-env VITE_DUBI_APP_ENV=staging node scripts/prepare-mobile-web.js",
-    "check:config": "node scripts/validate-app-config.js"
+    "check:config": "node scripts/validate-app-config.js",
+    "test:home-browser": "node scripts/test-home-consumption-browser.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
@@ -40,6 +41,7 @@
     "@capacitor/cli": "^7.4.3",
     "@vitejs/plugin-react": "^5.0.0",
     "cross-env": "^10.1.0",
+    "playwright": "1.55.0",
     "sharp": "^0.35.3",
     "vite": "^7.1.2"
   }

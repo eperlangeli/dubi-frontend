@@ -8,6 +8,7 @@ import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
 import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent, toggleIngredientCompletion } from "./planConsumptionModel.mjs";
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getExplicitWorkoutLabel, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
+import { buildTodayWorkoutModel, getTrainingSessionForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -479,6 +480,13 @@ const sportEntryForContract = (sportId, customName = "") => {
     custom_name: isCustom ? (customName || sportId || null) : null
   };
 };
+const getTrainingSessionsFromData = (data = {}) => normalizeTrainingSessions(
+  data.trainingSessions
+  ?? data.training_sessions
+  ?? data.sportOnboardingContract?.training?.sessions
+  ?? data.sport_onboarding_contract?.training?.sessions
+  ?? []
+);
 const buildSportOnboardingContract = (data = {}) => {
   const sports = normalizeSports(data.sports, data.sport);
   const primaryId = sports[0] || "";
@@ -494,7 +502,7 @@ const buildSportOnboardingContract = (data = {}) => {
     training: {
       sessions_per_week: Number(data.workoutDays ?? data.workout_days ?? 0) || 0,
       usual_duration_min: durationToMinutes(data.workoutDuration ?? data.workout_duration),
-      sessions: Array.isArray(data.trainingSessions ?? data.training_sessions) ? (data.trainingSessions ?? data.training_sessions) : [],
+      sessions: getTrainingSessionsFromData(data),
       double_sessions: Boolean(data.doubleSessions ?? data.double_sessions ?? false)
     },
     competition: {
@@ -553,6 +561,7 @@ const getPlanProfileSignature = (userData = {}) => {
     diet: String(userData.diet || ""),
     allergies: String(userData.allergies || "").trim().toLowerCase(),
     sports: normalizeSports(userData.sports, userData.sport).sort(),
+    training_sessions: workoutScheduleSignature(getTrainingSessionsFromData(userData)),
     training_time: normalizeTrainingTime(userData.training_time ?? userData.trainingTime),
     workout_days: String(userData.workout_days ?? userData.workoutDays ?? ""),
     workout_duration: String(userData.workout_duration ?? userData.workoutDuration ?? ""),
@@ -592,6 +601,8 @@ const getPlanProfileSignature = (userData = {}) => {
     workoutDays: data.workout_days != null ? String(data.workout_days) : (data.workoutDays || "0"),
     workoutDuration: data.workout_duration ?? data.workoutDuration ?? "45-60",
     workoutIntensity: toAppIntensity(data.workout_intensity ?? data.workoutIntensity ?? "moderata"),
+    trainingSessions: getTrainingSessionsFromData(data),
+    doubleSessions: Boolean(data.double_sessions ?? data.doubleSessions ?? false),
     dailySteps: data.daily_steps ?? data.dailySteps ?? "unknown",
     sedentaryDays: data.sedentary_days ?? data.sedentaryDays ?? 0,
     dietIntensity: data.diet_intensity ?? data.dietIntensity ?? "balanced",
@@ -1099,6 +1110,10 @@ const mapAiPlanToFrontend = (aiPlan, userData) => {
 };
 
 const getTodayIsoDate = () => {
+  if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
+    const testDate = new URLSearchParams(window.location.search).get("_test_date");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(testDate || "")) return testDate;
+  }
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
@@ -12784,14 +12799,14 @@ const DUBILogo = ({size=64, variant="dark"}) => {
 // ═══════════════════════════════════════════════
 // SMALL COMPONENTS
 // ═══════════════════════════════════════════════
-const MacroBar = ({label,current,max,color}) => (
-  <div style={{marginBottom:10}}>
+const MacroBar = ({label,current,max,color,testId}) => (
+  <div data-testid={testId} style={{marginBottom:10}}>
     <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
       <span style={{fontSize:12,color:T.muted,fontWeight:500}}>{label}</span>
-      <span style={{fontSize:12,color:T.text,fontWeight:500}}>{current}g <span style={{color:T.muted,fontWeight:400}}>/ {max}g</span></span>
+      <span data-testid={testId ? `${testId}-value` : undefined} style={{fontSize:12,color:T.text,fontWeight:500}}>{current}g <span style={{color:T.muted,fontWeight:400}}>/ {max}g</span></span>
     </div>
     <div style={{height:5,background:T.border,borderRadius:3,overflow:"hidden"}}>
-      <div style={{height:"100%",width:`${macroProgressPercent(current, max)}%`,background:color,borderRadius:3,transition:"width 0.6s ease"}} />
+      <div data-testid={testId ? `${testId}-fill` : undefined} style={{height:"100%",width:`${macroProgressPercent(current, max)}%`,background:color,borderRadius:3,transition:"width 0.6s ease"}} />
     </div>
   </div>
 );
@@ -16449,6 +16464,232 @@ const HealthDataConsentPrompt = ({accepted, onChange}) => {
   );
 };
 
+const WORKOUT_WEEK_DAYS = [
+  { day:1, it:"Lun", en:"Mon" },
+  { day:2, it:"Mar", en:"Tue" },
+  { day:3, it:"Mer", en:"Wed" },
+  { day:4, it:"Gio", en:"Thu" },
+  { day:5, it:"Ven", en:"Fri" },
+  { day:6, it:"Sab", en:"Sat" },
+  { day:7, it:"Dom", en:"Sun" },
+];
+
+const WorkoutScheduleEditor = ({ sessions = [], sports = [], legacySport = "", onChange, compact = false }) => {
+  const { lang, t } = useT();
+  const normalized = normalizeTrainingSessions(sessions);
+  const sportOptions = normalizeSports(sports, legacySport);
+  const primarySport = sportOptions[0] || "";
+  const update = (session) => onChange?.(upsertTrainingSession(normalized, session));
+
+  return (
+    <div data-testid="workout-schedule-editor">
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5,marginBottom:12}}>
+        {WORKOUT_WEEK_DAYS.map(({day,it,en}) => {
+          const active = normalized.some(session => session.day_of_week === day);
+          return (
+            <button key={day} type="button" data-testid={`workout-day-${day}`}
+              onClick={() => onChange?.(active
+                ? removeTrainingSession(normalized, day)
+                : upsertTrainingSession(normalized, {day_of_week:day,sport_id:primarySport,start_time:"",duration_min:null,session_index:1}))}
+              style={{padding:compact?"8px 2px":"10px 2px",borderRadius:10,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:T.text,fontSize:10,fontWeight:800,cursor:"pointer"}}>
+              {lang === "it" ? it : en}
+            </button>
+          );
+        })}
+      </div>
+      {normalized.map(session => {
+        const day = WORKOUT_WEEK_DAYS.find(item => item.day === session.day_of_week);
+        const complete = isTrainingSessionComplete(session);
+        return (
+          <div key={session.day_of_week} data-testid={`workout-session-${session.day_of_week}`}
+            style={{padding:12,borderRadius:14,border:`1px solid ${complete?T.border:"#D6A850"}`,background:T.bg,marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:9}}>
+              <strong style={{fontSize:12,color:T.text}}>{lang === "it" ? day?.it : day?.en}</strong>
+              {!complete && <span style={{fontSize:9,fontWeight:800,color:"#9A6500",textTransform:"uppercase"}}>{lang === "it" ? "Da completare" : "Incomplete"}</span>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1.25fr .8fr .8fr",gap:7}}>
+              <select aria-label={`Sport ${session.day_of_week}`} value={session.sport_id}
+                onChange={event=>update({...session,sport_id:event.target.value})}
+                style={{minWidth:0,padding:"10px 8px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}}>
+                <option value="">{lang === "it" ? "Sport" : "Sport"}</option>
+                {sportOptions.map(sport => <option key={sport} value={sport}>{getSportLabel(sport,t)}</option>)}
+              </select>
+              <input aria-label={`Ora ${session.day_of_week}`} type="time" value={session.start_time || ""}
+                onChange={event=>update({...session,start_time:event.target.value})}
+                style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}} />
+              <input aria-label={`Durata ${session.day_of_week}`} type="number" min="1" max="600" step="5" placeholder="min"
+                value={session.duration_min || ""} onChange={event=>update({...session,duration_min:event.target.value})}
+                style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}} />
+            </div>
+          </div>
+        );
+      })}
+      <p style={{fontSize:10.5,color:T.muted,lineHeight:1.45,margin:"8px 2px 0"}}>
+        {lang === "it"
+          ? "Inserisci orario esatto e durata per ogni giorno. Le doppie sessioni restano non supportate."
+          : "Enter the exact start time and duration for each day. Double sessions remain unsupported."}
+      </p>
+    </div>
+  );
+};
+
+const hasStoredConsumptionForDate = (userData, isoDate) => {
+  if (typeof localStorage === "undefined") return false;
+  const userKey = userData?.dubiCode || getAuthEmail() || "guest";
+  const prefixes = [`dubi_meal_status_${userKey}_${isoDate}`, `dubi_ing_checked_${userKey}_${isoDate}`];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !prefixes.some(prefix => key.startsWith(prefix))) continue;
+      const value = JSON.parse(localStorage.getItem(key) || "{}");
+      if (Object.values(value || {}).some(item => item === true || item === "done")) return true;
+    }
+  } catch (_) {}
+  return false;
+};
+
+const readDateCompletionState = (canonicalKey) => {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const canonical = JSON.parse(localStorage.getItem(canonicalKey) || "{}");
+    if (Object.keys(canonical).length) return canonical;
+    const migrated = {};
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || key === canonicalKey || !key.startsWith(`${canonicalKey}_`)) continue;
+      Object.assign(migrated, JSON.parse(localStorage.getItem(key) || "{}"));
+    }
+    if (Object.keys(migrated).length) localStorage.setItem(canonicalKey, JSON.stringify(migrated));
+    return migrated;
+  } catch (_) {
+    return {};
+  }
+};
+
+const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
+  const { lang, t } = useT();
+  const todayIso = getTodayIsoDate();
+  const sessions = getTrainingSessionsFromData(userData);
+  const sportIds = normalizeSports(userData?.sports, userData?.sport);
+  const sportLabels = Object.fromEntries(sportIds.map(sport => [sport, getSportLabel(sport,t)]));
+  const exactModel = buildTodayWorkoutModel({sessions,isoDate:todayIso,sportLabels});
+  const legacyTodayDeclared = (() => {
+    const dayKeys = ["sun","mon","tue","wed","thu","fri","sat"];
+    try {
+      const selected = JSON.parse(localStorage.getItem("dubi_training_days_setup") || "[]");
+      return Array.isArray(selected) && selected.includes(dayKeys[new Date(`${todayIso}T12:00:00Z`).getUTCDay()]);
+    } catch (_) { return false; }
+  })();
+  const model = exactModel.status === "rest" && legacyTodayDeclared
+    ? {status:"incomplete",session:null,title:lang === "it" ? "Mancano orario o durata" : "Time or duration missing"}
+    : exactModel;
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [draft, setDraft] = useState(() => model.session || {
+    day_of_week: ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1,
+    sport_id: sportIds[0] || "",
+    start_time: "",
+    duration_min: null,
+    session_index: 1,
+  });
+
+  useEffect(() => {
+    if (!editing) setDraft(model.session || {
+      day_of_week: ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1,
+      sport_id: sportIds[0] || "",
+      start_time: "",
+      duration_min: null,
+      session_index: 1,
+    });
+  }, [editing, todayIso, workoutScheduleSignature(sessions)]);
+
+  const save = async () => {
+    const nextSessions = upsertTrainingSession(sessions, draft);
+    const nextToday = getTrainingSessionForDate(nextSessions, todayIso);
+    if (!isTrainingSessionComplete(nextToday)) {
+      setMessage(lang === "it" ? "Completa sport, orario e durata." : "Complete sport, time and duration.");
+      return;
+    }
+    if (hasStoredConsumptionForDate(userData, todayIso)) {
+      const accepted = window.confirm(lang === "it"
+        ? "Hai già segnato alimenti consumati oggi. Rigenerare il piano preservando lo stato registrato?"
+        : "You already logged food today. Regenerate while preserving recorded completion state?");
+      if (!accepted) return;
+    }
+
+    const updatedData = {
+      ...userData,
+      trainingSessions: nextSessions,
+      training_sessions: nextSessions,
+      workoutDays: String(nextSessions.length),
+      workout_days: nextSessions.length,
+      doubleSessions: false,
+      double_sessions: false,
+    };
+    setSaving(true);
+    setMessage("");
+    try {
+      const saved = await saveOnboardingToBackend(updatedData);
+      if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
+      setUserData?.(updatedData);
+      saveDubiProfile(updatedData);
+      const {plan:updatedPlan,savedByAi} = await generateAiPlanFromBackend(updatedData, {
+        date: todayIso,
+        force: true,
+        reason: "today_workout_schedule_updated",
+      });
+      migrateTodayStatus(plan, updatedPlan, updatedData);
+      setPlan?.(updatedPlan);
+      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+      setEditing(false);
+      setMessage(lang === "it" ? "Piano aggiornato attorno all'allenamento." : "Plan updated around the workout.");
+    } catch (error) {
+      console.error("Today workout update failed:", error);
+      setMessage(lang === "it" ? "Non riesco ad aggiornare l'allenamento." : "Could not update the workout.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div data-testid="today-workout-card" style={{margin:"16px 24px",padding:16,borderRadius:18,background:T.card,border:`1px solid ${model.status==="incomplete"?"#D6A850":T.border}`}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+        <div style={{width:40,height:40,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="act" size={18} c={T.accentD}/></div>
+        <div style={{flex:1}}>
+          <p style={{fontSize:10,fontWeight:900,color:T.muted,letterSpacing:1,margin:"0 0 5px"}}>ALLENAMENTO DI OGGI</p>
+          {!editing && <>
+            <p data-testid="today-workout-title" style={{fontSize:14,fontWeight:900,color:T.text,margin:0,textTransform:"capitalize"}}>{model.title}</p>
+            {model.detail && <p data-testid="today-workout-detail" style={{fontSize:12,color:T.muted,margin:"3px 0 0"}}>{model.detail}</p>}
+          </>}
+        </div>
+        {!editing && <button type="button" onClick={()=>{setEditing(true);setMessage("");}}
+          style={{border:`1px solid ${T.border}`,background:T.bg,color:T.accentD,borderRadius:10,padding:"7px 9px",fontSize:10,fontWeight:900,cursor:"pointer"}}>
+          {model.status === "incomplete" ? "Completa" : "Modifica"}
+        </button>}
+      </div>
+      {editing && (
+        <div style={{marginTop:12,display:"grid",gridTemplateColumns:"1.2fr .8fr .8fr",gap:7}}>
+          <select aria-label="Sport allenamento di oggi" value={draft.sport_id || ""} onChange={event=>setDraft(prev=>({...prev,sport_id:event.target.value}))}
+            style={{minWidth:0,padding:"10px 7px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}}>
+            <option value="">Sport</option>
+            {sportIds.map(sport=><option key={sport} value={sport}>{sportLabels[sport]}</option>)}
+          </select>
+          <input aria-label="Orario allenamento di oggi" type="time" value={draft.start_time || ""} onChange={event=>setDraft(prev=>({...prev,start_time:event.target.value}))}
+            style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}} />
+          <input aria-label="Durata allenamento di oggi" type="number" min="1" max="600" step="5" placeholder="min" value={draft.duration_min || ""} onChange={event=>setDraft(prev=>({...prev,duration_min:event.target.value}))}
+            style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}} />
+          <div style={{gridColumn:"1 / -1",display:"flex",gap:7}}>
+            <button type="button" onClick={()=>setEditing(false)} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11,fontWeight:800}}>Annulla</button>
+            <button data-testid="save-today-workout" type="button" onClick={save} disabled={saving} style={{flex:1.5,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontSize:11,fontWeight:900,opacity:saving?.7:1}}>{saving?"Salvataggio...":"Salva"}</button>
+          </div>
+        </div>
+      )}
+      {message && <p style={{fontSize:10.5,color:T.muted,fontWeight:700,margin:"9px 0 0"}}>{message}</p>}
+    </div>
+  );
+};
+
 const PreferencesStep = ({d, u, page}) => {
   const { t, lang } = useT();
   const tx = (key, fallback) => {
@@ -16487,15 +16728,19 @@ const PreferencesStep = ({d, u, page}) => {
         }}
       />
 
-      {/* Orario allenamento */}
-      <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.training")}</p>
-      <OptBtn value={d.trainingTime} onChange={v=>u("trainingTime",v)} small options={[
-        {id:"morning",label:t("pref.training.morning"),note:t("pref.training.morning.r")},
-        {id:"lunch",label:t("pref.training.lunch"),note:t("pref.training.lunch.r")},
-        {id:"afternoon",label:t("pref.training.afternoon"),note:t("pref.training.afternoon.r")},
-        {id:"evening",label:t("pref.training.evening"),note:t("pref.training.evening.r")},
-        {id:"varies",label:t("pref.training.varies")},
-      ]} />
+      {/* Programma settimanale esatto: il runtime usa queste sessioni, non una fascia generica. */}
+      <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>
+        {lang === "it" ? "ALLENAMENTI SETTIMANALI" : "WEEKLY TRAINING SCHEDULE"}
+      </p>
+      <WorkoutScheduleEditor
+        sessions={d.trainingSessions}
+        sports={d.sports}
+        legacySport={d.sport}
+        onChange={sessions=>{
+          u("trainingSessions",sessions);
+          u("workoutDays",String(sessions.length));
+        }}
+      />
 
       {/* Colazione — Q1: abitudine */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>
@@ -16727,6 +16972,8 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   allergies:"",
   sport:"",
   sports:[],
+  trainingSessions:[],
+  doubleSessions:false,
   trainingTime:"evening",
   breakfastPref:"entrambi",
   dayStart:"07:00",
@@ -16795,6 +17042,8 @@ const normalizeInitialOnboardingData = (source) => {
     allergies: serializeCanonicalList(source.allergies || ""),
     sports: normalizeSports(source.sports, source.sport),
     sport: normalizeSports(source.sports, source.sport)[0] || "",
+    trainingSessions: getTrainingSessionsFromData(source),
+    doubleSessions: Boolean(source.double_sessions ?? source.doubleSessions ?? false),
     trainingTime: normalizeTrainingTime(source.training_time || source.trainingTime || defaultOnboardingData.trainingTime),
     breakfastPref: toAppBreakfast(source.breakfast_pref || source.breakfastPref || defaultOnboardingData.breakfastPref),
     dayStart: safeTime(source.day_start || source.dayStart, "07:00"),
@@ -16853,7 +17102,12 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
       ? !data.gender
       : !(isValidNum(data.age, 14, 85) && isValidNum(data.height, 140, 220) && isValidNum(data.weight, 35, 250))
   );
-  const canContinueStep = !healthConsentRequired && !wearableConsentRequired && !physicalIncomplete;
+  const selectedWorkoutCount = Number.parseInt(String(data.workoutDays || "0").split("-")[0],10) || 0;
+  const exactTrainingSessions = getTrainingSessionsFromData(data);
+  const workoutScheduleIncomplete = step === 4 && subStep === 1 && selectedWorkoutCount > 0 && (
+    exactTrainingSessions.length === 0 || exactTrainingSessions.some(session => !isTrainingSessionComplete(session))
+  );
+  const canContinueStep = !healthConsentRequired && !wearableConsentRequired && !physicalIncomplete && !workoutScheduleIncomplete;
 
   
   return (
@@ -17438,27 +17692,11 @@ function migrateTodayStatus(oldPlan, newPlan, userData) {
   try {
     if (!oldPlan || !newPlan) return;
     const userKey = userData?.dubiCode || getAuthEmail() || "guest";
-    const dateKey = new Date().toISOString().slice(0,10);
-    const makeKey = (p) => {
-      const pk = p?.aiEnginePlan?.generatedAt || p?.generatedAt || p?.calories || "plan";
-      return `dubi_meal_status_${userKey}_${dateKey}_${String(pk).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
-    };
-    const oldKey = makeKey(oldPlan);
-    const newKey = makeKey(newPlan);
-    if (oldKey === newKey) return;
-    const oldStatus = JSON.parse(localStorage.getItem(oldKey) || "{}");
-    if (!Object.keys(oldStatus).length) return;
-    const nowHHMM = new Date().toTimeString().slice(0,5);
-    const newMeals = typeof getAskDubiTodayMeals === "function" ? getAskDubiTodayMeals(newPlan, userData) : [];
-    const migrated = {};
-    for (const meal of newMeals) {
-      if (meal.time && meal.time <= nowHHMM && oldStatus[meal.id] !== undefined) {
-        migrated[meal.id] = oldStatus[meal.id];
-      }
-    }
-    if (Object.keys(migrated).length) {
-      localStorage.setItem(newKey, JSON.stringify(migrated));
-    }
+    const dateKey = getTodayIsoDate();
+    // Completion is date-scoped, so regenerating a plan never changes its key.
+    // This read also migrates any historical plan-scoped key once.
+    readDateCompletionState(`dubi_meal_status_${userKey}_${dateKey}`);
+    readDateCompletionState(`dubi_ing_checked_${userKey}_${dateKey}`);
   } catch(e) {
     console.warn("migrateTodayStatus error:", e);
   }
@@ -18067,23 +18305,21 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
   const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
   const dailyAdaptation = plan?.dailyAdaptation || adaptationPlanMeta?.dailyAdaptation || adaptationPlanMeta?.daily_adaptation || null;
-  const todayDateKey = new Date().toISOString().slice(0,10);
+  const todayDateKey = getTodayIsoDate();
 
   const todayMealStatusStorageKey = React.useMemo(() => {
     const userKey = userData?.dubiCode || getAuthEmail() || "guest";
-    const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.adaptationSignature || dailyAdaptation?.signature || plan?.calories || "plan";
-    return `dubi_meal_status_${userKey}_${todayDateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
-  }, [userData?.dubiCode, todayDateKey, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.adaptationSignature, dailyAdaptation?.signature, plan?.calories]);
+    return `dubi_meal_status_${userKey}_${todayDateKey}`;
+  }, [userData?.dubiCode, todayDateKey]);
   const todayIngredientStatusStorageKey = React.useMemo(() => {
     const userKey = userData?.dubiCode || getAuthEmail() || "guest";
-    const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.adaptationSignature || dailyAdaptation?.signature || plan?.calories || "plan";
-    return `dubi_ing_checked_${userKey}_${todayDateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g,"").slice(0,24)}`;
-  }, [userData?.dubiCode, todayDateKey, plan?.aiEnginePlan?.generatedAt, plan?.generatedAt, plan?.adaptationSignature, dailyAdaptation?.signature, plan?.calories]);
+    return `dubi_ing_checked_${userKey}_${todayDateKey}`;
+  }, [userData?.dubiCode, todayDateKey]);
   const [status,setStatus] = useState(() => {
-    try { return JSON.parse(safeLocalStorageGet(todayMealStatusStorageKey) || "{}"); } catch(e) { return {}; }
+    return readDateCompletionState(todayMealStatusStorageKey);
   });
   const [ingChecked,setIngChecked] = useState(() => {
-    try { return JSON.parse(safeLocalStorageGet(todayIngredientStatusStorageKey) || "{}"); } catch(e) { return {}; }
+    return readDateCompletionState(todayIngredientStatusStorageKey);
   });
   const [expanded,setExpanded] = useState(null);
   const [showWhy,setShowWhy] = useState({});
@@ -18097,7 +18333,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const [trainingMessage,setTrainingMessage] = useState("");
 
   React.useEffect(() => {
-    try { setStatus(JSON.parse(safeLocalStorageGet(todayMealStatusStorageKey) || "{}")); } catch(e) { setStatus({}); }
+    setStatus(readDateCompletionState(todayMealStatusStorageKey));
   }, [todayMealStatusStorageKey]);
 
   React.useEffect(() => {
@@ -18108,7 +18344,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   }, [todayMealStatusStorageKey, status]);
 
   React.useEffect(() => {
-    try { setIngChecked(JSON.parse(safeLocalStorageGet(todayIngredientStatusStorageKey) || "{}")); } catch(e) { setIngChecked({}); }
+    setIngChecked(readDateCompletionState(todayIngredientStatusStorageKey));
   }, [todayIngredientStatusStorageKey]);
 
   React.useEffect(() => {
@@ -18640,48 +18876,21 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
-      {/* ── Setup giorni: Step1 (prima volta o nessun piano settimana) OPPURE Step2 (reminder settimanale) ── */}
-      {(()=>{
-        const weekKey = "dubi_training_week_" + getWeekKey();
-        const weekDone  = Boolean(localStorage.getItem(weekKey));
-        const todayDow  = new Date().getDay();
-        const pd        = planningDay ?? 0;
-        const isReminderDay = todayDow === pd;
-        const trains = String(userData?.workout_days ?? userData?.workoutDays ?? "0") !== "0";
-        if (!trains) return null;
-        // Step1 se non c'è piano per questa settimana (prima volta O settimana nuova)
-        if (!weekDone && !isReminderDay) return <WeeklyTrainingSetupCard userData={userData}/>;
-        // Step2 solo il giorno del reminder
-        if (isReminderDay && !weekDone) return <WeeklyTrainingReminderCard userData={userData} planningDay={planningDay}/>;
-        return null;
-      })()}
-
-      {/* ── Badge allenamento: solo dopo conferma giornaliera ── */}
-      <TrainingTodayBadge userData={userData} setPlan={setPlan}/>
+      <TodayWorkoutCard userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan}/>
 
       {/* ── Card mattutine con filtro temporale ──
           Allenamento: solo fino alle 21:30 | Colazione: solo fino a dayStart+3.5h ── */}
       {(()=>{
         const nowH = new Date().getHours() + new Date().getMinutes()/60;
         const dayStart = Number(userData?.dayStart ?? userData?.day_start ?? 7);
-        const trains = String(userData?.workout_days ?? userData?.workoutDays ?? "0") !== "0";
         const todayKey = new Date().toISOString().slice(0,10);
-        const todayDow2 = new Date().getDay();
-        const DOW_KEY = ["sun","mon","tue","wed","thu","fri","sat"];
-        const declaredDays2 = (() => { try { return JSON.parse(localStorage.getItem("dubi_training_days_setup")||"[]"); } catch(e){ return []; } })();
-        // Se ha dichiarato giorni specifici, mostra solo in quei giorni
-        // Se NON ha ancora dichiarato giorni (setup non fatto), mostra sempre (poi si adatterà)
-        const isTrainingDay2 = declaredDays2.length === 0 ? true : declaredDays2.includes(DOW_KEY[todayDow2]);
-        const trainingAnswered  = Boolean(localStorage.getItem("dubi_training_answer_" + todayKey));
         const breakfastAnswered = Boolean(localStorage.getItem("dubi_bf_choice_"       + todayKey));
         const hasBreakfastPref  = ["variabile","entrambi"].includes(userData?.breakfastPref);
-        const trainingPending   = trains && isTrainingDay2 && !trainingAnswered && nowH < 21.5;
         const breakfastPending  = hasBreakfastPref && !breakfastAnswered && nowH < (dayStart + 3.5);
         return (
           <>
-            {trainingPending  && <MorningTrainingCard  userData={userData} setPlan={setPlan}/>}
-            {breakfastPending && !trainingPending && <MorningBreakfastCard userData={userData} setPlan={setPlan}/>}
-            {!trainingPending && !breakfastPending && !(activeNotif && !notifDismissed) && (
+            {breakfastPending && <MorningBreakfastCard userData={userData} setPlan={setPlan}/>}
+            {!breakfastPending && !(activeNotif && !notifDismissed) && (
               <ResearchInviteCard userData={userData} setUserData={setUserData}/>
             )}
           </>
@@ -18910,7 +19119,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
           })()}
           <div style={{flex:1}}>
             <p style={{fontSize:10,color:T.muted,margin:"0 0 2px",letterSpacing:0.5,textTransform:"uppercase"}}>{t("today.kcalConsumed")}</p>
-            <p style={{fontSize:26,fontWeight:800,color:T.text,margin:0,letterSpacing:-1,lineHeight:1.1}}>
+            <p data-testid="consumed-kcal" style={{fontSize:26,fontWeight:800,color:T.text,margin:0,letterSpacing:-1,lineHeight:1.1}}>
               {consumed.cal}
               <span style={{fontSize:13,fontWeight:400,color:T.muted,marginLeft:4}}>/ {plan.calories} kcal</span>
             </p>
@@ -18918,9 +19127,9 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <MacroBar label={t("today.macro.prot")} current={consumed.p} max={plan.protein} color={T.accent} />
-          <MacroBar label={t("today.macro.carb")} current={consumed.c} max={plan.carbs} color="#C9A87C" />
-          <MacroBar label={t("today.macro.fat")} current={consumed.f} max={plan.fat} color="#9A8FBF" />
+          <MacroBar testId="macro-protein" label={t("today.macro.prot")} current={consumed.p} max={plan.protein} color={T.accent} />
+          <MacroBar testId="macro-carbs" label={t("today.macro.carb")} current={consumed.c} max={plan.carbs} color="#C9A87C" />
+          <MacroBar testId="macro-fat" label={t("today.macro.fat")} current={consumed.f} max={plan.fat} color="#9A8FBF" />
         </div>
       </div>
 
@@ -18988,7 +19197,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
           const mealDisplay = getMealDisplayModel({ entry: mt, meal, fallbackLabel: fallbackMealLabel });
           return (
             <div key={mt.id} style={{marginBottom:10,background:st==="done"?T.sel:mt.isExtra?"rgba(107,138,100,0.07)":T.card,border:`1.5px solid ${mt.adaptSkipped?"#9A8FBF":mt.isExtra?T.accentD:st==="done"?T.accent:T.border}`,borderRadius:18,overflow:"hidden",opacity:st==="skip"?0.5:1,transition:"opacity 0.2s"}}>
-              <button onClick={()=>setExpanded(isOpen?null:mt.id)}
+              <button data-testid={`meal-toggle-${mt.id}`} onClick={()=>setExpanded(isOpen?null:mt.id)}
                 style={{width:"100%",display:"flex",alignItems:"center",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",gap:12}}>
                 <div style={{width:38,height:38,borderRadius:12,background:st==="done"?T.accentD+"22":T.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:`1px solid ${st==="done"?T.accent:T.border}`}}>
                   <Ico n={mt.icon||"fork"} size={18} c={st==="done"?T.accentD:T.muted}/>
@@ -19009,7 +19218,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                       </span>
                     )}
                     {mealDisplay.workoutLabel && (
-                      <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
+                      <span data-testid={`workout-badge-${mt.id}`} style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
                         background:mealDisplay.workoutLabel==="PRE"?"rgba(201,168,124,0.18)":"rgba(107,138,100,0.18)",
                         color:mealDisplay.workoutLabel==="PRE"?"#B8893A":T.accentD}}>
                         {mealDisplay.workoutBadgeText}
@@ -19081,7 +19290,14 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                         style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"6px 8px",borderRadius:10,cursor:"pointer",background:_tChecked?"rgba(107,138,100,0.08)":"transparent",border:`1px solid ${_tChecked?"rgba(107,138,100,0.24)":"transparent"}`,transition:"all 0.15s"}}
                         onMouseEnter={e=>{e.currentTarget.style.background=T.sel;e.currentTarget.style.borderColor=T.border;}}
                         onMouseLeave={e=>{e.currentTarget.style.background=_tChecked?"rgba(107,138,100,0.08)":"transparent";e.currentTarget.style.borderColor=_tChecked?"rgba(107,138,100,0.24)":"transparent";}}>
-                        <button data-no-haptic="true" type="button" onClick={(e)=>{e.stopPropagation();dubiHaptic(_tChecked?"soft":"success");setIngChecked(prev=>toggleIngredientCompletion(prev,_tCheckKey));}}
+                        <button data-testid={`ingredient-check-${mt.id}-${i}`} data-no-haptic="true" type="button" onClick={(e)=>{
+                          e.stopPropagation();
+                          dubiHaptic(_tChecked?"soft":"success");
+                          setIngChecked(prev=>toggleIngredientCompletion(prev,_tCheckKey));
+                          if (_tChecked && status[mt.id] === "done") {
+                            setStatus(prev=>{const next={...prev};delete next[mt.id];return next;});
+                          }
+                        }}
                           aria-label={_tChecked ? "Rimuovi ingrediente consumato" : "Segna ingrediente consumato"}
                           style={{width:22,height:22,borderRadius:7,border:`1.5px solid ${_tChecked?T.accentD:T.border}`,background:_tChecked?T.accentD:T.bg,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0,cursor:"pointer",lineHeight:1}}>
                           {_tChecked ? "✓" : ""}
@@ -19133,7 +19349,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                     </div>
                   )}
                   <div style={{display:"flex",gap:8}}>
-                    <button data-no-haptic="true" onClick={()=>{dubiHaptic("success");setMealIngredientsChecked(mt, true);setStatus(s=>({...s,[mt.id]:"done"}));setExpanded(null);}}
+                    <button data-testid={`meal-done-${mt.id}`} data-no-haptic="true" onClick={()=>{dubiHaptic("success");setMealIngredientsChecked(mt, true);setStatus(s=>({...s,[mt.id]:"done"}));setExpanded(null);}}
                       style={{flex:1,padding:11,borderRadius:12,background:T.accentD,color:T.white,border:"none",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                       <Ico n="check" size={16} c={T.bg}/> {t("today.done").replace(/^✓\s*/,"")}
                     </button>
@@ -19519,7 +19735,7 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:14,fontWeight:600,color:T.text}}>{mealDisplay.title}</span>
                     {displayWorkoutLabel && (
-                      <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
+                      <span data-testid={`plan-workout-badge-${mKey}`} style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:8,
                         background:displayWorkoutLabel==="PRE"?"rgba(201,168,124,0.2)":"rgba(107,138,100,0.2)",
                         color:displayWorkoutLabel==="PRE"?"#B8893A":T.accentD}}>
                         {mealDisplay.workoutBadgeText}
@@ -21791,6 +22007,13 @@ const [showHealthRevokeConfirm, setShowHealthRevokeConfirm] = useState(false);
 const [revokeStep, setRevokeStep] = useState(1);
 const [consentBusy, setConsentBusy] = useState(false);
 const [consentMessage, setConsentMessage] = useState("");
+const [scheduleDraft, setScheduleDraft] = useState(() => getTrainingSessionsFromData(userData));
+const [scheduleSaving, setScheduleSaving] = useState(false);
+const [scheduleMessage, setScheduleMessage] = useState("");
+
+useEffect(() => {
+  setScheduleDraft(getTrainingSessionsFromData(userData));
+}, [userData?.training_sessions, userData?.trainingSessions, userData?.sport_onboarding_contract]);
 
 useEffect(() => {
   let cancelled = false;
@@ -22272,6 +22495,59 @@ const handleSaveProfile = async () => {
   }
 };
 
+const handleSaveWorkoutSchedule = async () => {
+  if (scheduleSaving) return;
+  const sessions = normalizeTrainingSessions(scheduleDraft);
+  if (sessions.some(session => !isTrainingSessionComplete(session))) {
+    setScheduleMessage(lang === "it" ? "Completa sport, orario e durata per ogni giorno selezionato." : "Complete sport, time and duration for every selected day.");
+    return;
+  }
+  const todayIso = getTodayIsoDate();
+  const currentToday = getTrainingSessionForDate(getTrainingSessionsFromData(userData), todayIso);
+  const nextToday = getTrainingSessionForDate(sessions, todayIso);
+  const todayChanged = workoutScheduleSignature(currentToday ? [currentToday] : []) !== workoutScheduleSignature(nextToday ? [nextToday] : []);
+  if (todayChanged && hasStoredConsumptionForDate(userData, todayIso)) {
+    const accepted = window.confirm(lang === "it"
+      ? "Hai già segnato alimenti consumati oggi. Aggiornare l'allenamento e rigenerare il piano preservando lo stato registrato?"
+      : "You already logged food today. Update the workout and regenerate while preserving recorded completion state?");
+    if (!accepted) return;
+  }
+
+  const updatedData = {
+    ...userData,
+    trainingSessions: sessions,
+    training_sessions: sessions,
+    workoutDays: String(sessions.length),
+    workout_days: sessions.length,
+    doubleSessions: false,
+    double_sessions: false,
+  };
+  setScheduleSaving(true);
+  setScheduleMessage("");
+  try {
+    const saved = await saveOnboardingToBackend(updatedData);
+    if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
+    setUserData(updatedData);
+    saveDubiProfile(updatedData);
+    if (todayChanged) {
+      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+        date: todayIso,
+        force: true,
+        reason: "workout_schedule_updated",
+      });
+      migrateTodayStatus(plan, updatedPlan, updatedData);
+      setPlan(updatedPlan);
+      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
+    }
+    setScheduleMessage(lang === "it" ? "Allenamenti aggiornati." : "Workout schedule updated.");
+  } catch (error) {
+    console.error("Workout schedule update failed:", error);
+    setScheduleMessage(lang === "it" ? "Non riesco a salvare gli allenamenti." : "Could not save the workout schedule.");
+  } finally {
+    setScheduleSaving(false);
+  }
+};
+
 const closeDeletionFlow = () => {
   setShowDeleteConfirm(false);
   setDeleteStep("preview");
@@ -22519,6 +22795,31 @@ const requestDeletionOtp = async () => {
       )}
     </div>
   )}
+
+  {/* Exact weekly workout schedule used by Recipe Engine V1. */}
+  <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:22,padding:16,marginBottom:16}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+      <div style={{width:42,height:42,borderRadius:13,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <Ico n="act" size={19} c={T.accentD}/>
+      </div>
+      <div style={{flex:1}}>
+        <p style={{margin:0,fontSize:14,fontWeight:900,color:T.text}}>Allenamenti</p>
+        <p style={{margin:"3px 0 0",fontSize:11,color:T.muted,lineHeight:1.35}}>Sport, orario esatto e durata per ogni giorno.</p>
+      </div>
+    </div>
+    <WorkoutScheduleEditor
+      compact
+      sessions={scheduleDraft}
+      sports={profileForm.sports}
+      legacySport={profileForm.sport}
+      onChange={sessions=>{setScheduleDraft(sessions);setScheduleMessage("");}}
+    />
+    <button type="button" onClick={handleSaveWorkoutSchedule} disabled={scheduleSaving}
+      style={{width:"100%",padding:"12px",borderRadius:13,border:"none",background:T.accentD,color:"#E8E4DC",fontWeight:900,fontSize:13,cursor:scheduleSaving?"default":"pointer",opacity:scheduleSaving?.7:1,marginTop:12}}>
+      {scheduleSaving ? "Salvataggio..." : "Salva allenamenti"}
+    </button>
+    {scheduleMessage && <p style={{fontSize:11,fontWeight:700,color:T.muted,margin:"9px 2px 0"}}>{scheduleMessage}</p>}
+  </div>
 
   {/* Wearable connection */}
   <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:22,padding:16,marginBottom:16}}>
@@ -23005,10 +23306,9 @@ const DesktopSidebar = ({active,onChange,userData,plan}) => {
   const getProgress = React.useCallback(() => {
     try {
       const userKey = userData?.dubiCode || getAuthEmail() || "guest";
-      const dateKey = new Date().toISOString().slice(0, 10);
-      const planKey = plan?.aiEnginePlan?.generatedAt || plan?.generatedAt || plan?.calories || "plan";
-      const storageKey = `dubi_meal_status_${userKey}_${dateKey}_${String(planKey).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24)}`;
-      const statusMap = JSON.parse(localStorage.getItem(storageKey) || "{}");
+      const dateKey = getTodayIsoDate();
+      const storageKey = `dubi_meal_status_${userKey}_${dateKey}`;
+      const statusMap = readDateCompletionState(storageKey);
       const meals = (typeof getAskDubiTodayMeals === "function" ? getAskDubiTodayMeals(plan, userData) : []) || [];
       if (!meals.length || !kcal) return 0;
       const consumedCal = meals
@@ -23895,7 +24195,8 @@ function DUBIApp() {
     userData?.goal,
     userData?.weight,
     userData?.workoutDays,
-    userData?.trainingTime
+    userData?.trainingTime,
+    workoutScheduleSignature(getTrainingSessionsFromData(userData || {}))
   ]);
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -24287,8 +24588,75 @@ setPhase("app");
   );
 }
 
+const HomeConsumptionPreview = () => {
+  const todayIso = getTodayIsoDate();
+  const todayDay = ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  const [userData,setUserData] = useState({
+    name:"Test Home",
+    dubiCode:"browser-e2e",
+    gender:"M",
+    age:34,
+    height:178,
+    weight:78,
+    goal:"maintain",
+    diet:"omnivore",
+    breakfastPref:"entrambi",
+    sports:["powerlifting"],
+    sport:"powerlifting",
+    workoutDays:"1",
+    trainingSessions:[{day_of_week:todayDay,sport_id:"powerlifting",start_time:"19:00",duration_min:90,session_index:1}],
+    dayStart:7,
+    dayEnd:22,
+  });
+  const ingredient = (id,name,quantity,calories,protein,carbs,fat) => ({
+    ingredient_id:id,ingredient_name:name,name,selected_quantity_g:quantity,quantity_g:quantity,
+    calories,protein,carbs,fat,fiber:1,
+  });
+  const meals = [
+    {meal_type:"breakfast",recipe_name:"Porridge V16",authoring_key:"preview_breakfast",workout_relation:"NONE",scheduled_time:"08:00",ingredients:[ingredient(1,"Avena",60,228,8,38,4),ingredient(2,"Latte",200,92,7,10,3)],totalCalories:320,totalMacros:{protein:15,carbs:48,fat:7}},
+    {meal_type:"lunch",recipe_name:"Bowl V16",authoring_key:"preview_lunch",workout_relation:"NONE",scheduled_time:"13:00",ingredients:[ingredient(3,"Riso",80,288,6,62,1),ingredient(4,"Tacchino",150,165,35,0,2)],totalCalories:453,totalMacros:{protein:41,carbs:62,fat:3}},
+    {meal_type:"snack",recipe_name:"Snack V16",authoring_key:"preview_snack",workout_relation:"PRE",scheduled_time:"17:30",ingredients:[ingredient(5,"Banana",120,107,1.3,27,0.4)],totalCalories:107,totalMacros:{protein:1.3,carbs:27,fat:.4}},
+    {meal_type:"dinner",recipe_name:"Cena V16",authoring_key:"preview_dinner",workout_relation:"POST",scheduled_time:"21:00",ingredients:[ingredient(6,"Merluzzo",180,148,32,0,2),ingredient(7,"Patate",250,193,5,43,.3)],totalCalories:341,totalMacros:{protein:37,carbs:43,fat:2.3}},
+  ];
+  const [plan,setPlan] = useState({
+    calories:1221,protein:94.3,carbs:180,fat:12.7,mealCount:4,mealTimes:["08:00","13:00","17:30","21:00"],
+    generatedAt:"home-browser-e2e-v1",
+    ingredientPlan:{date:todayIso,engine_version:"recipe_engine_v1",generation_status:"SUCCESS",meals,daySummary:{totalCalories:1221,totalProtein:94.3,totalCarbs:180,totalFat:12.7}},
+  });
+  return <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={false} swaps={{}} planningDay={0} onOpenSettings={()=>{}}/>;
+};
+
+const WeeklyWorkoutBadgePreview = () => {
+  const todayIso = getTodayIsoDate();
+  const userData = {gender:"M",age:34,height:178,weight:78,goal:"maintain",diet:"omnivore",sports:["powerlifting"],sport:"powerlifting",dayStart:7,dayEnd:22};
+  const makeIngredient = (id,name) => ({ingredient_id:id,ingredient_name:name,selected_quantity_g:100,calories:100,protein:10,carbs:10,fat:2});
+  const rawPlan = {
+    date:todayIso,
+    engine_version:"recipe_engine_v1",
+    generation_status:"SUCCESS",
+    meals:[
+      {meal_type:"breakfast",recipe_name:"Colazione V16",authoring_key:"weekly_breakfast",workout_relation:"NONE",ingredients:[makeIngredient(1,"Avena")],totalCalories:100,totalMacros:{protein:10,carbs:10,fat:2}},
+      {meal_type:"lunch",recipe_name:"Pranzo V16",authoring_key:"weekly_lunch",workout_relation:"NONE",ingredients:[makeIngredient(2,"Riso")],totalCalories:100,totalMacros:{protein:10,carbs:10,fat:2}},
+      {meal_type:"snack",recipe_name:"Snack V16",authoring_key:"weekly_snack",workout_relation:"PRE",ingredients:[makeIngredient(3,"Banana")],totalCalories:100,totalMacros:{protein:10,carbs:10,fat:2}},
+      {meal_type:"dinner",recipe_name:"Cena V16",authoring_key:"weekly_dinner",workout_relation:"POST",ingredients:[makeIngredient(4,"Merluzzo")],totalCalories:100,totalMacros:{protein:10,carbs:10,fat:2}},
+    ],
+    daySummary:{totalCalories:400,totalProtein:40,totalCarbs:40,totalFat:8},
+  };
+  const plan = mapIngredientPlanToFrontend(rawPlan,userData);
+  plan.planDate = todayIso;
+  plan.ingredientPlanDate = todayIso;
+  const [swaps,setSwaps] = useState({});
+  return <WeeklyScreen userData={userData} plan={plan} weeklyPlans={[plan]} swaps={swaps} setSwaps={setSwaps}/>;
+};
+
 export function DUBIRoot() {
   const params = new URLSearchParams(window.location.search);
+  if (window.location.hostname === "127.0.0.1" && params.get("_home_consumption_preview") === "1") {
+    return <HomeConsumptionPreview />;
+  }
+  if (window.location.hostname === "127.0.0.1" && params.get("_weekly_workout_preview") === "1") {
+    return <WeeklyWorkoutBadgePreview />;
+  }
   if (window.location.hostname === "127.0.0.1" && params.get("_trend_preview") === "1") {
     return <TrendScreen userData={{weight:76.5,height:175,age:35,is_minor:false,targetWeight:72}} plan={{goal:"fatLoss",calories:2100,tdee:2500}} lang="en" />;
   }

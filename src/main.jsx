@@ -1,6 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
+window.__DUBI_BUILD__ = {
+  frontend_commit: __DUBI_FRONTEND_COMMIT__,
+  build_timestamp: __DUBI_BUILD_TIMESTAMP__,
+};
+
 const finishBoot = () => {
   window._dubiReady = true;
   clearTimeout(window._dubiBootTimer);
