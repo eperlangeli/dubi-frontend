@@ -8,7 +8,7 @@ import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
 import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent, toggleIngredientCompletion } from "./planConsumptionModel.mjs";
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getExplicitWorkoutLabel, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
-import { buildTodayWorkoutModel, getTrainingSessionForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
+import { buildTodayWorkoutModel, getTrainingSessionForDate, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -1559,13 +1559,18 @@ async function generateIngredientPlan(options = {}) {
     },
     body: JSON.stringify({
       date: today,
-      ...(options.breakfastChoice ? { breakfastChoice: options.breakfastChoice, reason: options.reason || "breakfast_choice" } : {})
+      ...(options.breakfastChoice ? { breakfastChoice: options.breakfastChoice, reason: options.reason || "breakfast_choice" } : {}),
+      ...(options.dailyTrainingOverride ? { daily_training_override: options.dailyTrainingOverride } : {})
     })
   });
 
   if (!genRes.ok) {
     const err = await genRes.json().catch(() => ({}));
-    throw new Error(err.error || getRuntimeCopy("plan.error.generate"));
+    const failure = new Error(err.error || getRuntimeCopy("plan.error.generate"));
+    failure.code = err.error || null;
+    failure.status = genRes.status;
+    failure.payload = err;
+    throw failure;
   }
 
   const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}`, {
@@ -1574,6 +1579,28 @@ async function generateIngredientPlan(options = {}) {
 
   if (!fetchRes.ok) throw new Error(getRuntimeCopy("plan.error.fetch"));
   return normalizeIngredientPlanPayload(await fetchRes.json());
+}
+
+async function saveTodayTrainingState({ date, state, sessions = [] }) {
+  const token = getAuthToken();
+  if (!token) throw new Error("missing_token");
+  const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/training-state`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ date, state, sessions }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const failure = new Error(payload.error || "training_state_save_failed");
+    failure.code = payload.error || null;
+    failure.status = response.status;
+    failure.payload = payload;
+    throw failure;
+  }
+  return payload;
 }
 
 const fetchCurrentIngredientPlanFromBackend = async () => {
@@ -1674,6 +1701,7 @@ const generateAiPlanFromBackend = async (userData, options = {}) => {
     return { plan: mapIngredientPlanToFrontend(ingredientPlan, userData), savedByAi: true };
   } catch (error) {
     console.error("Ingredient plan request failed:", error);
+    if (options.throwOnFailure) throw error;
     return { plan: fallbackPlan, savedByAi: false };
   }
 };
@@ -16478,8 +16506,17 @@ const WorkoutScheduleEditor = ({ sessions = [], sports = [], legacySport = "", o
   const { lang, t } = useT();
   const normalized = normalizeTrainingSessions(sessions);
   const sportOptions = normalizeSports(sports, legacySport);
-  const primarySport = sportOptions[0] || "";
   const update = (session) => onChange?.(upsertTrainingSession(normalized, session));
+  const addSession = (day) => {
+    const daySessions = normalized.filter(session => session.day_of_week === day);
+    onChange?.(normalizeTrainingSessions([...normalized, {
+      day_of_week: day,
+      sport_id: "",
+      start_time: "",
+      duration_min: null,
+      session_index: daySessions.length + 1,
+    }]));
+  };
 
   return (
     <div data-testid="workout-schedule-editor">
@@ -16490,7 +16527,7 @@ const WorkoutScheduleEditor = ({ sessions = [], sports = [], legacySport = "", o
             <button key={day} type="button" data-testid={`workout-day-${day}`}
               onClick={() => onChange?.(active
                 ? removeTrainingSession(normalized, day)
-                : upsertTrainingSession(normalized, {day_of_week:day,sport_id:primarySport,start_time:"",duration_min:null,session_index:1}))}
+                : upsertTrainingSession(normalized, {day_of_week:day,sport_id:"",start_time:"",duration_min:null,session_index:1}))}
               style={{padding:compact?"8px 2px":"10px 2px",borderRadius:10,border:`1.5px solid ${active?T.accent:T.border}`,background:active?T.sel:T.card,color:T.text,fontSize:10,fontWeight:800,cursor:"pointer"}}>
               {lang === "it" ? it : en}
             </button>
@@ -16501,33 +16538,44 @@ const WorkoutScheduleEditor = ({ sessions = [], sports = [], legacySport = "", o
         const day = WORKOUT_WEEK_DAYS.find(item => item.day === session.day_of_week);
         const complete = isTrainingSessionComplete(session);
         return (
-          <div key={session.day_of_week} data-testid={`workout-session-${session.day_of_week}`}
+          <div key={`${session.day_of_week}-${session.session_index}`} data-testid={`workout-session-${session.day_of_week}-${session.session_index}`}
             style={{padding:12,borderRadius:14,border:`1px solid ${complete?T.border:"#D6A850"}`,background:T.bg,marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:9}}>
-              <strong style={{fontSize:12,color:T.text}}>{lang === "it" ? day?.it : day?.en}</strong>
-              {!complete && <span style={{fontSize:9,fontWeight:800,color:"#9A6500",textTransform:"uppercase"}}>{lang === "it" ? "Da completare" : "Incomplete"}</span>}
+              <strong style={{fontSize:12,color:T.text}}>{lang === "it" ? day?.it : day?.en} · {lang === "it" ? "Sessione" : "Session"} {session.session_index}</strong>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                {!complete && <span style={{fontSize:9,fontWeight:800,color:"#9A6500",textTransform:"uppercase"}}>{lang === "it" ? "Da completare" : "Incomplete"}</span>}
+                <button type="button" aria-label={`Rimuovi sessione ${session.day_of_week}-${session.session_index}`}
+                  onClick={()=>onChange?.(removeTrainingSession(normalized,session.day_of_week,session.session_index))}
+                  style={{border:0,background:"transparent",color:T.muted,fontSize:16,cursor:"pointer",padding:2}}>×</button>
+              </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1.25fr .8fr .8fr",gap:7}}>
-              <select aria-label={`Sport ${session.day_of_week}`} value={session.sport_id}
+              <select aria-label={`Sport ${session.day_of_week}-${session.session_index}`} value={session.sport_id}
                 onChange={event=>update({...session,sport_id:event.target.value})}
                 style={{minWidth:0,padding:"10px 8px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}}>
                 <option value="">{lang === "it" ? "Sport" : "Sport"}</option>
                 {sportOptions.map(sport => <option key={sport} value={sport}>{getSportLabel(sport,t)}</option>)}
               </select>
-              <input aria-label={`Ora ${session.day_of_week}`} type="time" value={session.start_time || ""}
+              <input aria-label={`Ora ${session.day_of_week}-${session.session_index}`} type="time" value={session.start_time || ""}
                 onChange={event=>update({...session,start_time:event.target.value})}
                 style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}} />
-              <input aria-label={`Durata ${session.day_of_week}`} type="number" min="1" max="600" step="5" placeholder="min"
+              <input aria-label={`Durata ${session.day_of_week}-${session.session_index}`} type="number" min="1" max="600" step="5" placeholder="min"
                 value={session.duration_min || ""} onChange={event=>update({...session,duration_min:event.target.value})}
                 style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}} />
             </div>
+            {session.session_index === normalized.filter(item => item.day_of_week === session.day_of_week).length && (
+              <button type="button" onClick={()=>addSession(session.day_of_week)}
+                style={{marginTop:8,border:0,background:"transparent",color:T.accentD,fontSize:10.5,fontWeight:900,cursor:"pointer",padding:2}}>
+                + {lang === "it" ? "Aggiungi un altro allenamento" : "Add another workout"}
+              </button>
+            )}
           </div>
         );
       })}
       <p style={{fontSize:10.5,color:T.muted,lineHeight:1.45,margin:"8px 2px 0"}}>
         {lang === "it"
-          ? "Inserisci orario esatto e durata per ogni giorno. Le doppie sessioni restano non supportate."
-          : "Enter the exact start time and duration for each day. Double sessions remain unsupported."}
+          ? "Inserisci sport, orario esatto e durata per ogni sessione. Le sessioni multiple vengono salvate separatamente."
+          : "Enter sport, exact start time and duration for each session. Multiple sessions are stored separately."}
       </p>
     </div>
   );
@@ -16570,46 +16618,60 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
   const { lang, t } = useT();
   const todayIso = getTodayIsoDate();
   const sessions = getTrainingSessionsFromData(userData);
+  const todayDay = ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
   const sportIds = normalizeSports(userData?.sports, userData?.sport);
   const sportLabels = Object.fromEntries(sportIds.map(sport => [sport, getSportLabel(sport,t)]));
-  const exactModel = buildTodayWorkoutModel({sessions,isoDate:todayIso,sportLabels});
-  const legacyTodayDeclared = (() => {
-    const dayKeys = ["sun","mon","tue","wed","thu","fri","sat"];
-    try {
-      const selected = JSON.parse(localStorage.getItem("dubi_training_days_setup") || "[]");
-      return Array.isArray(selected) && selected.includes(dayKeys[new Date(`${todayIso}T12:00:00Z`).getUTCDay()]);
-    } catch (_) { return false; }
-  })();
-  const model = exactModel.status === "rest" && legacyTodayDeclared
-    ? {status:"incomplete",session:null,title:lang === "it" ? "Mancano orario o durata" : "Time or duration missing"}
-    : exactModel;
+  const overrideStorageKey = `dubi_today_training_override_${userData?.dubiCode || getAuthEmail() || "guest"}_${todayIso}`;
+  const planOverride = plan?.ingredientPlan?.daily_training_override || plan?.daily_training_override || null;
+  const readStoredOverride = () => {
+    try { return JSON.parse(localStorage.getItem(overrideStorageKey) || "null"); } catch (_) { return null; }
+  };
+  const [dailyOverride,setDailyOverride] = useState(() => planOverride || readStoredOverride());
+  const model = buildTodayWorkoutModel({sessions,isoDate:todayIso,sportLabels,dailyOverride});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [draft, setDraft] = useState(() => model.session || {
-    day_of_week: ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1,
-    sport_id: sportIds[0] || "",
-    start_time: "",
-    duration_min: null,
-    session_index: 1,
-  });
+  const [routineMode,setRoutineMode] = useState("today");
+  const defaultSessions = () => {
+    const source = dailyOverride?.state === "training"
+      ? dailyOverride.sessions
+      : getTrainingSessionsForDate(sessions,todayIso);
+    return source.length ? normalizeTrainingSessions(source) : [{
+      day_of_week:todayDay,
+      sport_id:"",
+      start_time:"",
+      duration_min:null,
+      session_index:1,
+    }];
+  };
+  const [draftSessions,setDraftSessions] = useState(defaultSessions);
 
   useEffect(() => {
-    if (!editing) setDraft(model.session || {
-      day_of_week: ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1,
-      sport_id: sportIds[0] || "",
-      start_time: "",
-      duration_min: null,
-      session_index: 1,
-    });
-  }, [editing, todayIso, workoutScheduleSignature(sessions)]);
+    if (planOverride) {
+      setDailyOverride(planOverride);
+      try { localStorage.setItem(overrideStorageKey,JSON.stringify(planOverride)); } catch (_) {}
+    }
+  }, [overrideStorageKey,JSON.stringify(planOverride)]);
 
-  const save = async () => {
-    const nextSessions = upsertTrainingSession(sessions, draft);
-    const nextToday = getTrainingSessionForDate(nextSessions, todayIso);
-    if (!isTrainingSessionComplete(nextToday)) {
-      setMessage(lang === "it" ? "Completa sport, orario e durata." : "Complete sport, time and duration.");
-      return;
+  useEffect(() => {
+    if (!editing) setDraftSessions(defaultSessions());
+  }, [editing,todayIso,workoutScheduleSignature(sessions),JSON.stringify(dailyOverride)]);
+
+  const replaceRoutineDay = (nextTodaySessions) => normalizeTrainingSessions([
+    ...sessions.filter(session=>session.day_of_week !== todayDay),
+    ...nextTodaySessions,
+  ]);
+
+  const persistState = async (nextOverride) => {
+    if (nextOverride.state === "training") {
+      if (!nextOverride.sessions.length || nextOverride.sessions.some(session=>!isTrainingSessionComplete(session))) {
+        setMessage(lang === "it" ? "Completa sport, orario e durata per ogni sessione." : "Complete sport, time and duration for every session.");
+        return;
+      }
+      if (trainingSessionsOverlap(nextOverride.sessions)) {
+        setMessage(lang === "it" ? "Le sessioni non possono sovrapporsi." : "Sessions cannot overlap.");
+        return;
+      }
     }
     if (hasStoredConsumptionForDate(userData, todayIso)) {
       const accepted = window.confirm(lang === "it"
@@ -16618,39 +16680,87 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
       if (!accepted) return;
     }
 
-    const updatedData = {
-      ...userData,
-      trainingSessions: nextSessions,
-      training_sessions: nextSessions,
-      workoutDays: String(nextSessions.length),
-      workout_days: nextSessions.length,
-      doubleSessions: false,
-      double_sessions: false,
-    };
     setSaving(true);
     setMessage("");
     try {
-      const saved = await saveOnboardingToBackend(updatedData);
-      if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
-      setUserData?.(updatedData);
-      saveDubiProfile(updatedData);
-      const {plan:updatedPlan,savedByAi} = await generateAiPlanFromBackend(updatedData, {
+      const normalizedOverride = {
+        date:todayIso,
+        state:nextOverride.state,
+        sessions:nextOverride.state === "training" ? normalizeTrainingSessions(nextOverride.sessions) : [],
+      };
+      const savedState = await saveTodayTrainingState(normalizedOverride);
+      const persistedOverride = savedState.daily_training_override || normalizedOverride;
+      setDailyOverride(persistedOverride);
+      try { localStorage.setItem(overrideStorageKey,JSON.stringify(persistedOverride)); } catch (_) {}
+      setPlan?.(current=>({
+        ...current,
+        ingredientPlan:{
+          ...(current?.ingredientPlan || {}),
+          daily_training_override:persistedOverride,
+          nutrition_context_stale:true,
+        },
+      }));
+
+      let updatedData = userData;
+      if (routineMode === "routine") {
+        const nextRoutineSessions = replaceRoutineDay(persistedOverride.sessions);
+        const workoutDayCount = new Set(nextRoutineSessions.map(session=>session.day_of_week)).size;
+        const hasDoubleSessions = [...new Set(nextRoutineSessions.map(session=>session.day_of_week))]
+          .some(day=>nextRoutineSessions.filter(session=>session.day_of_week===day).length > 1);
+        updatedData = {
+          ...userData,
+          trainingSessions:nextRoutineSessions,
+          training_sessions:nextRoutineSessions,
+          workoutDays:String(workoutDayCount),
+          workout_days:workoutDayCount,
+          doubleSessions:hasDoubleSessions,
+          double_sessions:hasDoubleSessions,
+        };
+        const saved = await saveOnboardingToBackend(updatedData);
+        if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
+        setUserData?.(updatedData);
+        saveDubiProfile(updatedData);
+      }
+
+      const {plan:updatedPlan} = await generateAiPlanFromBackend(updatedData, {
         date: todayIso,
         force: true,
-        reason: "today_workout_schedule_updated",
+        reason: "today_training_state_updated",
+        dailyTrainingOverride:persistedOverride,
+        throwOnFailure:true,
       });
       migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan?.(updatedPlan);
-      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
       setEditing(false);
-      setMessage(lang === "it" ? "Piano aggiornato attorno all'allenamento." : "Plan updated around the workout.");
+      setMessage(persistedOverride.state === "rest"
+        ? (lang === "it" ? "Oggi è impostato come giorno di riposo." : "Today is set as a rest day.")
+        : (lang === "it" ? "Piano aggiornato attorno all'allenamento." : "Plan updated around the workout."));
     } catch (error) {
       console.error("Today workout update failed:", error);
-      setMessage(lang === "it" ? "Non riesco ad aggiornare l'allenamento." : "Could not update the workout.");
+      setEditing(false);
+      setMessage(error?.code === "RECIPE_ENGINE_V1_DOUBLE_SESSION_RULE_NOT_IMPLEMENTED"
+        ? (lang === "it" ? "Sessioni salvate. Il piano nutrizionale per doppia sessione è in attesa di regole professionali approvate." : "Sessions saved. Double-session nutrition rules are still awaiting professional approval.")
+        : (lang === "it" ? "Non riesco ad aggiornare l'allenamento." : "Could not update the workout."));
     } finally {
       setSaving(false);
     }
   };
+
+  const beginTrainingEdit = () => {
+    setDraftSessions(defaultSessions());
+    setRoutineMode("today");
+    setEditing(true);
+    setMessage("");
+  };
+
+  const updateDraft = (session) => setDraftSessions(current=>upsertTrainingSession(current,session));
+  const addDraftSession = () => setDraftSessions(current=>normalizeTrainingSessions([...current,{
+    day_of_week:todayDay,
+    sport_id:"",
+    start_time:"",
+    duration_min:null,
+    session_index:current.length + 1,
+  }]));
 
   return (
     <div data-testid="today-workout-card" style={{margin:"16px 24px",padding:16,borderRadius:18,background:T.card,border:`1px solid ${model.status==="incomplete"?"#D6A850":T.border}`}}>
@@ -16658,30 +16768,52 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
         <div style={{width:40,height:40,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="act" size={18} c={T.accentD}/></div>
         <div style={{flex:1}}>
           <p style={{fontSize:10,fontWeight:900,color:T.muted,letterSpacing:1,margin:"0 0 5px"}}>ALLENAMENTO DI OGGI</p>
-          {!editing && <>
-            <p data-testid="today-workout-title" style={{fontSize:14,fontWeight:900,color:T.text,margin:0,textTransform:"capitalize"}}>{model.title}</p>
-            {model.detail && <p data-testid="today-workout-detail" style={{fontSize:12,color:T.muted,margin:"3px 0 0"}}>{model.detail}</p>}
+          {!editing && !dailyOverride && <p data-testid="today-training-question" style={{fontSize:14,fontWeight:900,color:T.text,margin:0}}>{lang === "it" ? "Ti alleni oggi?" : "Are you training today?"}</p>}
+          {!editing && dailyOverride && <>
+            {model.status === "multiple" ? model.sessions.map(session=><div key={session.session_index} style={{marginTop:session.session_index===1?0:7}}>
+              <p style={{fontSize:12,fontWeight:900,color:T.text,margin:0}}>{session.session_index}. {sportLabels[session.sport_id] || session.sport_id}</p>
+              <p style={{fontSize:11,color:T.muted,margin:"2px 0 0"}}>{session.start_time} · {session.duration_min} min</p>
+            </div>) : <>
+              <p data-testid="today-workout-title" style={{fontSize:14,fontWeight:900,color:T.text,margin:0,textTransform:"capitalize"}}>{model.title}</p>
+              {model.detail && <p data-testid="today-workout-detail" style={{fontSize:12,color:T.muted,margin:"3px 0 0"}}>{model.detail}</p>}
+            </>}
           </>}
         </div>
-        {!editing && <button type="button" onClick={()=>{setEditing(true);setMessage("");}}
+        {!editing && dailyOverride && <button type="button" onClick={beginTrainingEdit}
           style={{border:`1px solid ${T.border}`,background:T.bg,color:T.accentD,borderRadius:10,padding:"7px 9px",fontSize:10,fontWeight:900,cursor:"pointer"}}>
-          {model.status === "incomplete" ? "Completa" : "Modifica"}
+          Modifica
         </button>}
       </div>
+      {!editing && !dailyOverride && <div style={{display:"flex",gap:8,marginTop:12}}>
+        <button data-testid="today-training-yes" type="button" onClick={beginTrainingEdit} style={{flex:1,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontWeight:900,cursor:"pointer"}}>Sì</button>
+        <button data-testid="today-training-no" type="button" onClick={()=>persistState({state:"rest",sessions:[]})} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontWeight:900,cursor:"pointer"}}>No</button>
+      </div>}
       {editing && (
-        <div style={{marginTop:12,display:"grid",gridTemplateColumns:"1.2fr .8fr .8fr",gap:7}}>
-          <select aria-label="Sport allenamento di oggi" value={draft.sport_id || ""} onChange={event=>setDraft(prev=>({...prev,sport_id:event.target.value}))}
-            style={{minWidth:0,padding:"10px 7px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}}>
-            <option value="">Sport</option>
-            {sportIds.map(sport=><option key={sport} value={sport}>{sportLabels[sport]}</option>)}
-          </select>
-          <input aria-label="Orario allenamento di oggi" type="time" value={draft.start_time || ""} onChange={event=>setDraft(prev=>({...prev,start_time:event.target.value}))}
-            style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}} />
-          <input aria-label="Durata allenamento di oggi" type="number" min="1" max="600" step="5" placeholder="min" value={draft.duration_min || ""} onChange={event=>setDraft(prev=>({...prev,duration_min:event.target.value}))}
-            style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}} />
-          <div style={{gridColumn:"1 / -1",display:"flex",gap:7}}>
+        <div style={{marginTop:12}}>
+          {draftSessions.map(session=><div key={session.session_index} style={{marginBottom:10}}>
+            <p style={{fontSize:10,fontWeight:900,color:T.muted,margin:"0 0 6px"}}>SESSIONE {session.session_index}</p>
+            <div style={{display:"grid",gridTemplateColumns:"1.2fr .8fr .8fr",gap:7}}>
+              <select aria-label={`Sport allenamento di oggi ${session.session_index}`} value={session.sport_id || ""} onChange={event=>updateDraft({...session,sport_id:event.target.value})}
+                style={{minWidth:0,padding:"10px 7px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}}>
+                <option value="">Sport</option>
+                {sportIds.map(sport=><option key={sport} value={sport}>{sportLabels[sport]}</option>)}
+              </select>
+              <input aria-label={`Orario allenamento di oggi ${session.session_index}`} type="time" value={session.start_time || ""} onChange={event=>updateDraft({...session,start_time:event.target.value})}
+                style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}} />
+              <input aria-label={`Durata allenamento di oggi ${session.session_index}`} type="number" min="1" max="600" step="5" placeholder="min" value={session.duration_min || ""} onChange={event=>updateDraft({...session,duration_min:event.target.value})}
+                style={{minWidth:0,padding:"9px 6px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}} />
+            </div>
+            {draftSessions.length > 1 && <button type="button" onClick={()=>setDraftSessions(current=>removeTrainingSession(current,todayDay,session.session_index))} style={{border:0,background:"transparent",color:T.muted,fontSize:10.5,fontWeight:800,padding:"7px 0",cursor:"pointer"}}>Rimuovi sessione</button>}
+          </div>)}
+          <button data-testid="add-today-workout" type="button" onClick={addDraftSession} style={{border:0,background:"transparent",color:T.accentD,fontSize:11,fontWeight:900,padding:"3px 0 10px",cursor:"pointer"}}>+ Aggiungi un altro allenamento</button>
+          <div style={{display:"flex",gap:7,marginBottom:10}}>
+            <button type="button" onClick={()=>setRoutineMode("today")} style={{flex:1,padding:9,borderRadius:10,border:`1px solid ${routineMode==="today"?T.accent:T.border}`,background:routineMode==="today"?T.sel:T.bg,color:T.text,fontSize:10,fontWeight:800}}>Modifica solo oggi</button>
+            <button type="button" onClick={()=>setRoutineMode("routine")} style={{flex:1,padding:9,borderRadius:10,border:`1px solid ${routineMode==="routine"?T.accent:T.border}`,background:routineMode==="routine"?T.sel:T.bg,color:T.text,fontSize:10,fontWeight:800}}>Modifica anche routine settimanale</button>
+          </div>
+          <div style={{display:"flex",gap:7}}>
             <button type="button" onClick={()=>setEditing(false)} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11,fontWeight:800}}>Annulla</button>
-            <button data-testid="save-today-workout" type="button" onClick={save} disabled={saving} style={{flex:1.5,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontSize:11,fontWeight:900,opacity:saving?.7:1}}>{saving?"Salvataggio...":"Salva"}</button>
+            <button type="button" onClick={()=>persistState({state:"rest",sessions:[]})} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11,fontWeight:800}}>Oggi no</button>
+            <button data-testid="save-today-workout" type="button" onClick={()=>persistState({state:"training",sessions:draftSessions})} disabled={saving} style={{flex:1.5,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontSize:11,fontWeight:900,opacity:saving?.7:1}}>{saving?"Salvataggio...":"Salva"}</button>
           </div>
         </div>
       )}
@@ -16738,7 +16870,9 @@ const PreferencesStep = ({d, u, page}) => {
         legacySport={d.sport}
         onChange={sessions=>{
           u("trainingSessions",sessions);
-          u("workoutDays",String(sessions.length));
+          u("workoutDays",String(new Set(sessions.map(session=>session.day_of_week)).size));
+          u("doubleSessions",[...new Set(sessions.map(session=>session.day_of_week))]
+            .some(day=>sessions.filter(session=>session.day_of_week===day).length > 1));
         }}
       />
 
@@ -22499,13 +22633,17 @@ const handleSaveWorkoutSchedule = async () => {
   if (scheduleSaving) return;
   const sessions = normalizeTrainingSessions(scheduleDraft);
   if (sessions.some(session => !isTrainingSessionComplete(session))) {
-    setScheduleMessage(lang === "it" ? "Completa sport, orario e durata per ogni giorno selezionato." : "Complete sport, time and duration for every selected day.");
+    setScheduleMessage(lang === "it" ? "Completa sport, orario e durata per ogni sessione." : "Complete sport, time and duration for every session.");
+    return;
+  }
+  if (trainingSessionsOverlap(sessions)) {
+    setScheduleMessage(lang === "it" ? "Le sessioni dello stesso giorno non possono sovrapporsi." : "Sessions on the same day cannot overlap.");
     return;
   }
   const todayIso = getTodayIsoDate();
-  const currentToday = getTrainingSessionForDate(getTrainingSessionsFromData(userData), todayIso);
-  const nextToday = getTrainingSessionForDate(sessions, todayIso);
-  const todayChanged = workoutScheduleSignature(currentToday ? [currentToday] : []) !== workoutScheduleSignature(nextToday ? [nextToday] : []);
+  const currentToday = getTrainingSessionsForDate(getTrainingSessionsFromData(userData), todayIso);
+  const nextToday = getTrainingSessionsForDate(sessions, todayIso);
+  const todayChanged = workoutScheduleSignature(currentToday) !== workoutScheduleSignature(nextToday);
   if (todayChanged && hasStoredConsumptionForDate(userData, todayIso)) {
     const accepted = window.confirm(lang === "it"
       ? "Hai già segnato alimenti consumati oggi. Aggiornare l'allenamento e rigenerare il piano preservando lo stato registrato?"
@@ -22513,14 +22651,17 @@ const handleSaveWorkoutSchedule = async () => {
     if (!accepted) return;
   }
 
+  const workoutDayCount = new Set(sessions.map(session=>session.day_of_week)).size;
+  const hasDoubleSessions = [...new Set(sessions.map(session=>session.day_of_week))]
+    .some(day=>sessions.filter(session=>session.day_of_week===day).length > 1);
   const updatedData = {
     ...userData,
     trainingSessions: sessions,
     training_sessions: sessions,
-    workoutDays: String(sessions.length),
-    workout_days: sessions.length,
-    doubleSessions: false,
-    double_sessions: false,
+    workoutDays: String(workoutDayCount),
+    workout_days: workoutDayCount,
+    doubleSessions: hasDoubleSessions,
+    double_sessions: hasDoubleSessions,
   };
   setScheduleSaving(true);
   setScheduleMessage("");
@@ -22534,6 +22675,7 @@ const handleSaveWorkoutSchedule = async () => {
         date: todayIso,
         force: true,
         reason: "workout_schedule_updated",
+        throwOnFailure: true,
       });
       migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan(updatedPlan);
@@ -24590,7 +24732,6 @@ setPhase("app");
 
 const HomeConsumptionPreview = () => {
   const todayIso = getTodayIsoDate();
-  const todayDay = ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
   const [userData,setUserData] = useState({
     name:"Test Home",
     dubiCode:"browser-e2e",
@@ -24601,10 +24742,10 @@ const HomeConsumptionPreview = () => {
     goal:"maintain",
     diet:"omnivore",
     breakfastPref:"entrambi",
-    sports:["powerlifting"],
+    sports:["powerlifting","running"],
     sport:"powerlifting",
-    workoutDays:"1",
-    trainingSessions:[{day_of_week:todayDay,sport_id:"powerlifting",start_time:"19:00",duration_min:90,session_index:1}],
+    workoutDays:"0",
+    trainingSessions:[],
     dayStart:7,
     dayEnd:22,
   });

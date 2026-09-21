@@ -37,6 +37,7 @@ try {
 
   await page.goto(preview(firstDate));
   await page.getByTestId("meal-toggle-colazione").waitFor();
+  await page.getByTestId("today-training-question").waitFor();
   assert.equal(await readKcal(page), 0);
   assert.equal(await readMacro(page, "macro-protein"), 0);
 
@@ -95,6 +96,7 @@ try {
   await workoutContext.addInitScript(() => localStorage.setItem("dubi_auth_token", "browser-test-token"));
   const workoutPage = await workoutContext.newPage();
   let savedOnboarding = null;
+  let trainingStatePayload = null;
   let generationPayload = null;
   const responsePlan = {
     date:firstDate,
@@ -108,6 +110,7 @@ try {
     ],
     daySummary:{totalCalories:771,totalProtein:47.3,totalCarbs:127,totalFat:7.4},
   };
+  let servedPlan = responsePlan;
   await workoutPage.route("https://dubi-backend.onrender.com/**", async route => {
     const request = route.request();
     const url = request.url();
@@ -115,26 +118,66 @@ try {
       savedOnboarding = JSON.parse(request.postData() || "{}");
       return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({success:true})});
     }
+    if (url.endsWith("/plan/ingredient-plan/training-state")) {
+      trainingStatePayload = JSON.parse(request.postData() || "{}");
+      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
+        date:firstDate,
+        daily_training_override:trainingStatePayload,
+        nutrition_context_stale:true,
+      })});
+    }
     if (url.endsWith("/plan/ingredient-plan/generate")) {
       generationPayload = JSON.parse(request.postData() || "{}");
-      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({success:true})});
+      if ((generationPayload.daily_training_override?.sessions || []).length > 1) {
+        return route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({error:"RECIPE_ENGINE_V1_DOUBLE_SESSION_RULE_NOT_IMPLEMENTED",controlled_failure:true})});
+      }
+      const isRest = generationPayload.daily_training_override?.state === "rest";
+      servedPlan = {
+        ...responsePlan,
+        has_training:!isRest,
+        daily_training_override:generationPayload.daily_training_override,
+        nutrition_context_stale:false,
+        meals:responsePlan.meals.map(meal=>isRest?{...meal,workout_relation:"NONE"}:meal),
+      };
+      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(servedPlan)});
     }
     if (url.includes(`/plan/ingredient-plan/${firstDate}`)) {
-      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(responsePlan)});
+      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(servedPlan)});
     }
     return route.fulfill({status:404,contentType:"application/json",body:"{}"});
   });
   await workoutPage.goto(preview(firstDate));
   await workoutPage.getByTestId("today-workout-card").waitFor();
+  await workoutPage.getByTestId("today-training-question").waitFor();
+  await workoutPage.getByTestId("today-training-no").click();
+  await workoutPage.getByText("Oggi non ti alleni").waitFor();
+  await workoutPage.getByText(/rest day/).waitFor();
+  assert.equal(trainingStatePayload?.state,"rest","NO must persist an explicit rest-day override");
+  assert.equal(generationPayload?.daily_training_override?.state,"rest");
+  assert.equal(await workoutPage.locator('[data-testid^="workout-badge-"]').count(),0,"rest-day regeneration must expose no PRE/POST labels");
   await workoutPage.getByRole("button", {name:"Modifica"}).click();
-  await workoutPage.getByLabel("Orario allenamento di oggi").fill("20:00");
-  await workoutPage.getByLabel("Durata allenamento di oggi").fill("75");
+  await workoutPage.getByLabel("Sport allenamento di oggi 1").selectOption("powerlifting");
+  await workoutPage.getByLabel("Orario allenamento di oggi 1").fill("20:00");
+  await workoutPage.getByLabel("Durata allenamento di oggi 1").fill("75");
   await workoutPage.getByTestId("save-today-workout").click();
   await workoutPage.getByText("20:00 · 75 min").waitFor();
-  assert.equal(savedOnboarding?.training_sessions?.[0]?.start_time, "20:00", "exact edited start time must reach onboarding backend payload");
-  assert.equal(savedOnboarding?.training_sessions?.[0]?.duration_min, 75, "exact edited duration must reach onboarding backend payload");
-  assert.equal(savedOnboarding?.training_sessions?.[0]?.sport_id, "powerlifting");
+  assert.equal(trainingStatePayload?.sessions?.[0]?.start_time, "20:00", "exact edited start time must reach daily override payload");
+  assert.equal(trainingStatePayload?.sessions?.[0]?.duration_min, 75, "exact edited duration must reach daily override payload");
+  assert.equal(trainingStatePayload?.sessions?.[0]?.sport_id, "powerlifting");
+  assert.equal(savedOnboarding, null, "Modifica solo oggi must not silently change the weekly routine");
   assert.equal(generationPayload?.date, firstDate, "workout edit must regenerate the affected exact date");
+  assert.equal(generationPayload?.daily_training_override?.state, "training");
+
+  await workoutPage.getByRole("button", {name:"Modifica"}).click();
+  await workoutPage.getByTestId("add-today-workout").click();
+  await workoutPage.getByLabel("Sport allenamento di oggi 2").selectOption("running");
+  await workoutPage.getByLabel("Orario allenamento di oggi 2").fill("22:00");
+  await workoutPage.getByLabel("Durata allenamento di oggi 2").fill("30");
+  await workoutPage.getByTestId("save-today-workout").click();
+  await workoutPage.getByText(/Sessions saved/).waitFor();
+  assert.equal(trainingStatePayload?.sessions?.length,2,"two independent daily sessions must be persisted");
+  assert.equal(trainingStatePayload?.sessions?.[1]?.sport_id,"running","daily session 2 must preserve the selected secondary sport");
+  assert.equal(generationPayload?.daily_training_override?.sessions?.length,2,"multi-session generation must receive both sessions before controlled fail-closed");
   await workoutContext.close();
 
   console.log("Home real browser consumption test passed");
