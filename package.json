@@ -21,7 +21,8 @@
     "build:web:production": "cross-env VITE_DUBI_APP_ENV=production node scripts/prepare-mobile-web.js",
     "build:web:staging": "cross-env VITE_DUBI_APP_ENV=staging node scripts/prepare-mobile-web.js",
     "check:config": "node scripts/validate-app-config.js",
-    "test:home-browser": "node scripts/test-home-consumption-browser.mjs"
+    "test:home-browser": "node scripts/test-home-consumption-browser.mjs",
+    "test:routing-safety": "node scripts/test-no-name-substitution.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

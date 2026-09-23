@@ -51,3 +51,6 @@ jobs:
 
       - name: Build mobile web assets
         run: pnpm run build:web
+
+      - name: Reject frontend ingredient-name substitutions
+        run: node scripts/test-no-name-substitution.mjs

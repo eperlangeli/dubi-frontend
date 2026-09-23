@@ -174,7 +174,7 @@ try {
   await workoutPage.getByLabel("Orario allenamento di oggi 2").fill("22:00");
   await workoutPage.getByLabel("Durata allenamento di oggi 2").fill("30");
   await workoutPage.getByTestId("save-today-workout").click();
-  await workoutPage.getByText(/Sessions saved/).waitFor();
+  await workoutPage.getByText(/Sessioni salvate|Sessions saved/).waitFor();
   assert.equal(trainingStatePayload?.sessions?.length,2,"two independent daily sessions must be persisted");
   assert.equal(trainingStatePayload?.sessions?.[1]?.sport_id,"running","daily session 2 must preserve the selected secondary sport");
   assert.equal(generationPayload?.daily_training_override?.sessions?.length,2,"multi-session generation must receive both sessions before controlled fail-closed");

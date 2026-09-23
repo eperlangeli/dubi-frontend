@@ -396,7 +396,7 @@ const normalizeSports = (sports, legacySport = "") => {
   return legacy ? [legacy] : [];
 };
 
-const ALLERGY_KEYS = ["egg", "gluten", "dairy", "nuts", "shellfish", "soy", "sesame", "fish"];
+const ALLERGY_KEYS = ["egg", "gluten", "dairy", "nuts", "shellfish", "soy", "sesame", "mustard", "fish"];
 const ALLERGY_CANONICAL_MAP = {
   uovo: "egg",
   uova: "egg",
@@ -1246,6 +1246,8 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     aiGenerated: true,
     ingredientGenerated: true,
     ingredientPlan,
+    generationStatus: ingredientPlan?.generation_status || ingredientPlan?.generationStatus || null,
+    controlledFailure: ingredientPlan?.controlled_failure || ingredientPlan?.controlledFailure || null,
     dailyAdaptation: ingredientPlan?.dailyAdaptation || ingredientPlan?.daily_adaptation || null,
     baseTargets: ingredientPlan?.baseTargets || ingredientPlan?.base_targets || null,
     adjustedTargets: ingredientPlan?.adjustedTargets || ingredientPlan?.adjusted_targets || null,
@@ -1533,12 +1535,27 @@ const PROMPT14_PATHOLOGY_BADGE_COPY = {
 Object.assign(GI_BADGE_COPY, PROMPT14_GI_BADGE_COPY);
 Object.assign(PATHOLOGY_BADGE_COPY, PROMPT14_PATHOLOGY_BADGE_COPY);
 
+const NO_SAFE_MATCH_COPY = {
+  it: "Non abbiamo ancora una ricetta sicura per il tuo profilo in questo pasto. Il nostro team nutrizionale è stato avvisato.",
+  en: "We do not yet have a safe recipe for your profile for this meal. Our nutrition team has been notified.",
+  fr: "Nous n'avons pas encore de recette sûre pour votre profil pour ce repas. Notre équipe nutritionnelle a été informée.",
+  es: "Todavía no tenemos una receta segura para tu perfil en esta comida. Nuestro equipo nutricional ha sido avisado.",
+  de: "Für diese Mahlzeit gibt es noch kein sicheres Rezept für dein Profil. Unser Ernährungsteam wurde informiert.",
+  ar: "لا توجد لدينا بعد وصفة آمنة لملفك لهذه الوجبة. تم إبلاغ فريق التغذية.",
+  pt: "Ainda não temos uma receita segura para o teu perfil nesta refeição. A nossa equipa de nutrição foi avisada.",
+  zh: "这顿餐目前还没有适合你个人资料的安全食谱。营养团队已收到通知。",
+  ja: "この食事には、あなたのプロフィールに安全なレシピがまだありません。栄養チームに通知しました。",
+  ru: "Для этого приема пищи пока нет безопасного рецепта для вашего профиля. Команда питания уведомлена.",
+};
+
 const getRuntimeCopy = (key, vars, requestedLang) => {
   let lang = requestedLang || "it";
   if (!requestedLang) {
     try { lang = localStorage.getItem("dubi_lang") || "it"; } catch (error) {}
   }
-  let value = TRANSLATIONS?.[lang]?.[key] || TRANSLATIONS?.en?.[key] || TRANSLATIONS?.it?.[key] || key;
+  let value = key === "plan.error.noSafeMatch"
+    ? (NO_SAFE_MATCH_COPY[lang] || NO_SAFE_MATCH_COPY.en)
+    : (TRANSLATIONS?.[lang]?.[key] || TRANSLATIONS?.en?.[key] || TRANSLATIONS?.it?.[key] || key);
   if (vars) Object.entries(vars).forEach(([name, replacement]) => {
     value = value.replace(new RegExp(`\\{${name}\\}`, "g"), replacement);
   });
@@ -1579,6 +1596,40 @@ async function generateIngredientPlan(options = {}) {
 
   if (!fetchRes.ok) throw new Error(getRuntimeCopy("plan.error.fetch"));
   return normalizeIngredientPlanPayload(await fetchRes.json());
+}
+
+const ENGINE_MEAL_TYPE_BY_UI_SLOT = {
+  colazione: "breakfast",
+  snack_m: "snack",
+  pranzo: "lunch",
+  snack: "snack",
+  cena: "dinner",
+  snack_n: "snack",
+  pre_workout: "pre_workout",
+  post_workout: "post_workout",
+};
+
+async function replaceIngredientPlanMeal(date, mealId) {
+  const token = getAuthToken();
+  if (!token) throw new Error("missing_token");
+  const mealType = ENGINE_MEAL_TYPE_BY_UI_SLOT[mealId] || mealId;
+  const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/replace-meal`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ date, meal_type: mealType }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const failure = new Error(payload.error || "RECIPE_ENGINE_V1_CONTROLLED_FAILURE");
+    failure.code = payload.error || null;
+    failure.status = response.status;
+    failure.payload = payload;
+    throw failure;
+  }
+  return normalizeIngredientPlanPayload(payload);
 }
 
 async function saveTodayTrainingState({ date, state, sessions = [] }) {
@@ -1658,7 +1709,20 @@ const fetchIngredientPlanForDate = async (date, options = {}) => {
     headers: { "Authorization": `Bearer ${token}` }
   });
 
-  if (fetchRes.ok) return normalizeIngredientPlanPayload(await fetchRes.json());
+  const payload = await fetchRes.json().catch(() => ({}));
+  if (fetchRes.ok) return normalizeIngredientPlanPayload(payload);
+  if (fetchRes.status === 409 && (
+    String(payload.error || "").startsWith("RECIPE_ENGINE_V1_")
+    || payload.generation_status === "NO_SAFE_MATCH"
+  )) {
+    return {
+      date,
+      engine_version: "recipe_engine_v1",
+      generation_status: payload.generation_status || "NO_SAFE_MATCH",
+      controlled_failure: payload,
+      meals: [],
+    };
+  }
   if (!options.generateIfMissing) return null;
 
   return await generateIngredientPlan({ date, reason: options.reason || "weekly_shopping_sync" });
@@ -1702,6 +1766,17 @@ const generateAiPlanFromBackend = async (userData, options = {}) => {
   } catch (error) {
     console.error("Ingredient plan request failed:", error);
     if (options.throwOnFailure) throw error;
+    if (String(error?.code || "").startsWith("RECIPE_ENGINE_V1_") || error?.payload?.generation_status === "NO_SAFE_MATCH") {
+      return {
+        plan: {
+          ...fallbackPlan,
+          generationStatus: error?.payload?.generation_status || "NO_SAFE_MATCH",
+          controlledFailure: error?.payload || { error: error?.code || "RECIPE_ENGINE_V1_CONTROLLED_FAILURE" },
+          ingredientPlan: null,
+        },
+        savedByAi: true,
+      };
+    }
     return { plan: fallbackPlan, savedByAi: false };
   }
 };
@@ -7184,6 +7259,7 @@ const FINAL_AUDIT_TRANSLATIONS = {
     "allergy.shellfish":"Shellfish",
     "allergy.soy":"Soy",
     "allergy.sesame":"Sesame",
+    "allergy.mustard":"Mustard",
     "allergy.fish":"Fish",
     "allergy.addCustom":"Add custom",
     "allergy.customPlaceholder":"Custom allergy or condition",
@@ -7239,6 +7315,7 @@ const FINAL_AUDIT_TRANSLATIONS = {
     "allergy.shellfish":"Crostacei",
     "allergy.soy":"Soia",
     "allergy.sesame":"Sesamo",
+    "allergy.mustard":"Senape",
     "allergy.fish":"Pesce",
     "allergy.addCustom":"Aggiungi custom",
     "allergy.customPlaceholder":"Allergia o patologia",
@@ -7257,28 +7334,28 @@ const FINAL_AUDIT_TRANSLATIONS = {
     "intensity.high":"Alta"
   },
   fr: {
-    "sidebar.tagline":"Plan, suivi et support","home.training.title":"Entrainement du jour","home.training.timingMessage":"Confirme l'horaire : DUBI utilise {timing} pour placer glucides et repas.","home.training.updating":"Mise a jour du plan autour de l'entrainement...","wearable.connected.message":"{provider} connecte. Des que le fournisseur envoie les donnees, DUBI les utilise ici et dans le plan.","wearable.notConnected.message":"Ton plan fonctionne aussi sans wearable : connecte-en un pour des adaptations automatiques.","wearable.partialData.message":"Donnees partielles recues. DUBI affiche et utilise seulement les signaux fournis.","wearable.unavailable.message":"Non fourni par {provider}","wearable.status.none":"Non connecte","wearable.status.partial":"Donnees partielles","wearable.connect.prompt":"Connecte un wearable pour activer","home.calories.lossEstimate":"~{rate} kg/semaine de perte · plage ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semaine de gain · plage ACSM 0,1-0,5 kg","nav.today.subtitle":"Suivi","nav.weekly.subtitle":"Plan complet","nav.shopping.subtitle":"Courses","nav.progress.subtitle":"Progres","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Perte de gras","goal.muscleGain":"Prise musculaire","goal.maintenance":"Maintien","goal.definition":"Definition","meal.macroAnomaly":"Anomalie macro","meal.eaten":"Mange","diet.omnivore":"Omnivore","diet.pescatarian":"Pescetarien","diet.vegetarian":"Vegetarien","diet.vegan":"Vegan","sport.running":"Course","sport.cycling":"Cyclisme","sport.swimming":"Natation","sport.triathlon":"Triathlon","sport.rowing":"Aviron","sport.kayak":"Canoë/Kayak","sport.nordic_ski":"Ski de Fond","sport.football":"Football","sport.basketball":"Basketball","sport.volleyball":"Volleyball","sport.tennis":"Tennis","sport.padel":"Padel","sport.rugby":"Rugby","sport.hockey":"Hockey","sport.handball":"Handball","sport.baseball":"Baseball","sport.alpine_ski":"Ski Alpin","sport.surf":"Surf","sport.fencing":"Escrime","sport.gym":"Salle","sport.crossfit":"CrossFit","sport.powerlifting":"Powerlifting","sport.climbing":"Escalade","sport.boxing":"Boxe","sport.martial_arts":"Arts Martiaux","sport.wrestling":"Lutte","sport.judo":"Judo","sport.mma":"MMA","sport.gymnastics":"Gymnastique","sport.sprint":"Sprint","sport.yoga":"Yoga","sport.pilates":"Pilates","sport.golf":"Golf","sport.archery":"Tir à l'Arc","sport.equestrian":"Équitation","sport.dance":"Danse","sport.other":"Autre","allergy.egg":"Oeuf","allergy.gluten":"Gluten","allergy.dairy":"Lait/lactose","allergy.nuts":"Fruits a coque","allergy.shellfish":"Crustaces","allergy.soy":"Soja","allergy.sesame":"Sesame","allergy.fish":"Poisson","allergy.addCustom":"Ajouter custom","allergy.customPlaceholder":"Allergie ou condition","allergy.noneSelected":"Aucune allergie selectionnee","breakfast.both":"Les deux","breakfast.sweet":"Sucre","breakfast.savory":"Sale","breakfast.none":"Aucun","training.timing.morning":"Matin","training.timing.lunch":"Dejeuner","training.timing.afternoon":"Apres-midi","training.timing.evening":"Soir","training.timing.varies":"Variable","intensity.low":"Basse","intensity.moderate":"Moderee","intensity.high":"Elevee"
+    "sidebar.tagline":"Plan, suivi et support","home.training.title":"Entrainement du jour","home.training.timingMessage":"Confirme l'horaire : DUBI utilise {timing} pour placer glucides et repas.","home.training.updating":"Mise a jour du plan autour de l'entrainement...","wearable.connected.message":"{provider} connecte. Des que le fournisseur envoie les donnees, DUBI les utilise ici et dans le plan.","wearable.notConnected.message":"Ton plan fonctionne aussi sans wearable : connecte-en un pour des adaptations automatiques.","wearable.partialData.message":"Donnees partielles recues. DUBI affiche et utilise seulement les signaux fournis.","wearable.unavailable.message":"Non fourni par {provider}","wearable.status.none":"Non connecte","wearable.status.partial":"Donnees partielles","wearable.connect.prompt":"Connecte un wearable pour activer","home.calories.lossEstimate":"~{rate} kg/semaine de perte · plage ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semaine de gain · plage ACSM 0,1-0,5 kg","nav.today.subtitle":"Suivi","nav.weekly.subtitle":"Plan complet","nav.shopping.subtitle":"Courses","nav.progress.subtitle":"Progres","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Perte de gras","goal.muscleGain":"Prise musculaire","goal.maintenance":"Maintien","goal.definition":"Definition","meal.macroAnomaly":"Anomalie macro","meal.eaten":"Mange","diet.omnivore":"Omnivore","diet.pescatarian":"Pescetarien","diet.vegetarian":"Vegetarien","diet.vegan":"Vegan","sport.running":"Course","sport.cycling":"Cyclisme","sport.swimming":"Natation","sport.triathlon":"Triathlon","sport.rowing":"Aviron","sport.kayak":"Canoë/Kayak","sport.nordic_ski":"Ski de Fond","sport.football":"Football","sport.basketball":"Basketball","sport.volleyball":"Volleyball","sport.tennis":"Tennis","sport.padel":"Padel","sport.rugby":"Rugby","sport.hockey":"Hockey","sport.handball":"Handball","sport.baseball":"Baseball","sport.alpine_ski":"Ski Alpin","sport.surf":"Surf","sport.fencing":"Escrime","sport.gym":"Salle","sport.crossfit":"CrossFit","sport.powerlifting":"Powerlifting","sport.climbing":"Escalade","sport.boxing":"Boxe","sport.martial_arts":"Arts Martiaux","sport.wrestling":"Lutte","sport.judo":"Judo","sport.mma":"MMA","sport.gymnastics":"Gymnastique","sport.sprint":"Sprint","sport.yoga":"Yoga","sport.pilates":"Pilates","sport.golf":"Golf","sport.archery":"Tir à l'Arc","sport.equestrian":"Équitation","sport.dance":"Danse","sport.other":"Autre","allergy.egg":"Oeuf","allergy.gluten":"Gluten","allergy.dairy":"Lait/lactose","allergy.nuts":"Fruits a coque","allergy.shellfish":"Crustaces","allergy.soy":"Soja","allergy.sesame":"Sesame","allergy.mustard":"Moutarde","allergy.fish":"Poisson","allergy.addCustom":"Ajouter custom","allergy.customPlaceholder":"Allergie ou condition","allergy.noneSelected":"Aucune allergie selectionnee","breakfast.both":"Les deux","breakfast.sweet":"Sucre","breakfast.savory":"Sale","breakfast.none":"Aucun","training.timing.morning":"Matin","training.timing.lunch":"Dejeuner","training.timing.afternoon":"Apres-midi","training.timing.evening":"Soir","training.timing.varies":"Variable","intensity.low":"Basse","intensity.moderate":"Moderee","intensity.high":"Elevee"
   },
   es: {
-    "sidebar.tagline":"Plan, seguimiento y soporte","home.training.title":"Entrenamiento de hoy","home.training.timingMessage":"Confirma la hora: DUBI usa {timing} para colocar carbohidratos y comidas.","home.training.updating":"Actualizando el plan alrededor del entrenamiento...","wearable.connected.message":"{provider} conectado. Cuando el proveedor envie datos, DUBI los usara aqui y en el plan.","wearable.notConnected.message":"Tu plan tambien funciona sin wearable: conecta uno para adaptaciones automaticas.","wearable.partialData.message":"Datos parciales recibidos. DUBI solo muestra y usa senales suministradas.","wearable.unavailable.message":"No proporcionado por {provider}","wearable.status.none":"No conectado","wearable.status.partial":"Datos parciales","wearable.connect.prompt":"Conecta un wearable para activar","home.calories.lossEstimate":"~{rate} kg/semana de perdida · rango ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganancia · rango ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plan completo","nav.shopping.subtitle":"Compra","nav.progress.subtitle":"Progreso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perdida de grasa","goal.muscleGain":"Ganancia muscular","goal.maintenance":"Mantenimiento","goal.definition":"Definicion","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Gimnasio","sport.running":"Correr","sport.cycling":"Ciclismo","sport.swimming":"Natacion","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futbol","sport.tennis":"Tenis","sport.other":"Otro","allergy.egg":"Huevo","allergy.gluten":"Gluten","allergy.dairy":"Leche/lactosa","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.fish":"Pescado","allergy.addCustom":"Anadir custom","allergy.customPlaceholder":"Alergia o condicion","allergy.noneSelected":"Ninguna alergia seleccionada","breakfast.both":"Ambos","breakfast.sweet":"Dulce","breakfast.savory":"Salado","breakfast.none":"Ninguno","training.timing.morning":"Manana","training.timing.lunch":"Almuerzo","training.timing.afternoon":"Tarde","training.timing.evening":"Noche","training.timing.varies":"Variable","intensity.low":"Baja","intensity.moderate":"Moderada","intensity.high":"Alta"
+    "sidebar.tagline":"Plan, seguimiento y soporte","home.training.title":"Entrenamiento de hoy","home.training.timingMessage":"Confirma la hora: DUBI usa {timing} para colocar carbohidratos y comidas.","home.training.updating":"Actualizando el plan alrededor del entrenamiento...","wearable.connected.message":"{provider} conectado. Cuando el proveedor envie datos, DUBI los usara aqui y en el plan.","wearable.notConnected.message":"Tu plan tambien funciona sin wearable: conecta uno para adaptaciones automaticas.","wearable.partialData.message":"Datos parciales recibidos. DUBI solo muestra y usa senales suministradas.","wearable.unavailable.message":"No proporcionado por {provider}","wearable.status.none":"No conectado","wearable.status.partial":"Datos parciales","wearable.connect.prompt":"Conecta un wearable para activar","home.calories.lossEstimate":"~{rate} kg/semana de perdida · rango ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganancia · rango ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plan completo","nav.shopping.subtitle":"Compra","nav.progress.subtitle":"Progreso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perdida de grasa","goal.muscleGain":"Ganancia muscular","goal.maintenance":"Mantenimiento","goal.definition":"Definicion","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Gimnasio","sport.running":"Correr","sport.cycling":"Ciclismo","sport.swimming":"Natacion","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futbol","sport.tennis":"Tenis","sport.other":"Otro","allergy.egg":"Huevo","allergy.gluten":"Gluten","allergy.dairy":"Leche/lactosa","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.mustard":"Mostaza","allergy.fish":"Pescado","allergy.addCustom":"Anadir custom","allergy.customPlaceholder":"Alergia o condicion","allergy.noneSelected":"Ninguna alergia seleccionada","breakfast.both":"Ambos","breakfast.sweet":"Dulce","breakfast.savory":"Salado","breakfast.none":"Ninguno","training.timing.morning":"Manana","training.timing.lunch":"Almuerzo","training.timing.afternoon":"Tarde","training.timing.evening":"Noche","training.timing.varies":"Variable","intensity.low":"Baja","intensity.moderate":"Moderada","intensity.high":"Alta"
   },
   de: {
-    "sidebar.tagline":"Plan, Tracker und Support","home.training.title":"Heutiges Training","home.training.timingMessage":"Timing bestaetigen: DUBI nutzt {timing}, um Kohlenhydrate und Mahlzeiten zu platzieren.","home.training.updating":"Plan rund ums Training wird aktualisiert...","wearable.connected.message":"{provider} verbunden. Sobald der Anbieter Daten sendet, nutzt DUBI sie hier und im Plan.","wearable.notConnected.message":"Dein Plan funktioniert auch ohne Wearable: verbinde eines fuer automatische Anpassungen.","wearable.partialData.message":"Teildaten empfangen. DUBI zeigt und nutzt nur gelieferte Signale.","wearable.unavailable.message":"Nicht von {provider} bereitgestellt","wearable.status.none":"Nicht verbunden","wearable.status.partial":"Teildaten","wearable.connect.prompt":"Wearable verbinden zum Aktivieren","home.calories.lossEstimate":"~{rate} kg/Woche Verlust · ACSM Bereich 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/Woche Zunahme · ACSM Bereich 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Vollplan","nav.shopping.subtitle":"Einkauf","nav.progress.subtitle":"Fortschritt","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Fettabbau","goal.muscleGain":"Muskelaufbau","goal.maintenance":"Erhalt","goal.definition":"Definition","meal.macroAnomaly":"Makro-Anomalie","meal.eaten":"Gegessen","diet.omnivore":"Omnivor","diet.pescatarian":"Pescetarisch","diet.vegetarian":"Vegetarisch","diet.vegan":"Vegan","sport.gym":"Fitnessstudio","sport.running":"Laufen","sport.cycling":"Radfahren","sport.swimming":"Schwimmen","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Fussball","sport.tennis":"Tennis","sport.other":"Andere","allergy.egg":"Ei","allergy.gluten":"Gluten","allergy.dairy":"Milch/Laktose","allergy.nuts":"Nuesse","allergy.shellfish":"Schalentiere","allergy.soy":"Soja","allergy.sesame":"Sesam","allergy.fish":"Fisch","allergy.addCustom":"Custom hinzufuegen","allergy.customPlaceholder":"Allergie oder Zustand","allergy.noneSelected":"Keine Allergie ausgewaehlt","breakfast.both":"Beides","breakfast.sweet":"Suess","breakfast.savory":"Herzhaft","breakfast.none":"Keine","training.timing.morning":"Morgen","training.timing.lunch":"Mittag","training.timing.afternoon":"Nachmittag","training.timing.evening":"Abend","training.timing.varies":"Variiert","intensity.low":"Niedrig","intensity.moderate":"Moderat","intensity.high":"Hoch"
+    "sidebar.tagline":"Plan, Tracker und Support","home.training.title":"Heutiges Training","home.training.timingMessage":"Timing bestaetigen: DUBI nutzt {timing}, um Kohlenhydrate und Mahlzeiten zu platzieren.","home.training.updating":"Plan rund ums Training wird aktualisiert...","wearable.connected.message":"{provider} verbunden. Sobald der Anbieter Daten sendet, nutzt DUBI sie hier und im Plan.","wearable.notConnected.message":"Dein Plan funktioniert auch ohne Wearable: verbinde eines fuer automatische Anpassungen.","wearable.partialData.message":"Teildaten empfangen. DUBI zeigt und nutzt nur gelieferte Signale.","wearable.unavailable.message":"Nicht von {provider} bereitgestellt","wearable.status.none":"Nicht verbunden","wearable.status.partial":"Teildaten","wearable.connect.prompt":"Wearable verbinden zum Aktivieren","home.calories.lossEstimate":"~{rate} kg/Woche Verlust · ACSM Bereich 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/Woche Zunahme · ACSM Bereich 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Vollplan","nav.shopping.subtitle":"Einkauf","nav.progress.subtitle":"Fortschritt","nav.sources.subtitle":"Methode","nav.settings.subtitle":"Profil","goal.fatLoss":"Fettabbau","goal.muscleGain":"Muskelaufbau","goal.maintenance":"Erhalt","goal.definition":"Definition","meal.macroAnomaly":"Makro-Anomalie","meal.eaten":"Gegessen","diet.omnivore":"Omnivor","diet.pescatarian":"Pescetarisch","diet.vegetarian":"Vegetarisch","diet.vegan":"Vegan","sport.gym":"Fitnessstudio","sport.running":"Laufen","sport.cycling":"Radfahren","sport.swimming":"Schwimmen","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Fussball","sport.tennis":"Tennis","sport.other":"Andere","allergy.egg":"Ei","allergy.gluten":"Gluten","allergy.dairy":"Milch/Laktose","allergy.nuts":"Nuesse","allergy.shellfish":"Schalentiere","allergy.soy":"Soja","allergy.sesame":"Sesam","allergy.mustard":"Senf","allergy.fish":"Fisch","allergy.addCustom":"Custom hinzufuegen","allergy.customPlaceholder":"Allergie oder Zustand","allergy.noneSelected":"Keine Allergie ausgewaehlt","breakfast.both":"Beides","breakfast.sweet":"Suess","breakfast.savory":"Herzhaft","breakfast.none":"Keine","training.timing.morning":"Morgen","training.timing.lunch":"Mittag","training.timing.afternoon":"Nachmittag","training.timing.evening":"Abend","training.timing.varies":"Variiert","intensity.low":"Niedrig","intensity.moderate":"Moderat","intensity.high":"Hoch"
   },
   pt: {
-    "sidebar.tagline":"Plano, tracker e suporte","home.training.title":"Treino de hoje","home.training.timingMessage":"Confirma o horario: DUBI usa {timing} para posicionar hidratos e refeicoes.","home.training.updating":"A atualizar o plano em torno do treino...","wearable.connected.message":"{provider} ligado. Assim que o provider enviar dados, a DUBI usa-os aqui e no plano.","wearable.notConnected.message":"O teu plano tambem funciona sem wearable: liga um para adaptacoes automaticas.","wearable.partialData.message":"Dados parciais recebidos. A DUBI so mostra e usa sinais fornecidos.","wearable.unavailable.message":"Nao fornecido por {provider}","wearable.status.none":"Nao ligado","wearable.status.partial":"Dados parciais","wearable.connect.prompt":"Liga um wearable para ativar","home.calories.lossEstimate":"~{rate} kg/semana de perda · intervalo ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganho · intervalo ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plano completo","nav.shopping.subtitle":"Compras","nav.progress.subtitle":"Progresso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perda de gordura","goal.muscleGain":"Ganho muscular","goal.maintenance":"Manutencao","goal.definition":"Definicao","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Ginasio","sport.running":"Corrida","sport.cycling":"Ciclismo","sport.swimming":"Natacao","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futebol","sport.tennis":"Tenis","sport.other":"Outro","allergy.egg":"Ovo","allergy.gluten":"Gluten","allergy.dairy":"Leite/lactose","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.fish":"Peixe","allergy.addCustom":"Adicionar custom","allergy.customPlaceholder":"Alergia ou condicao","allergy.noneSelected":"Nenhuma alergia selecionada","breakfast.both":"Ambos","breakfast.sweet":"Doce","breakfast.savory":"Salgado","breakfast.none":"Nenhum","training.timing.morning":"Manha","training.timing.lunch":"Almoco","training.timing.afternoon":"Tarde","training.timing.evening":"Noite","training.timing.varies":"Varia","intensity.low":"Baixa","intensity.moderate":"Moderada","intensity.high":"Alta"
+    "sidebar.tagline":"Plano, tracker e suporte","home.training.title":"Treino de hoje","home.training.timingMessage":"Confirma o horario: DUBI usa {timing} para posicionar hidratos e refeicoes.","home.training.updating":"A atualizar o plano em torno do treino...","wearable.connected.message":"{provider} ligado. Assim que o provider enviar dados, a DUBI usa-os aqui e no plano.","wearable.notConnected.message":"O teu plano tambem funciona sem wearable: liga um para adaptacoes automaticas.","wearable.partialData.message":"Dados parciais recebidos. A DUBI so mostra e usa sinais fornecidos.","wearable.unavailable.message":"Nao fornecido por {provider}","wearable.status.none":"Nao ligado","wearable.status.partial":"Dados parciais","wearable.connect.prompt":"Liga um wearable para ativar","home.calories.lossEstimate":"~{rate} kg/semana de perda · intervalo ACSM 0,25-1,0 kg","home.calories.gainEstimate":"~{rate} kg/semana de ganho · intervalo ACSM 0,1-0,5 kg","nav.today.subtitle":"Tracker","nav.weekly.subtitle":"Plano completo","nav.shopping.subtitle":"Compras","nav.progress.subtitle":"Progresso","nav.sources.subtitle":"Metodo","nav.settings.subtitle":"Perfil","goal.fatLoss":"Perda de gordura","goal.muscleGain":"Ganho muscular","goal.maintenance":"Manutencao","goal.definition":"Definicao","meal.macroAnomaly":"Anomalia de macros","meal.eaten":"Comido","diet.omnivore":"Omnivoro","diet.pescatarian":"Pescetariano","diet.vegetarian":"Vegetariano","diet.vegan":"Vegano","sport.gym":"Ginasio","sport.running":"Corrida","sport.cycling":"Ciclismo","sport.swimming":"Natacao","sport.yoga":"Yoga","sport.crossfit":"CrossFit","sport.football":"Futebol","sport.tennis":"Tenis","sport.other":"Outro","allergy.egg":"Ovo","allergy.gluten":"Gluten","allergy.dairy":"Leite/lactose","allergy.nuts":"Frutos secos","allergy.shellfish":"Marisco","allergy.soy":"Soja","allergy.sesame":"Sesamo","allergy.mustard":"Mostarda","allergy.fish":"Peixe","allergy.addCustom":"Adicionar custom","allergy.customPlaceholder":"Alergia ou condicao","allergy.noneSelected":"Nenhuma alergia selecionada","breakfast.both":"Ambos","breakfast.sweet":"Doce","breakfast.savory":"Salgado","breakfast.none":"Nenhum","training.timing.morning":"Manha","training.timing.lunch":"Almoco","training.timing.afternoon":"Tarde","training.timing.evening":"Noite","training.timing.varies":"Varia","intensity.low":"Baixa","intensity.moderate":"Moderada","intensity.high":"Alta"
   },
   ar: {
-    "sidebar.tagline":"الخطة والتتبع والدعم","home.training.title":"تمرين اليوم","home.training.timingMessage":"أكد التوقيت: تستخدم DUBI {timing} لتوزيع الكربوهيدرات والوجبات.","home.training.updating":"يتم تحديث الخطة حول التمرين...","wearable.connected.message":"تم ربط {provider}. عند إرسال البيانات، تستخدمها DUBI هنا وفي الخطة.","wearable.notConnected.message":"تعمل خطتك أيضا بدون wearable: اربط واحدا للتعديلات التلقائية.","wearable.partialData.message":"تم استلام بيانات جزئية. تعرض DUBI فقط الإشارات المتاحة.","wearable.unavailable.message":"غير متاح من {provider}","wearable.status.none":"غير متصل","wearable.status.partial":"بيانات جزئية","wearable.connect.prompt":"اربط wearable للتفعيل","home.calories.lossEstimate":"~{rate} كغ/أسبوع فقدان · نطاق ACSM 0.25-1.0 كغ","home.calories.gainEstimate":"~{rate} كغ/أسبوع زيادة · نطاق ACSM 0.1-0.5 كغ","nav.today.subtitle":"التتبع","nav.weekly.subtitle":"الخطة الكاملة","nav.shopping.subtitle":"قائمة التسوق","nav.progress.subtitle":"التقدم","nav.sources.subtitle":"المنهج","nav.settings.subtitle":"الملف","goal.fatLoss":"فقدان الدهون","goal.muscleGain":"زيادة العضلات","goal.maintenance":"الحفاظ","goal.definition":"التنشيف","meal.macroAnomaly":"خلل في الماكروز","meal.eaten":"تم الأكل","diet.omnivore":"متنوع","diet.pescatarian":"نباتي مع سمك","diet.vegetarian":"نباتي","diet.vegan":"نباتي صارم","sport.gym":"النادي","sport.running":"الجري","sport.cycling":"الدراجات","sport.swimming":"السباحة","sport.yoga":"يوغا","sport.crossfit":"كروسفت","sport.football":"كرة القدم","sport.tennis":"تنس","sport.other":"آخر","allergy.egg":"بيض","allergy.gluten":"غلوتين","allergy.dairy":"حليب/لاكتوز","allergy.nuts":"مكسرات","allergy.shellfish":"قشريات","allergy.soy":"صويا","allergy.sesame":"سمسم","allergy.fish":"سمك","allergy.addCustom":"إضافة مخصص","allergy.customPlaceholder":"حساسية أو حالة","allergy.noneSelected":"لا توجد حساسية محددة","breakfast.both":"كلاهما","breakfast.sweet":"حلو","breakfast.savory":"مالح","breakfast.none":"بدون","training.timing.morning":"الصباح","training.timing.lunch":"الغداء","training.timing.afternoon":"بعد الظهر","training.timing.evening":"المساء","training.timing.varies":"متغير","intensity.low":"منخفضة","intensity.moderate":"متوسطة","intensity.high":"عالية"
+    "sidebar.tagline":"الخطة والتتبع والدعم","home.training.title":"تمرين اليوم","home.training.timingMessage":"أكد التوقيت: تستخدم DUBI {timing} لتوزيع الكربوهيدرات والوجبات.","home.training.updating":"يتم تحديث الخطة حول التمرين...","wearable.connected.message":"تم ربط {provider}. عند إرسال البيانات، تستخدمها DUBI هنا وفي الخطة.","wearable.notConnected.message":"تعمل خطتك أيضا بدون wearable: اربط واحدا للتعديلات التلقائية.","wearable.partialData.message":"تم استلام بيانات جزئية. تعرض DUBI فقط الإشارات المتاحة.","wearable.unavailable.message":"غير متاح من {provider}","wearable.status.none":"غير متصل","wearable.status.partial":"بيانات جزئية","wearable.connect.prompt":"اربط wearable للتفعيل","home.calories.lossEstimate":"~{rate} كغ/أسبوع فقدان · نطاق ACSM 0.25-1.0 كغ","home.calories.gainEstimate":"~{rate} كغ/أسبوع زيادة · نطاق ACSM 0.1-0.5 كغ","nav.today.subtitle":"التتبع","nav.weekly.subtitle":"الخطة الكاملة","nav.shopping.subtitle":"قائمة التسوق","nav.progress.subtitle":"التقدم","nav.sources.subtitle":"المنهج","nav.settings.subtitle":"الملف","goal.fatLoss":"فقدان الدهون","goal.muscleGain":"زيادة العضلات","goal.maintenance":"الحفاظ","goal.definition":"التنشيف","meal.macroAnomaly":"خلل في الماكروز","meal.eaten":"تم الأكل","diet.omnivore":"متنوع","diet.pescatarian":"نباتي مع سمك","diet.vegetarian":"نباتي","diet.vegan":"نباتي صارم","sport.gym":"النادي","sport.running":"الجري","sport.cycling":"الدراجات","sport.swimming":"السباحة","sport.yoga":"يوغا","sport.crossfit":"كروسفت","sport.football":"كرة القدم","sport.tennis":"تنس","sport.other":"آخر","allergy.egg":"بيض","allergy.gluten":"غلوتين","allergy.dairy":"حليب/لاكتوز","allergy.nuts":"مكسرات","allergy.shellfish":"قشريات","allergy.soy":"صويا","allergy.sesame":"سمسم","allergy.mustard":"خردل","allergy.fish":"سمك","allergy.addCustom":"إضافة مخصص","allergy.customPlaceholder":"حساسية أو حالة","allergy.noneSelected":"لا توجد حساسية محددة","breakfast.both":"كلاهما","breakfast.sweet":"حلو","breakfast.savory":"مالح","breakfast.none":"بدون","training.timing.morning":"الصباح","training.timing.lunch":"الغداء","training.timing.afternoon":"بعد الظهر","training.timing.evening":"المساء","training.timing.varies":"متغير","intensity.low":"منخفضة","intensity.moderate":"متوسطة","intensity.high":"عالية"
   },
   zh: {
-    "sidebar.tagline":"计划、追踪和支持","home.training.title":"今日训练","home.training.timingMessage":"确认时间：DUBI 正使用 {timing} 安排碳水和餐食。","home.training.updating":"正在围绕训练更新计划...","wearable.connected.message":"{provider} 已连接。Provider 发送数据后，DUBI 会在这里和计划中使用。","wearable.notConnected.message":"没有 wearable 也能使用计划；连接后可自动调整。","wearable.partialData.message":"收到部分数据。DUBI 只显示并使用 provider 提供的信号。","wearable.unavailable.message":"{provider} 未提供","wearable.status.none":"未连接","wearable.status.partial":"部分数据","wearable.connect.prompt":"连接 wearable 以启用","home.calories.lossEstimate":"~{rate} kg/周减重 · ACSM 范围 0.25-1.0 kg","home.calories.gainEstimate":"~{rate} kg/周增重 · ACSM 范围 0.1-0.5 kg","nav.today.subtitle":"追踪","nav.weekly.subtitle":"完整计划","nav.shopping.subtitle":"购物清单","nav.progress.subtitle":"进展","nav.sources.subtitle":"方法","nav.settings.subtitle":"资料","goal.fatLoss":"减脂","goal.muscleGain":"增肌","goal.maintenance":"维持","goal.definition":"塑形","meal.macroAnomaly":"宏量异常","meal.eaten":"已吃","diet.omnivore":"杂食","diet.pescatarian":"鱼素","diet.vegetarian":"素食","diet.vegan":"纯素","sport.gym":"健身房","sport.running":"跑步","sport.cycling":"骑行","sport.swimming":"游泳","sport.yoga":"瑜伽","sport.crossfit":"CrossFit","sport.football":"足球","sport.tennis":"网球","sport.other":"其他","allergy.egg":"鸡蛋","allergy.gluten":"麸质","allergy.dairy":"乳制品/乳糖","allergy.nuts":"坚果","allergy.shellfish":"贝类","allergy.soy":"大豆","allergy.sesame":"芝麻","allergy.fish":"鱼","allergy.addCustom":"添加自定义","allergy.customPlaceholder":"过敏或状况","allergy.noneSelected":"未选择过敏","breakfast.both":"都可以","breakfast.sweet":"甜","breakfast.savory":"咸","breakfast.none":"无","training.timing.morning":"早上","training.timing.lunch":"午餐","training.timing.afternoon":"下午","training.timing.evening":"晚上","training.timing.varies":"不固定","intensity.low":"低","intensity.moderate":"中","intensity.high":"高"
+    "sidebar.tagline":"计划、追踪和支持","home.training.title":"今日训练","home.training.timingMessage":"确认时间：DUBI 正使用 {timing} 安排碳水和餐食。","home.training.updating":"正在围绕训练更新计划...","wearable.connected.message":"{provider} 已连接。Provider 发送数据后，DUBI 会在这里和计划中使用。","wearable.notConnected.message":"没有 wearable 也能使用计划；连接后可自动调整。","wearable.partialData.message":"收到部分数据。DUBI 只显示并使用 provider 提供的信号。","wearable.unavailable.message":"{provider} 未提供","wearable.status.none":"未连接","wearable.status.partial":"部分数据","wearable.connect.prompt":"连接 wearable 以启用","home.calories.lossEstimate":"~{rate} kg/周减重 · ACSM 范围 0.25-1.0 kg","home.calories.gainEstimate":"~{rate} kg/周增重 · ACSM 范围 0.1-0.5 kg","nav.today.subtitle":"追踪","nav.weekly.subtitle":"完整计划","nav.shopping.subtitle":"购物清单","nav.progress.subtitle":"进展","nav.sources.subtitle":"方法","nav.settings.subtitle":"资料","goal.fatLoss":"减脂","goal.muscleGain":"增肌","goal.maintenance":"维持","goal.definition":"塑形","meal.macroAnomaly":"宏量异常","meal.eaten":"已吃","diet.omnivore":"杂食","diet.pescatarian":"鱼素","diet.vegetarian":"素食","diet.vegan":"纯素","sport.gym":"健身房","sport.running":"跑步","sport.cycling":"骑行","sport.swimming":"游泳","sport.yoga":"瑜伽","sport.crossfit":"CrossFit","sport.football":"足球","sport.tennis":"网球","sport.other":"其他","allergy.egg":"鸡蛋","allergy.gluten":"麸质","allergy.dairy":"乳制品/乳糖","allergy.nuts":"坚果","allergy.shellfish":"贝类","allergy.soy":"大豆","allergy.sesame":"芝麻","allergy.mustard":"芥末","allergy.fish":"鱼","allergy.addCustom":"添加自定义","allergy.customPlaceholder":"过敏或状况","allergy.noneSelected":"未选择过敏","breakfast.both":"都可以","breakfast.sweet":"甜","breakfast.savory":"咸","breakfast.none":"无","training.timing.morning":"早上","training.timing.lunch":"午餐","training.timing.afternoon":"下午","training.timing.evening":"晚上","training.timing.varies":"不固定","intensity.low":"低","intensity.moderate":"中","intensity.high":"高"
   },
   ja: {
-    "sidebar.tagline":"プラン、トラッカー、サポート","home.training.title":"今日のトレーニング","home.training.timingMessage":"時間を確認：DUBI は {timing} を使って炭水化物と食事を配置します。","home.training.updating":"トレーニングに合わせてプランを更新中...","wearable.connected.message":"{provider} が接続されました。Provider がデータを送ると、DUBI はここでもプランでも使用します。","wearable.notConnected.message":"wearable なしでもプランは使えます。接続すると自動調整できます。","wearable.partialData.message":"一部データを受信しました。DUBI は提供された信号だけを表示・使用します。","wearable.unavailable.message":"{provider} から未提供","wearable.status.none":"未接続","wearable.status.partial":"一部データ","wearable.connect.prompt":"wearable を接続して有効化","home.calories.lossEstimate":"~{rate} kg/週 減量 · ACSM 範囲 0.25-1.0 kg","home.calories.gainEstimate":"~{rate} kg/週 増量 · ACSM 範囲 0.1-0.5 kg","nav.today.subtitle":"トラッカー","nav.weekly.subtitle":"全体プラン","nav.shopping.subtitle":"買い物リスト","nav.progress.subtitle":"進捗","nav.sources.subtitle":"方法","nav.settings.subtitle":"プロフィール","goal.fatLoss":"脂肪減少","goal.muscleGain":"筋肉増加","goal.maintenance":"維持","goal.definition":"引き締め","meal.macroAnomaly":"マクロ異常","meal.eaten":"食べた","diet.omnivore":"雑食","diet.pescatarian":"魚中心","diet.vegetarian":"ベジタリアン","diet.vegan":"ヴィーガン","sport.gym":"ジム","sport.running":"ランニング","sport.cycling":"サイクリング","sport.swimming":"水泳","sport.yoga":"ヨガ","sport.crossfit":"CrossFit","sport.football":"サッカー","sport.tennis":"テニス","sport.other":"その他","allergy.egg":"卵","allergy.gluten":"グルテン","allergy.dairy":"乳製品/乳糖","allergy.nuts":"ナッツ","allergy.shellfish":"甲殻類","allergy.soy":"大豆","allergy.sesame":"ごま","allergy.fish":"魚","allergy.addCustom":"カスタム追加","allergy.customPlaceholder":"アレルギーまたは状態","allergy.noneSelected":"アレルギー未選択","breakfast.both":"両方","breakfast.sweet":"甘い","breakfast.savory":"塩味","breakfast.none":"なし","training.timing.morning":"朝","training.timing.lunch":"昼","training.timing.afternoon":"午後","training.timing.evening":"夜","training.timing.varies":"不定","intensity.low":"低い","intensity.moderate":"中程度","intensity.high":"高い"
+    "sidebar.tagline":"プラン、トラッカー、サポート","home.training.title":"今日のトレーニング","home.training.timingMessage":"時間を確認：DUBI は {timing} を使って炭水化物と食事を配置します。","home.training.updating":"トレーニングに合わせてプランを更新中...","wearable.connected.message":"{provider} が接続されました。Provider がデータを送ると、DUBI はここでもプランでも使用します。","wearable.notConnected.message":"wearable なしでもプランは使えます。接続すると自動調整できます。","wearable.partialData.message":"一部データを受信しました。DUBI は提供された信号だけを表示・使用します。","wearable.unavailable.message":"{provider} から未提供","wearable.status.none":"未接続","wearable.status.partial":"一部データ","wearable.connect.prompt":"wearable を接続して有効化","home.calories.lossEstimate":"~{rate} kg/週 減量 · ACSM 範囲 0.25-1.0 kg","home.calories.gainEstimate":"~{rate} kg/週 増量 · ACSM 範囲 0.1-0.5 kg","nav.today.subtitle":"トラッカー","nav.weekly.subtitle":"全体プラン","nav.shopping.subtitle":"買い物リスト","nav.progress.subtitle":"進捗","nav.sources.subtitle":"方法","nav.settings.subtitle":"プロフィール","goal.fatLoss":"脂肪減少","goal.muscleGain":"筋肉増加","goal.maintenance":"維持","goal.definition":"引き締め","meal.macroAnomaly":"マクロ異常","meal.eaten":"食べた","diet.omnivore":"雑食","diet.pescatarian":"魚中心","diet.vegetarian":"ベジタリアン","diet.vegan":"ヴィーガン","sport.gym":"ジム","sport.running":"ランニング","sport.cycling":"サイクリング","sport.swimming":"水泳","sport.yoga":"ヨガ","sport.crossfit":"CrossFit","sport.football":"サッカー","sport.tennis":"テニス","sport.other":"その他","allergy.egg":"卵","allergy.gluten":"グルテン","allergy.dairy":"乳製品/乳糖","allergy.nuts":"ナッツ","allergy.shellfish":"甲殻類","allergy.soy":"大豆","allergy.sesame":"ごま","allergy.mustard":"マスタード","allergy.fish":"魚","allergy.addCustom":"カスタム追加","allergy.customPlaceholder":"アレルギーまたは状態","allergy.noneSelected":"アレルギー未選択","breakfast.both":"両方","breakfast.sweet":"甘い","breakfast.savory":"塩味","breakfast.none":"なし","training.timing.morning":"朝","training.timing.lunch":"昼","training.timing.afternoon":"午後","training.timing.evening":"夜","training.timing.varies":"不定","intensity.low":"低い","intensity.moderate":"中程度","intensity.high":"高い"
   },
   ru: {
-    "sidebar.tagline":"План, трекер и поддержка","home.training.title":"Сегодняшняя тренировка","home.training.timingMessage":"Подтверди время: DUBI использует {timing}, чтобы распределить углеводы и приемы пищи.","home.training.updating":"Обновляю план вокруг тренировки...","wearable.connected.message":"{provider} подключен. Когда provider пришлет данные, DUBI использует их здесь и в плане.","wearable.notConnected.message":"План работает и без wearable: подключи устройство для автоматических адаптаций.","wearable.partialData.message":"Получены частичные данные. DUBI показывает и использует только доступные сигналы.","wearable.unavailable.message":"Не предоставлено {provider}","wearable.status.none":"Не подключено","wearable.status.partial":"Частичные данные","wearable.connect.prompt":"Подключи wearable для активации","home.calories.lossEstimate":"~{rate} кг/неделю снижение · диапазон ACSM 0.25-1.0 кг","home.calories.gainEstimate":"~{rate} кг/неделю набор · диапазон ACSM 0.1-0.5 кг","nav.today.subtitle":"Трекер","nav.weekly.subtitle":"Полный план","nav.shopping.subtitle":"Покупки","nav.progress.subtitle":"Прогресс","nav.sources.subtitle":"Метод","nav.settings.subtitle":"Профиль","goal.fatLoss":"Снижение жира","goal.muscleGain":"Набор мышц","goal.maintenance":"Поддержание","goal.definition":"Рельеф","meal.macroAnomaly":"Аномалия макро","meal.eaten":"Съедено","diet.omnivore":"Всеядный","diet.pescatarian":"Пескетарианский","diet.vegetarian":"Вегетарианский","diet.vegan":"Веганский","sport.gym":"Зал","sport.running":"Бег","sport.cycling":"Велоспорт","sport.swimming":"Плавание","sport.yoga":"Йога","sport.crossfit":"CrossFit","sport.football":"Футбол","sport.tennis":"Теннис","sport.other":"Другое","allergy.egg":"Яйцо","allergy.gluten":"Глютен","allergy.dairy":"Молоко/лактоза","allergy.nuts":"Орехи","allergy.shellfish":"Моллюски","allergy.soy":"Соя","allergy.sesame":"Кунжут","allergy.fish":"Рыба","allergy.addCustom":"Добавить свое","allergy.customPlaceholder":"Аллергия или состояние","allergy.noneSelected":"Аллергия не выбрана","breakfast.both":"Оба","breakfast.sweet":"Сладкий","breakfast.savory":"Соленый","breakfast.none":"Нет","training.timing.morning":"Утро","training.timing.lunch":"Обед","training.timing.afternoon":"День","training.timing.evening":"Вечер","training.timing.varies":"По-разному","intensity.low":"Низкая","intensity.moderate":"Средняя","intensity.high":"Высокая"
+    "sidebar.tagline":"План, трекер и поддержка","home.training.title":"Сегодняшняя тренировка","home.training.timingMessage":"Подтверди время: DUBI использует {timing}, чтобы распределить углеводы и приемы пищи.","home.training.updating":"Обновляю план вокруг тренировки...","wearable.connected.message":"{provider} подключен. Когда provider пришлет данные, DUBI использует их здесь и в плане.","wearable.notConnected.message":"План работает и без wearable: подключи устройство для автоматических адаптаций.","wearable.partialData.message":"Получены частичные данные. DUBI показывает и использует только доступные сигналы.","wearable.unavailable.message":"Не предоставлено {provider}","wearable.status.none":"Не подключено","wearable.status.partial":"Частичные данные","wearable.connect.prompt":"Подключи wearable для активации","home.calories.lossEstimate":"~{rate} кг/неделю снижение · диапазон ACSM 0.25-1.0 кг","home.calories.gainEstimate":"~{rate} кг/неделю набор · диапазон ACSM 0.1-0.5 кг","nav.today.subtitle":"Трекер","nav.weekly.subtitle":"Полный план","nav.shopping.subtitle":"Покупки","nav.progress.subtitle":"Прогресс","nav.sources.subtitle":"Метод","nav.settings.subtitle":"Профиль","goal.fatLoss":"Снижение жира","goal.muscleGain":"Набор мышц","goal.maintenance":"Поддержание","goal.definition":"Рельеф","meal.macroAnomaly":"Аномалия макро","meal.eaten":"Съедено","diet.omnivore":"Всеядный","diet.pescatarian":"Пескетарианский","diet.vegetarian":"Вегетарианский","diet.vegan":"Веганский","sport.gym":"Зал","sport.running":"Бег","sport.cycling":"Велоспорт","sport.swimming":"Плавание","sport.yoga":"Йога","sport.crossfit":"CrossFit","sport.football":"Футбол","sport.tennis":"Теннис","sport.other":"Другое","allergy.egg":"Яйцо","allergy.gluten":"Глютен","allergy.dairy":"Молоко/лактоза","allergy.nuts":"Орехи","allergy.shellfish":"Моллюски","allergy.soy":"Соя","allergy.sesame":"Кунжут","allergy.mustard":"Горчица","allergy.fish":"Рыба","allergy.addCustom":"Добавить свое","allergy.customPlaceholder":"Аллергия или состояние","allergy.noneSelected":"Аллергия не выбрана","breakfast.both":"Оба","breakfast.sweet":"Сладкий","breakfast.savory":"Соленый","breakfast.none":"Нет","training.timing.morning":"Утро","training.timing.lunch":"Обед","training.timing.afternoon":"День","training.timing.evening":"Вечер","training.timing.varies":"По-разному","intensity.low":"Низкая","intensity.moderate":"Средняя","intensity.high":"Высокая"
   }
 };
 LANGUAGES.forEach(({code}) => {
@@ -8529,6 +8606,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "boot.error":"Connessione assente o lenta. Verifica la connessione internet e riprova.",
     "plan.error.generate":"Non è stato possibile generare il piano. Riprova tra poco.",
     "plan.error.fetch":"Non è stato possibile recuperare il piano. Riprova tra poco.",
+    "plan.error.noSafeMatch":"Non abbiamo ancora una ricetta sicura per il tuo profilo in questo pasto. Il nostro team nutrizionale è stato avvisato.",
     "onb.health.notice":"DUBI offre orientamento nutrizionale educativo e non sostituisce medico, dietista o nutrizionista. Prima della generazione del piano ti chiederemo il consenso privacy e la presa visione della nota salute.",
     "onb.minor.authorizationRequired":"Prima di continuare serve l’autorizzazione del genitore o tutore.",
     "onb.save.error":"Non riesco a salvare l’onboarding ora. Controlla la connessione e riprova tra poco: DUBI non genererà il piano finché i dati iniziali non saranno salvati.",
@@ -8581,6 +8659,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "boot.error":"Connection is unavailable or slow. Check your internet connection and try again.",
     "plan.error.generate":"The plan could not be generated. Please try again shortly.",
     "plan.error.fetch":"The plan could not be retrieved. Please try again shortly.",
+    "plan.error.noSafeMatch":"We do not yet have a safe recipe for your profile for this meal. Our nutrition team has been notified.",
     "onb.health.notice":"DUBI provides educational nutrition guidance and does not replace a doctor, dietitian or nutritionist. Before generating the plan, we will ask for privacy consent and acknowledgment of the health notice.",
     "onb.minor.authorizationRequired":"Parental or guardian authorisation is required before continuing.",
     "onb.save.error":"I cannot save your onboarding right now. Check your connection and try again shortly: DUBI will not generate the plan until the initial data is saved.",
@@ -11210,822 +11289,6 @@ function calcPlan(data) {
 // ═══════════════════════════════════════════════
 // WEEKLY MEALS — with alts for colazione + snack
 // ═══════════════════════════════════════════════
-const WEEKLY_MEALS = {
-  omnivore: [
-    // ── LUNEDÌ ──
-    {
-      colazione_dolce:{ items:["Porridge d'avena (60g fiocchi)","Latte scremato (200ml)","Banana (1 media)","Miele grezzo (10g)","Noci (15g)","Cannella"],
-        macros:{cal:519,p:20,f:14,c:83},
-        why:"L'avena fornisce carboidrati complessi a basso indice glicemico (Ludwig & Ebbeling, JAMA 2018). Le noci apportano omega-3 cardioprotettivi (Mozaffarian, Circulation 2016).",whyEN:"Oats provide complex carbohydrates with a low glycemic index (Ludwig & Ebbeling, JAMA 2018). Walnuts supply cardioprotective omega-3s (Mozaffarian, Circulation 2016).",
-        alts:{0:["Porridge di quinoa (60g)","Overnight oats (60g)","Granola no-sugar (50g)"],1:["Frutti di bosco (100g)","Mela (1 media)","Pera (1 media)"],3:["Mandorle (15g)","Semi di zucca (15g)","Burro di mandorle (15g)"]} },
-      colazione_salata:{ items:["Uova strapazzate (2)","Pane integrale (60g)","Avocado (¼)","Pomodorini (50g)"],
-        macros:{cal:380,p:16,f:19,c:32},
-        why:"Le uova offrono proteine complete ad alta biodisponibilità. L'avocado fornisce grassi monoinsaturi (Harvard Healthy Eating Plate).",whyEN:"Eggs offer complete proteins with high bioavailability. Avocado provides monounsaturated fats (Harvard Healthy Eating Plate).",
-        alts:{0:["Albumi strapazzati (4)","Tofu strapazzato (100g)","Uova sode (2)"],1:["Pane di segale (60g)","Gallette di riso (40g)","Pane proteico (60g)"],2:["Hummus (40g)","Ricotta (50g)","Tahini (15g)"],3:["Cetrioli (50g)","Spinaci (50g)","Rucola (30g)"]} },
-      pranzo:{ items:["Petto di pollo alla griglia (150g)","Quinoa (80g secco)","Spinaci (150g) saltati con olio EVO (10ml)","Limone"],
-        macros:{cal:581,p:49,f:18,c:57},
-        why:"Il pollo è fonte proteica magra (Sacks et al., NEJM 2009). La quinoa contiene tutti gli aminoacidi essenziali. Gli spinaci forniscono ferro e magnesio.",whyEN:"Chicken is a lean protein source (Sacks et al., NEJM 2009). Quinoa contains all essential amino acids. Spinach provides iron and magnesium.",
-        alts:{0:["Tacchino alla piastra (150g)","Merluzzo al forno (160g)","Tofu grigliato (180g)"],1:["Riso integrale (80g)","Farro (80g)","Cous cous integrale (80g)"],2:["Broccoli al vapore","Zucchine grigliate","Cavolo kale saltato"]} },
-      cena:{ items:["Salmone al forno (150g)","Patate dolci (200g)","Broccoli al vapore (200g)","Olio EVO (10ml)"],
-        macros:{cal:640,p:39,f:31,c:53},
-        why:"Il salmone apporta omega-3 EPA/DHA (Willett et al., EAT-Lancet 2019). Le patate dolci hanno indice glicemico moderato e sono ricche di beta-carotene.",whyEN:"Salmon provides omega-3 EPA/DHA (Willett et al., EAT-Lancet 2019). Sweet potatoes have a moderate glycemic index and are rich in beta-carotene.",
-        alts:{0:["Sgombro al forno (150g)","Orata al cartoccio (160g)","Petto di tacchino (150g)"],1:["Riso basmati integrale (180g)","Patate novelle (200g)","Zucca al forno (250g)"],2:["Cavolfiori gratinati","Fagiolini al vapore","Asparagi"]} },
-      snack:{ items:["Yogurt greco 0% (150g)","Mandorle (20g)","Miele grezzo (5g)"],
-        macros:{cal:220,p:20,f:11,c:14},
-        why:"Lo yogurt greco fornisce proteine caseine a rilascio lento (Bray et al., The Lancet 2016). Le mandorle apportano vitamina E e grassi salutari.",whyEN:"Greek yogurt provides slow-releasing casein proteins (Bray et al., The Lancet 2016). Almonds supply vitamin E and healthy fats.",
-        alts:{0:["Kefir (200ml)","Fiocchi di latte (150g)","Skyr (150g)"],1:["Noci (20g)","Anacardi (18g)","Mix di semi (15g)"],2:["Marmellata 100% frutta (10g)","Mirtilli freschi (30g)","Cannella a piacere"]} },
-      snack_m:{ items:["Banana (1 piccola)","Burro di arachidi (10g)"],
-        macros:{cal:148,p:4,f:5,c:25},
-        why:"La banana fornisce carboidrati rapidi per l'energia mattutina. Il burro di arachidi bilancia con grassi e proteine.",whyEN:"Banana provides fast carbohydrates for morning energy. Peanut butter balances with healthy fats and proteins.",
-        alts:{0:["Dattero (2 pz)","Arancia (1 media)","Ananas (150g)"],1:["Tahini (10g)","Mandorle (12g)","Ricotta (30g)"]} },
-      snack_n:{ items:["Fiocchi di latte (100g)","Semi di chia (10g)"],
-        macros:{cal:147,p:13,f:7,c:8},
-        why:"I fiocchi di latte sono ricchi di caseina a lento rilascio, ideali pre-nanna per il recupero muscolare notturno.",whyEN:"Cottage cheese is rich in slow-releasing casein, ideal before bed for overnight muscle recovery.",
-        alts:{0:["Skyr (100g)","Yogurt greco 0% (100g)","Ricotta magra (100g)"],1:["Semi di lino (10g)","Noci (10g)","Cannella (a piacere)"]} },
-    },
-    // ── MARTEDÌ ──
-    {
-      colazione_dolce:{ items:["Yogurt greco (200g)","Granola senza zuccheri aggiunti (40g)","Frutti di bosco (100g)","Semi di chia (10g)"],
-        macros:{cal:369,p:26,f:9,c:46},
-        why:"I frutti di bosco hanno alta densità di antiossidanti. I semi di chia apportano fibre e omega-3 vegetali ALA.",whyEN:"Berries have high antioxidant density. Chia seeds provide fiber and plant-based ALA omega-3s.",
-        alts:{0:["Skyr (200g)","Kefir (200ml)","Fiocchi di latte (150g)"],1:["Muesli no-zuccheri (40g)","Fiocchi d'avena (40g)","Granola proteica (40g)"],2:["Lamponi (100g)","Mirtilli (100g)","Fragole (120g)"],3:["Semi di lino (10g)","Noci (10g)","Semi di canapa (10g)"]} },
-      colazione_salata:{ items:["Frittata con verdure (2 uova)","Pane di segale (50g)","Ricotta (40g)","Rucola"],
-        macros:{cal:335,p:19,f:15,c:28},
-        why:"La combinazione uova-ricotta fornisce un profilo aminoacidico completo. Il pane di segale ha indice glicemico più basso del frumento (Ludwig & Ebbeling, JAMA 2018).",whyEN:"The egg-ricotta combination provides a complete amino acid profile. Rye bread has a lower GI than wheat (Ludwig & Ebbeling, JAMA 2018).",
-        alts:{0:["Frittata di albumi (4)","Uova sode (2)","Tofu strapazzato (100g)"],1:["Pane integrale (50g)","Gallette di grano saraceno (40g)","Crackers di segale (30g)"],2:["Cottage cheese (50g)","Hummus (40g)","Avocado (¼)"],3:["Spinaci (50g)","Rucola (30g)","Pomodorini (50g)"]} },
-      pranzo:{ items:["Tacchino ai ferri (150g)","Riso integrale (80g secco)","Zucchine grigliate (200g)","Olio EVO (10ml)"],
-        macros:{cal:574,p:43,f:15,c:67},
-        why:"Il tacchino è ricco di triptofano, precursore della serotonina. Il riso integrale mantiene la fibra del chicco intero (Hall et al., Cell Metabolism 2019).",whyEN:"Turkey is rich in tryptophan, a serotonin precursor. Brown rice retains the whole grain's fiber (Hall et al., Cell Metabolism 2019).",
-        alts:{0:["Petto di pollo (150g)","Tonno fresco (140g)","Tempeh (160g)"],1:["Quinoa (80g)","Farro (80g)","Orzo perlato (80g)"],2:["Melanzane grigliate","Peperoni al forno","Funghi trifolati"]} },
-      cena:{ items:["Merluzzo al forno (170g)","Ceci (80g secco)","Insalata mista (150g)","Olio EVO (10ml)"],
-        macros:{cal:540,p:48,f:16,c:53},
-        why:"Il merluzzo è pesce magro ad alto contenuto proteico. I ceci combinano proteine vegetali e fibre per salute del microbioma.",whyEN:"Cod is a lean fish with high protein content. Chickpeas combine plant proteins and fiber for microbiome health.",
-        alts:{0:["Orata al forno (160g)","Pollo al limone (150g)","Uova sode (3)"],1:["Lenticchie (80g)","Fagioli cannellini (80g)","Edamame (100g)"],2:["Finocchi gratinati","Rucola e pomodorini","Radicchio grigliato"]} },
-      snack:{ items:["Mela (1 media)","Burro di arachidi naturale (15g)"],
-        macros:{cal:166,p:4,f:8,c:24},
-        why:"La mela è ricca di pectina, fibra solubile che rallenta la digestione. Il burro di arachidi aggiunge proteine e grassi salutari.",whyEN:"Apple is rich in pectin, a soluble fiber that slows digestion. Peanut butter adds proteins and healthy fats.",
-        alts:{0:["Pera (1 media)","Arancia (1 grande)","Kiwi (2 pz)"],1:["Burro di mandorle (15g)","Tahini (15g)","Noci (20g)"]} },
-      snack_m:{ items:["Ricotta (80g)","Miele (5g)"],
-        macros:{cal:126,p:9,f:8,c:8},
-        why:"La ricotta fornisce proteine del siero. Il miele apporta energia rapida con proprietà prebiotiche.",whyEN:"Ricotta provides whey proteins. Honey brings quick energy with prebiotic properties.",
-        alts:{0:["Fiocchi di latte (80g)","Skyr (80g)","Yogurt greco (80g)"],1:["Confettura 100% frutta (8g)","Cannella (a piacere)","Mirtilli (20g)"]} },
-      snack_n:{ items:["Skyr (120g)","Mandorle (10g)"],
-        macros:{cal:134,p:15,f:5,c:7},
-        why:"Lo skyr è tra i latticini con più alto contenuto proteico a basso contenuto di grassi — ideale per il recupero notturno.",whyEN:"Skyr is among the dairy products with the highest protein and lowest fat — ideal for overnight recovery.",
-        alts:{0:["Fiocchi di latte (120g)","Yogurt greco 0% (120g)","Ricotta magra (100g)"],1:["Noci (10g)","Semi di girasole (10g)","Anacardi (10g)"]} },
-    },
-    // ── MERCOLEDÌ ──
-    {
-      colazione_dolce:{ items:["Pancake proteici (2 pz, avena+albume)","Frutti di bosco (80g)","Sciroppo d'acero (10ml)"],
-        macros:{cal:302,p:18,f:4,c:50},
-        why:"I pancake di avena e albume combinano carboidrati complessi e proteine. I frutti di bosco aggiungono antiossidanti (Mozaffarian, Circulation 2016).",whyEN:"Oat and egg white pancakes combine complex carbohydrates and proteins. Berries add antioxidants (Mozaffarian, Circulation 2016).",
-        alts:{0:["Pancake di banana (2 pz)","Waffle di avena (2 pz)","French toast integrale (2 fette)"],1:["Lamponi (80g)","Fragole (100g)","Mirtilli (80g)"],2:["Miele grezzo (10g)","Confettura 100% frutta (15g)","Yogurt greco (30g)"]} },
-      colazione_salata:{ items:["Toast integrale (2 fette, 80g)","Salmone affumicato (50g)","Avocado (80g)","Limone"],
-        macros:{cal:384,p:18,f:17,c:40},
-        why:"Il salmone affumicato apporta omega-3 e proteine di alto valore biologico. L'avocado fornisce potassio e grassi monoinsaturi.",whyEN:"Smoked salmon provides omega-3s and high biological value proteins. Avocado supplies potassium and monounsaturated fats.",
-        alts:{0:["Pane di segale (2 fette)","Crackers integrali (40g)","Pane proteico (60g)"],1:["Tonno in acqua (60g)","Uova sode (2)","Ricotta (50g)"],2:["Hummus (40g)","Avocado (½)","Ricotta (40g)"],3:["Lime","Lime e pepe","Erba cipollina"]} },
-      pranzo:{ items:["Sgombro al forno (150g)","Farro (80g secco)","Pomodori e rucola (150g)","Olive (20g)"],
-        macros:{cal:631,p:42,f:25,c:62},
-        why:"Lo sgombro è tra i pesci più ricchi di omega-3. Il farro è cereale antico con alto contenuto di fibre. Le olive apportano polifenoli.",whyEN:"Mackerel is among the fish richest in omega-3s. Spelt is an ancient grain with high fiber content. Olives provide polyphenols.",
-        alts:{0:["Tonno alla piastra (140g)","Pollo al rosmarino (150g)","Tofu affumicato (180g)"],1:["Quinoa (80g)","Riso venere (80g)","Pasta integrale (80g)"],2:["Insalata mista grande","Cetrioli e pomodori","Verdure alla julienne"]} },
-      cena:{ items:["Petto di pollo al limone (160g)","Lenticchie rosse (70g secco)","Carote al vapore (150g)","Olio EVO (10ml)"],
-        macros:{cal:573,p:53,f:14,c:59},
-        why:"Le lenticchie rosse sono ricche di ferro e folati. La vitamina C delle carote migliora l'assorbimento del ferro (Schüpbach et al., Eur J Nutr 2017).",whyEN:"Red lentils are rich in iron and folate. Vitamin C from carrots improves iron absorption (Schüpbach et al., Eur J Nutr 2017).",
-        alts:{0:["Tacchino (160g)","Salmone (140g)","Uova sode (3)"],1:["Ceci (70g secco)","Fagioli borlotti (70g)","Piselli (100g)"],2:["Zucchine al vapore","Finocchi","Spinaci al vapore"]} },
-      snack:{ items:["Ricotta vaccina (100g)","Noci (15g)","Miele (5g)"],
-        macros:{cal:251,p:14,f:20,c:11},
-        why:"La ricotta fornisce proteine del siero. Le noci sono la frutta secca con il miglior rapporto omega-6/omega-3.",whyEN:"Ricotta provides whey proteins. Walnuts have the best omega-6/omega-3 ratio among nuts.",
-        alts:{0:["Fiocchi di latte (100g)","Skyr (100g)","Yogurt greco 0% (130g)"],1:["Mandorle (15g)","Noci pecan (15g)","Mix di semi (15g)"],2:["Confettura 100% frutta (8g)","Cannella (a piacere)","Mirtilli (20g)"]} },
-      snack_m:{ items:["Dattero Medjool (2 pz, ~30g)","Mandorle (15g)"],
-        macros:{cal:170,p:4,f:8,c:26},
-        why:"I datteri forniscono energia rapida da fruttosio e glucosio naturali. Le mandorle completano con proteine e vitamina E.",whyEN:"Dates provide quick energy from natural fructose and glucose. Almonds complement with proteins and vitamin E.",
-        alts:{0:["Fichi secchi (2 pz)","Albicocche secche (4 pz)","Banana (½)"],1:["Noci (15g)","Anacardi (15g)","Pistacchi (15g)"]} },
-      snack_n:{ items:["Yogurt greco 0% (120g)","Semi di chia (8g)"],
-        macros:{cal:110,p:14,f:3,c:8},
-        why:"I semi di chia sono ricchi di fibre e omega-3 vegetali. La combinazione con lo yogurt greco supporta il recupero muscolare notturno.",whyEN:"Chia seeds are rich in fiber and plant-based omega-3s. Combined with Greek yogurt, they support overnight muscle recovery.",
-        alts:{0:["Kefir (150ml)","Skyr (120g)","Fiocchi di latte (120g)"],1:["Semi di lino (8g)","Semi di canapa (8g)","Noci tritate (10g)"]} },
-    },
-    // ── GIOVEDÌ ──
-    {
-      colazione_dolce:{ items:["Smoothie bowl (banana 100g, avena 60g, latte scremato 200ml)","Cocco in scaglie (10g)","Semi di lino (10g)"],
-        macros:{cal:479,p:20,f:12,c:77},
-        why:"La banana fornisce potassio e carboidrati rapidi per l'energia mattutina. I semi di lino sono una delle fonti vegetali più ricche di omega-3 ALA.",whyEN:"Banana provides potassium and fast carbohydrates for morning energy. Flaxseeds are one of the richest plant sources of ALA omega-3.",
-        alts:{0:["Bowl di avena e mango (200ml)","Acai bowl (150g)","Bowl di yogurt e banana"],1:["Cocco rapé tostato (10g)","Granola (15g)","Scaglie di cioccolato fondente (10g)"],2:["Semi di chia (10g)","Semi di zucca (10g)","Noci tritate (10g)"]} },
-      colazione_salata:{ items:["Uovo in camicia (2)","Pane integrale (60g)","Hummus (30g)","Cetriolo (100g)"],
-        macros:{cal:359,p:18,f:15,c:33},
-        why:"L'hummus aggiunge proteine vegetali e fibre dai ceci. La combinazione uova-legumi offre profilo aminoacidico ottimale.",whyEN:"Hummus adds plant proteins and fiber from chickpeas. The egg-legume combination offers an optimal amino acid profile.",
-        alts:{0:["Uova sode (2)","Tofu strapazzato (100g)","Frittata (2 uova)"],1:["Pane di segale (60g)","Crackers integrali (40g)","Gallette di riso (40g)"],2:["Avocado (¼)","Ricotta (40g)","Cottage cheese (40g)"],3:["Pomodorini (50g)","Ravanelli (50g)","Rucola (30g)"]} },
-      pranzo:{ items:["Manzo magro alla griglia (130g)","Riso basmati integrale (80g secco)","Peperoni al forno (200g)","Olio EVO (10ml)"],
-        macros:{cal:635,p:42,f:19,c:73},
-        why:"La carne rossa non processata 2-3x/settimana è compatibile con una dieta salutare (Willett et al., EAT-Lancet 2019). I peperoni sono ricchissimi di vitamina C.",whyEN:"Unprocessed red meat 2-3×/week is compatible with a healthy diet (Willett et al., EAT-Lancet 2019). Bell peppers are extremely rich in vitamin C.",
-        alts:{0:["Petto di pollo (150g)","Tonno (140g)","Seitan (150g)"],1:["Quinoa (80g)","Farro (80g)","Patate (200g)"],2:["Melanzane grigliate","Zucchine al forno","Verdure miste"]} },
-      cena:{ items:["Orata al cartoccio (170g)","Patate novelle (180g)","Fagiolini (180g)","Olio EVO (5ml)","Limone e prezzemolo"],
-        macros:{cal:404,p:38,f:9,c:43},
-        why:"L'orata è pesce bianco magro ideale per la cena per la sua digeribilità. Le patate novelle hanno meno amido. I fagiolini sono ottima fonte di fibre.",whyEN:"Sea bream is an ideal lean white fish for dinner due to its digestibility. New potatoes have less starch. Green beans are an excellent fiber source.",
-        alts:{0:["Branzino (170g)","Pollo arrosto (150g)","Tofu al forno (180g)"],1:["Riso (180g)","Cous cous (160g)","Pane integrale (80g)"],2:["Broccoli al vapore","Asparagi","Bieta"]} },
-      snack:{ items:["Banana (1 media)","Mandorle (20g)"],
-        macros:{cal:205,p:5,f:10,c:27},
-        why:"La banana fornisce potassio e carboidrati per il ripristino del glicogeno muscolare. Le mandorle bilanciano con grassi e proteine.",whyEN:"Banana provides potassium and carbohydrates for muscle glycogen restoration. Almonds balance with healthy fats and proteins.",
-        alts:{0:["Arancia (1 grande)","Pera (1 media)","Kiwi (2 pz)"],1:["Noci (20g)","Anacardi (18g)","Semi di girasole (20g)"]} },
-      snack_m:{ items:["Gallette di riso (3 pz, ~30g)","Ricotta (60g)","Marmellata 100% frutta (10g)"],
-        macros:{cal:222,p:9,f:6,c:35},
-        why:"Le gallette di riso offrono carboidrati leggeri. La ricotta aggiunge proteine per sostenere l'energia fino al pranzo.",whyEN:"Rice cakes offer light carbohydrates. Ricotta adds proteins to sustain energy until lunch.",
-        alts:{0:["Crackers di segale (30g)","Pane integrale (40g)","Crackers proteici (30g)"],1:["Hummus (40g)","Avocado (¼)","Cottage cheese (50g)"],2:["Confettura di frutti rossi (10g)","Miele (8g)","Fettine di banana"]} },
-      snack_n:{ items:["Latte parzialmente scremato (200ml)","Cacao amaro (5g)"],
-        macros:{cal:103,p:8,f:4,c:12},
-        why:"Il latte caldo favorisce il sonno (triptofano e calcio). Il cacao amaro apporta flavonoidi e magnesio per il rilassamento muscolare.",whyEN:"Warm milk promotes sleep (tryptophan and calcium). Bitter cocoa provides flavonoids and magnesium for muscle relaxation.",
-        alts:{0:["Latte di mandorla (200ml)","Kefir (150ml)","Latte di avena (200ml)"],1:["Curcuma e cannella","Vaniglia naturale","Miele (5g)"]} },
-    },
-    // ── VENERDÌ ──
-    {
-      colazione_dolce:{ items:["Chia pudding (semi di chia 25g + latte scremato 200ml)","Mango (80g)","Cocco rapé (10g)"],
-        macros:{cal:273,p:12,f:12,c:34},
-        why:"I semi di chia assorbono liquidi formando un gel ricco di fibre solubili che promuove sazietà. Il mango fornisce vitamina A e C.",whyEN:"Chia seeds absorb liquid forming a gel rich in soluble fiber that promotes satiety. Mango provides vitamins A and C.",
-        alts:{0:["Chia pudding al cacao","Chia pudding alla vaniglia","Porridge di chia e mela"],1:["Frutti di bosco (80g)","Ananas (80g)","Kiwi (2 pz)"],2:["Granola (10g)","Noci tritate (10g)","Scaglie di cioccolato fondente (8g)"]} },
-      colazione_salata:{ items:["Omelette (2 uova + verdure miste 50g)","Pane integrale (50g)","Ricotta fresca (30g)"],
-        macros:{cal:318,p:18,f:14,c:25},
-        why:"L'omelette con verdure combina proteine ad alto valore biologico con fitonutrienti. Il formaggio fresco aggiunge calcio.",whyEN:"The vegetable omelette combines high biological value proteins with phytonutrients. Fresh cheese adds calcium.",
-        alts:{0:["Uova sode (2) + verdure","Tofu strapazzato (100g)","Frittata di albumi (4)"],1:["Pane di segale (50g)","Gallette di riso (40g)","Crackers integrali (30g)"],2:["Ricotta (40g)","Hummus (40g)","Avocado (¼)"]} },
-      pranzo:{ items:["Tonno fresco alla piastra (140g)","Pasta integrale (80g secco)","Pomodorini e basilico (100g)","Olio EVO (10ml)"],
-        macros:{cal:550,p:47,f:13,c:61},
-        why:"Il tonno fresco è una delle migliori fonti di proteine e omega-3. La pasta integrale mantiene la fibra del grano (Hall et al., Cell Metabolism 2019).",whyEN:"Fresh tuna is one of the best sources of protein and omega-3s. Wholegrain pasta retains grain fiber (Hall et al., Cell Metabolism 2019).",
-        alts:{0:["Salmone (140g)","Pollo (150g)","Tempeh (160g)"],1:["Riso integrale (80g)","Farro (80g)","Orzo (80g)"],2:["Zucchine e melanzane","Spinaci freschi","Rucola e parmigiano"]} },
-      cena:{ items:["Pollo al curry leggero (160g)","Riso basmati (70g secco)","Verdure miste (200g)","Yogurt greco 0% (30g)"],
-        macros:{cal:517,p:48,f:6,c:68},
-        why:"La curcuma nel curry ha proprietà antinfiammatorie documentate. Il riso basmati ha indice glicemico inferiore ad altri risi. Le spezie stimolano il metabolismo.",whyEN:"Turmeric in curry has documented anti-inflammatory properties. Basmati rice has a lower GI than other rice varieties. Spices stimulate metabolism.",
-        alts:{0:["Tacchino al curry (160g)","Gamberi (160g)","Tofu (180g)"],1:["Quinoa (70g)","Bulgur (70g)","Miglio (70g)"],2:["Cavolfiore al curry","Broccoli","Spinaci"]} },
-      snack:{ items:["Fiocchi di latte (120g)","Noci (15g)","Miele (5g)"],
-        macros:{cal:231,p:16,f:15,c:10},
-        why:"I fiocchi di latte sono ricchi di caseina a lento rilascio per mantenere l'apporto proteico prolungato. Le noci completano con acidi grassi essenziali.",whyEN:"Cottage cheese is rich in slow-releasing casein for sustained protein supply. Walnuts complement with essential fatty acids.",
-        alts:{0:["Skyr (130g)","Yogurt greco 0% (130g)","Ricotta (120g)"],1:["Mandorle (15g)","Pistacchi (15g)","Anacardi (15g)"],2:["Confettura 100% frutta (8g)","Mirtilli (30g)","Cannella"]} },
-      snack_m:{ items:["Frutto di stagione (1 medio, ~150g)","Skyr (80g)"],
-        macros:{cal:128,p:9,f:0,c:24},
-        why:"La frutta di stagione apporta vitamine e antiossidanti al picco nutritivo. Lo skyr aggiunge proteine senza aggiungere grassi.",whyEN:"Seasonal fruit provides vitamins and antioxidants at their nutritional peak. Skyr adds proteins without adding fat.",
-        alts:{0:["Mela","Pera","Arancia"],1:["Yogurt greco 0% (80g)","Fiocchi di latte (80g)","Kefir (100ml)"]} },
-      snack_n:{ items:["Noci (20g)","Cioccolato fondente 85% (15g)"],
-        macros:{cal:220,p:4,f:19,c:10},
-        why:"Le noci apportano melatonina naturale e acidi grassi omega-3 favorevoli al sonno. Il cioccolato fondente 85%+ fornisce magnesio e flavonoidi.",whyEN:"Walnuts provide natural melatonin and sleep-friendly omega-3 fatty acids. Dark chocolate 85%+ provides magnesium and flavonoids.",
-        alts:{0:["Mandorle (20g)","Pistacchi (20g)","Mix di frutta secca (20g)"],1:["Cacao amaro in latte (10g)","Nocciole (10g)","Semi di zucca (15g)"]} },
-    },
-    // ── SABATO ──
-    {
-      colazione_dolce:{ items:["French toast integrale (pane integrale 80g + 1 uovo)","Cannella","Frutti di bosco (80g)","Sciroppo d'acero (10ml)"],
-        macros:{cal:335,p:13,f:8,c:49},
-        why:"Il pane integrale tostato con uovo mantiene le fibre e aggiunge proteine. La cannella ha effetti positivi sulla sensibilità insulinica.",whyEN:"Toasted wholegrain bread with egg retains fiber and adds proteins. Cinnamon has positive effects on insulin sensitivity.",
-        alts:{0:["Pancake di avena (2 pz)","Waffle proteico (2 pz)","Bowl di açaí"],1:["Timo e vaniglia","Cardamomo","Solo cannella e vaniglia"],2:["Mirtilli (80g)","Lamponi (80g)","Fragole (100g)"],3:["Miele grezzo (10g)","Sciroppo di agave (10g)","Confettura 100% frutta (15g)"]} },
-      colazione_salata:{ items:["Uova alla benedict light (2)","English muffin integrale (60g)","Spinaci (50g)","Salmone affumicato (30g)"],
-        macros:{cal:338,p:22,f:13,c:27},
-        why:"Una versione bilanciata del classico brunch con proteine nobili da uova e salmone, e carboidrati complessi dal muffin integrale.",whyEN:"A balanced version of the classic brunch with quality proteins from eggs and salmon, and complex carbohydrates from a wholegrain muffin.",
-        alts:{0:["Uova in camicia (2)","Uova sode (2)","Frittata (2 uova)"],1:["Pane integrale tostato (60g)","Gallette di riso (40g)","Pane di segale (60g)"],2:["Rucola (50g)","Rucola e pomodorini","Songino (50g)"],3:["Tonno affumicato (30g)","Bresaola (30g)","Ricotta (40g)"]} },
-      pranzo:{ items:["Bowl: riso venere (80g secco)","Edamame (80g)","Avocado (½, 100g)","Salmone crudo (100g)","Salsa di soia (5ml)"],
-        macros:{cal:757,p:38,f:35,c:77},
-        why:"Il riso venere è ricco di antocianine. L'edamame fornisce proteine vegetali complete. Il salmone crudo preserva tutti gli omega-3 senza degradazione termica.",whyEN:"Black (Venere) rice is rich in anthocyanins. Edamame provides complete plant proteins. Raw salmon preserves all omega-3s without thermal degradation.",
-        alts:{0:["Riso integrale (80g)","Quinoa (80g)","Soba noodles (80g)"],1:["Tofu (100g)","Pollo (120g)","Tonno (100g)"],2:["Cetriolo e carote","Wakame","Cavolo rosso"]} },
-      cena:{ items:["Tagliata di manzo (120g)","Rucola (20g) e Parmigiano (15g)","Pomodorini (100g)","Pane integrale (50g)"],
-        macros:{cal:436,p:43,f:20,c:27},
-        why:"La carne rossa di qualità fornisce ferro eme altamente biodisponibile, zinco e vitamina B12 (EAT-Lancet Commission).",whyEN:"Quality red meat provides highly bioavailable heme iron, zinc and vitamin B12 (EAT-Lancet Commission).",
-        alts:{0:["Pollo alla piastra (150g)","Salmone (140g)","Seitan (140g)"],1:["Spinaci freschi","Insalata mista","Radicchio"],2:["Patate al forno (150g)","Crostini integrali","Farro (60g)"]} },
-      snack:{ items:["Mandorle (15g) e Noci (15g)","Cioccolato fondente 85% (15g)"],
-        macros:{cal:275,p:7,f:24,c:12},
-        why:"Il cioccolato fondente 85%+ è fonte di flavonoidi con effetti positivi sulla pressione sanguigna. La frutta secca apporta micronutrienti essenziali.",whyEN:"Dark chocolate 85%+ is a source of flavonoids with positive effects on blood pressure. Dried fruit provides essential micronutrients.",
-        alts:{0:["Mandorle e noci (30g)","Pistacchi (30g)","Anacardi e noci (30g)"],1:["Cacao amaro (8g) + latte","Quadretto di cioccolato extra-fondente","Nocciole crude (15g)"]} },
-      snack_m:{ items:["Smoothie proteico (latte scremato 150ml + banana 100g + whey 20g)"],
-        macros:{cal:220,p:22,f:2,c:32},
-        why:"Uno smoothie proteico con frutta è ideale come pre-allenamento: carboidrati rapidi + proteine per preparare i muscoli allo sforzo.",whyEN:"A protein smoothie with fruit is ideal as a pre-workout: fast carbohydrates + proteins to prepare muscles for effort.",
-        alts:{0:["Smoothie al cioccolato e banana","Smoothie verde (spinaci+banana+latte)","Smoothie ai frutti di bosco"]} },
-      snack_n:{ items:["Latte parz. scremato caldo (200ml)","Curcuma (2g)","Miele (5g)"],
-        macros:{cal:107,p:7,f:3,c:14},
-        why:"Il golden milk (curcuma+latte) ha proprietà antinfiammatorie. La curcuma con pepe nero aumenta la biodisponibilità della curcumina dell'800%.",whyEN:"Golden milk (turmeric+milk) has anti-inflammatory properties. Turmeric with black pepper increases curcumin bioavailability by 800%.",
-        alts:{0:["Latte di mandorla caldo (200ml)","Kefir (150ml)","Latte di avena (200ml)"],1:["Cannella e zenzero","Cacao amaro (5g)","Vaniglia naturale"]} },
-    },
-    // ── DOMENICA ──
-    {
-      colazione_dolce:{ items:["Pancake di banana e avena (banana 100g + avena 60g + albume 80g)","Yogurt greco 0% (80g)","Miele (10g)","Noci (10g)"],
-        macros:{cal:507,p:30,f:11,c:76},
-        why:"La banana schiacciata sostituisce parte delle farine raffinate, riducendo l'indice glicemico. Lo yogurt greco aggiunge proteine per bilanciare il pasto.",whyEN:"Mashed banana replaces some refined flour, reducing the glycemic index. Greek yogurt adds proteins to balance the meal.",
-        alts:{0:["Pancake proteici (3 pz)","Waffles di avena (2 pz)","Crepes integrali (3 pz)"],1:["Skyr (80g)","Kefir (80ml)","Fiocchi di latte (80g)"],2:["Sciroppo d'acero (10ml)","Confettura 100% frutta (15g)","Marmellata di frutti rossi (15g)"],3:["Mandorle (10g)","Semi di chia (8g)","Granola (15g)"]} },
-      colazione_salata:{ items:["Avocado toast (pane integrale 70g)","Uovo poché (1, ~50g)","Semi di sesamo (5g)","Pomodoro (100g)","Avocado (½, 100g)"],
-        macros:{cal:451,p:15,f:25,c:43},
-        why:"L'avocado è ricco di potassio (più della banana) e grassi monoinsaturi. I semi di sesamo apportano calcio e lignani antiossidanti.",whyEN:"Avocado is rich in potassium (more than banana) and monounsaturated fats. Sesame seeds provide calcium and antioxidant lignans.",
-        alts:{0:["Pane di segale (70g)","Pane con semi (70g)","Pane di grano saraceno (70g)"],1:["Uova sode (1)","Salmone affumicato (40g)","Ricotta (50g)"],2:["Semi di zucca","Semi misti","Noci tritate"],3:["Pomodorini (50g)","Rucola (30g)","Cetriolo (50g)"]} },
-      pranzo:{ items:["Lasagna di verdure light (porzione 250g)","Insalata di contorno (150g)","Olio EVO (5ml)"],
-        macros:{cal:362,p:16,f:11,c:52},
-        why:"Un piatto della tradizione rivisitato. Le verdure nella lasagna aumentano la densità nutrizionale riducendo la densità calorica (Hall et al., 2019).",whyEN:"A revisited traditional dish. Vegetables in the lasagna increase nutritional density while reducing caloric density (Hall et al., 2019).",
-        alts:{0:["Pasta integrale al ragù vegetale","Risotto alle verdure","Polenta con funghi"],1:["Rucola e grana","Insalata greca","Finocchi e arance"]} },
-      cena:{ items:["Spigola al forno (170g)","Verdure al forno miste (250g)","Olive (15g)","Pane integrale (40g)"],
-        macros:{cal:368,p:39,f:8,c:34},
-        why:"La spigola è un pesce bianco magro ricco di selenio. Le olive apportano polifenoli. Le verdure al forno concentrate sviluppano sapore senza grassi eccessivi.",whyEN:"Sea bass is a lean white fish rich in selenium. Olives provide polyphenols. Oven-roasted vegetables develop flavor without excess fat.",
-        alts:{0:["Branzino (170g)","Pollo arrosto (150g)","Halloumi (120g)"],1:["Patate al rosmarino (180g)","Cous cous (60g)","Polenta (100g)"],2:["Insalata caprese","Verdure crude","Radicchio"]} },
-      snack:{ items:["Hummus (60g)","Carote e cetrioli crudi (150g)"],
-        macros:{cal:147,p:6,f:6,c:18},
-        why:"L'hummus combina ceci e tahini fornendo proteine vegetali, fibre e grassi insaturi. Le verdure crude apportano enzimi e micronutrienti intatti.",whyEN:"Hummus combines chickpeas and tahini, providing plant proteins, fiber and unsaturated fats. Raw vegetables bring intact enzymes and micronutrients.",
-        alts:{0:["Baba ganoush (60g)","Guacamole (60g)","Tzatziki (80g)"],1:["Cetriolo e carote (150g)","Sedano e peperoni (150g)","Finocchi (150g)"]} },
-      snack_m:{ items:["Kefir (200ml)","Mirtilli (50g)"],
-        macros:{cal:150,p:7,f:7,c:17},
-        why:"Il kefir è ricco di probiotici per la salute del microbioma intestinale. I mirtilli apportano antocianine ad alta attività antiossidante.",whyEN:"Kefir is rich in probiotics for gut microbiome health. Blueberries provide anthocyanins with high antioxidant activity.",
-        alts:{0:["Yogurt greco (150ml)","Latte fermentato (200ml)","Skyr (150g)"],1:["Fragole (60g)","Lamponi (50g)","Frutti di bosco misti (50g)"]} },
-      snack_n:{ items:["Mandorle (20g)","Tisana alla camomilla"],
-        macros:{cal:116,p:4,f:10,c:4},
-        why:"Le mandorle apportano magnesio favorevole al rilassamento muscolare. La camomilla ha proprietà rilassanti documentate per migliorare la qualità del sonno.",whyEN:"Almonds provide magnesium favorable for muscle relaxation. Chamomile has documented relaxing properties to improve sleep quality.",
-        alts:{0:["Noci (20g)","Pistacchi (20g)","Mix di frutta secca (20g)"],1:["Tisana alla lavanda","Tisana al tiglio","Latte caldo (200ml)"]} },
-    },
-  ],
-};
-
-// ═══════════════════════════════════════════════
-// DUBI CODE SYSTEM
-// ═══════════════════════════════════════════════
-function generateDubiCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'D';
-  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code; // es. "DX7KM2"
-}
-function saveDubiProfile(userData) {
-  if (!userData?.dubiCode) return;
-  try {
-    localStorage.setItem(`dubi_${userData.dubiCode}`, JSON.stringify({ userData, savedAt: Date.now() }));
-  } catch(e) {}
-}
-function loadDubiProfile(code) {
-  try {
-    const raw = localStorage.getItem(`dubi_${code.toUpperCase().replace(/\s/g,'')}`);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch(e) { return null; }
-}
-
-// ═══════════════════════════════════════════════
-// PERSONALIZED SHOPPING — basato su profilo reale
-// ═══════════════════════════════════════════════
-function _scaleQty(base, scale, unit) {
-  // Non scalare pz (troppo variabile), scala g/ml/kg/l
-  if (unit === 'pz') return `${Math.max(1, Math.round(base * scale))}pz`;
-  let val = Math.round(base * scale / 50) * 50; // arrotonda a 50
-  val = Math.max(50, val);
-  if (unit === 'g' && val >= 1000) { const k = (val/1000); return `${k%1===0?k:k.toFixed(1)}kg`; }
-  if (unit === 'ml' && val >= 1000) { const l = (val/1000); return `${l%1===0?l:l.toFixed(1)}l`; }
-  return `${val}${unit}`;
-}
-// ── Diet substitution helpers ──
-// ── Calendario stagionale frutta e verdura ────────────────────────────────
-// Fonti:
-//   • AULSS9 Scaligera / Ministero delle politiche agricole alimentari e forestali
-//     https://sian.aulss9.veneto.it/Calendario-stagionalit-di-frutta-e-verdura
-//   • OrtoRomi Società Cooperativa Agricola
-//     https://www.ortoromi.it/idee/stagionalita-frutta-verdura-calendario-completo
-// Mesi in cui ogni ingrediente NON è di stagione (verrà sostituito automaticamente)
-const PRODUCE_OFF_SEASON = {
-  // Verdure estive — fuori stagione in autunno-inverno-inizio primavera
-  "pomodorini": [1,2,3,4,10,11,12],
-  "pomodori":   [1,2,3,4,10,11,12],
-  "pomodoro":   [1,2,3,4,10,11,12],
-  "melanzane":  [1,2,3,4,11,12],
-  "melanzana":  [1,2,3,4,11,12],
-  "peperoni":   [1,2,3,4,11,12],
-  "peperone":   [1,2,3,4,11,12],
-  "cetrioli":   [1,2,3,4,10,11,12],
-  "cetriolo":   [1,2,3,4,10,11,12],
-  "mais":       [1,2,3,4,5,10,11,12],
-  "zucchine":   [1,2,3,4,10,11,12],
-  "zucchina":   [1,2,3,4,10,11,12],
-  "fagiolini":  [1,2,3,4,10,11,12],
-  "fave":       [1,2,7,8,9,10,11,12],
-  "piselli":    [1,2,7,8,9,10,11,12],
-  // Verdure primaverili — fuori stagione in estate e inverno
-  "asparagi":   [1,2,6,7,8,9,10,11,12],
-  // Verdure invernali — fuori stagione in estate-inizio autunno
-  "broccoli":   [4,5,6,7,8,9],
-  "cavolfiore": [5,6,7,8,9],
-  "cavolfiori": [5,6,7,8,9],
-  // Frutta estiva
-  "fragole":    [1,2,9,10,11,12],
-  "mirtilli":   [1,2,3,4,5,10,11,12],
-  "lamponi":    [1,2,3,9,10,11,12],
-  "pesche":     [1,2,3,4,5,10,11,12],
-  "pesca":      [1,2,3,4,5,10,11,12],
-  "nettarine":  [1,2,3,4,5,10,11,12],
-  "albicocche": [1,2,3,4,8,9,10,11,12],
-  "albicocca":  [1,2,3,4,8,9,10,11,12],
-  "ciliegie":   [1,2,3,4,8,9,10,11,12],
-  "melone":     [1,2,3,4,5,10,11,12],
-  "meloni":     [1,2,3,4,5,10,11,12],
-  "anguria":    [1,2,3,4,5,6,9,10,11,12],
-  "angurie":    [1,2,3,4,5,6,9,10,11,12],
-  "fichi":      [1,2,3,4,5,10,11,12],
-  // Frutta autunnale
-  "uva":        [1,2,3,4,5,6,12],
-};
-
-// Sostituti stagionali — per ciascun ingrediente fuori stagione, qual è l'alternativa
-// Stagioni: winter=Dic–Feb | spring=Mar–Mag | summer=Giu–Ago | autumn=Set–Nov
-const SEASONAL_SUBS = {
-  "pomodorini": { winter:"carote",      spring:"ravanelli",      summer:"pomodorini", autumn:"pomodorini" },
-  "pomodori":   { winter:"carote",      spring:"ravanelli",      summer:"pomodori",   autumn:"pomodori"   },
-  "pomodoro":   { winter:"carota",      spring:"ravanello",      summer:"pomodoro",   autumn:"pomodoro"   },
-  "melanzane":  { winter:"zucca",       spring:"asparagi",       summer:"melanzane",  autumn:"melanzane"  },
-  "melanzana":  { winter:"zucca",       spring:"asparago",       summer:"melanzana",  autumn:"melanzana"  },
-  "peperoni":   { winter:"carote",      spring:"carote",         summer:"peperoni",   autumn:"peperoni"   },
-  "peperone":   { winter:"carota",      spring:"carota",         summer:"peperone",   autumn:"peperone"   },
-  "cetrioli":   { winter:"finocchi",    spring:"ravanelli",      summer:"cetrioli",   autumn:"finocchi"   },
-  "cetriolo":   { winter:"finocchio",   spring:"ravanello",      summer:"cetriolo",   autumn:"finocchio"  },
-  "mais":       { winter:"lenticchie",  spring:"piselli",        summer:"mais",       autumn:"zucca"      },
-  "zucchine":   { winter:"zucca",       spring:"zucchine",       summer:"zucchine",   autumn:"zucca"      },
-  "zucchina":   { winter:"zucca",       spring:"zucchina",       summer:"zucchina",   autumn:"zucca"      },
-  "fagiolini":  { winter:"broccoli",    spring:"asparagi",       summer:"fagiolini",  autumn:"fagiolini"  },
-  "fave":       { winter:"lenticchie",  spring:"fave",           summer:"fagiolini",  autumn:"ceci"       },
-  "piselli":    { winter:"lenticchie",  spring:"piselli",        summer:"piselli",    autumn:"ceci"       },
-  "asparagi":   { winter:"broccoli",    spring:"asparagi",       summer:"zucchine",   autumn:"broccoli"   },
-  "broccoli":   { winter:"broccoli",    spring:"asparagi",       summer:"zucchine grigliate", autumn:"broccoli" },
-  "cavolfiore": { winter:"cavolfiore",  spring:"asparagi",       summer:"fagiolini",  autumn:"cavolfiore" },
-  "cavolfiori": { winter:"cavolfiori",  spring:"asparagi",       summer:"fagiolini",  autumn:"cavolfiori" },
-  "fragole":    { winter:"kiwi",        spring:"fragole",        summer:"fragole",    autumn:"uva"        },
-  "mirtilli":   { winter:"kiwi",        spring:"fragole",        summer:"mirtilli",   autumn:"melograni"  },
-  "lamponi":    { winter:"kiwi",        spring:"lamponi",        summer:"lamponi",    autumn:"uva"        },
-  "pesche":     { winter:"mele",        spring:"fragole",        summer:"pesche",     autumn:"pere"       },
-  "pesca":      { winter:"mela",        spring:"fragola",        summer:"pesca",      autumn:"pera"       },
-  "nettarine":  { winter:"mele",        spring:"fragole",        summer:"nettarine",  autumn:"uva"        },
-  "albicocche": { winter:"kiwi",        spring:"albicocche",     summer:"albicocche", autumn:"mele"       },
-  "albicocca":  { winter:"kiwi",        spring:"albicocca",      summer:"albicocca",  autumn:"mela"       },
-  "ciliegie":   { winter:"kiwi",        spring:"ciliegie",       summer:"ciliegie",   autumn:"uva"        },
-  "melone":     { winter:"pompelmo",    spring:"kiwi",           summer:"melone",     autumn:"melograno"  },
-  "meloni":     { winter:"pompelmi",    spring:"kiwi",           summer:"meloni",     autumn:"melograni"  },
-  "anguria":    { winter:"arance",      spring:"kiwi",           summer:"anguria",    autumn:"melograno"  },
-  "angurie":    { winter:"arance",      spring:"kiwi",           summer:"angurie",    autumn:"melograni"  },
-  "fichi":      { winter:"pere",        spring:"fragole",        summer:"fichi",      autumn:"fichi"      },
-  "uva":        { winter:"arance",      spring:"kiwi",           summer:"pesche",     autumn:"uva"        },
-};
-
-// ── Filtro allergeni / intolleranze — applicato ai pasti e alla spesa ────────
-// Legge il testo libero inserito dall'utente nel campo allergie e sostituisce
-// gli ingredienti esclusi con alternative compatibili.
-function applyAllergyFilter(item, allergyText) {
-  if (!allergyText || allergyText.trim().length < 2) return item;
-  const allrg = allergyText.toLowerCase();
-  let result = item;
-
-  // ── Gruppi allergenici riconosciuti ──────────────────────────────────────
-  const isLactoseFree = /latt(osio|icini?|e\b)|dairy|milk|formagg|yogurt|ricotta|kefir|burro di mucca/.test(allrg);
-  const isEggFree     = /\buov[ao]?\b|uova|egg\b|albume|albumi/.test(allrg);
-  const isFishFree    = /\bpesce\b|fish\b|crostac|seafood|mollusch|salmone|tonno|gamberi|sgombro|merluzzo|orata|branzino|spigola/.test(allrg);
-  const isGlutenFree  = /glutin|celiac|celiach|frumento|grano\b|segale|farro|orzo\b|bulgur|seitan|kamut/.test(allrg);
-  const isNutFree     = /frutta secca|noci\b|mandorl|arachid|pistacch|nocciole?|anacard|pinoli|pecan|nuts\b/.test(allrg);
-  const isPeanutFree  = /arachid|peanut/.test(allrg) || isNutFree;
-  const isSesameFree  = /sesamo|tahini|tahina|sesame/.test(allrg);
-  const isSeedFree    = /semi\b|seeds?\b|chia|lino|canapa|zucca|girasole/.test(allrg);
-  const isSoyFree     = /\bsoia\b|soy\b|tofu|tempeh|edamame/.test(allrg);
-  const isChickenFree = /\bpollo\b|chicken/.test(allrg);
-  const isBeefFree    = /\bmanzo\b|carne rossa|beef|bistecca|tagliata/.test(allrg);
-  const isPorkFree    = /\bmaiale\b|prosciutto|pancetta|salame|pork/.test(allrg);
-  const isAvocadoFree = /avocado/.test(allrg);
-  const isDiabetesSafe = /diabet|insulino|insulin|glicem|glycem|prediabet/.test(allrg);
-  const isHypertensionSafe = /pressione alta|ipertension|hypertension|blood pressure/.test(allrg);
-  const isCholesterolSafe = /colesterol|cholesterol|ipercolesterol|ldl/.test(allrg);
-  const isLowFodmapSafe = /colon irritabile|ibs|fodmap|intestino irritabile|gonfiore cronico/.test(allrg);
-  const isRefluxSafe = /reflusso|gastrite|gerd|acidit|reflux/.test(allrg);
-  const isHistamineSafe = /istamina|histamine/.test(allrg);
-  const isGoutSafe = /gotta|gout|uric|acido urico|iperuricemia/.test(allrg);
-  const isRenalCaution = /renale|rene|kidney|renal|nefropat|dialisi/.test(allrg);
-  const isNickelSafe = /nichel|nickel/.test(allrg);
-
-  // ── Latticini ────────────────────────────────────────────────────────────
-  if (isLactoseFree) {
-    result = result
-      .replace(/\byogurt greco 0%\b/gi,        "Yogurt di soia 0%")
-      .replace(/\byogurt greco\b/gi,            "Yogurt di soia")
-      .replace(/\byogurt\b(?! di soia| di cocco| vegetale)/gi, "Yogurt di soia")
-      .replace(/\bskyr\b/gi,                    "Yogurt di soia")
-      .replace(/\bkefir\b(?! di cocco)/gi,      "Kefir di cocco")
-      .replace(/\bricotta magra\b/gi,           "Tofu morbido")
-      .replace(/\bricotta\b(?! di mandorle)/gi, "Tofu morbido")
-      .replace(/\bfiocchi di latte\b/gi,        "Tofu sbriciolato")
-      .replace(/\bformaggio fresco\b/gi,        "Hummus")
-      .replace(/\bformaggio\b(?! vegano)/gi,    "Formaggio vegano")
-      .replace(/\bmozzarella\b/gi,              "Tofu (stessa quantità)")
-      .replace(/\bparmigiano\b/gi,              "Lievito nutritivo")
-      .replace(/\bgrana\b/gi,                   "Lievito nutritivo")
-      .replace(/\blatte parzialmente scremato\b/gi, "Latte di avena")
-      .replace(/\blatte\b(?! di [a-zàèéìòùü])/gi,  "Latte di avena");
-  }
-
-  // ── Uova ─────────────────────────────────────────────────────────────────
-  if (isEggFree) {
-    result = result
-      .replace(/\buova strapazzate\b/gi,     "Tofu strapazzato")
-      .replace(/\buova sode\b/gi,            "Tofu sodo")
-      .replace(/\buovo? in camicia\b/gi,     "Tofu morbido al vapore")
-      .replace(/\buovo? poché\b/gi,          "Tofu morbido al vapore")
-      .replace(/\bfrittata di albumi\b/gi,   "Frittata di ceci")
-      .replace(/\bfrittata\b/gi,             "Frittata di ceci")
-      .replace(/\bomelette\b/gi,             "Frittata di farina di ceci")
-      .replace(/\balbume\b/gi,               "Proteine vegetali in polvere")
-      .replace(/\balbumi\b/gi,               "Proteine vegetali in polvere")
-      .replace(/\buov[ao]\b/gi,              "Tofu morbido");
-  }
-
-  // ── Pesce & crostacei ────────────────────────────────────────────────────
-  if (isFishFree) {
-    result = result
-      .replace(/\btonno fresco\b/gi,         "Petto di pollo alla piastra")
-      .replace(/\btonno\b/gi,                "Ceci al naturale")
-      .replace(/\bsalmone affumicato\b/gi,   "Petto di tacchino affumicato")
-      .replace(/\bsalmone\b/gi,              "Petto di pollo")
-      .replace(/\bsgombro\b/gi,              "Petto di pollo")
-      .replace(/\bmerluzzo\b/gi,             "Petto di pollo")
-      .replace(/\borata\b/gi,                "Petto di pollo")
-      .replace(/\bbranzino\b/gi,             "Petto di pollo")
-      .replace(/\bgamberi\b/gi,              "Edamame")
-      .replace(/\bpesce spada\b/gi,          "Petto di pollo");
-  }
-
-  // ── Glutine ──────────────────────────────────────────────────────────────
-  if (isGlutenFree) {
-    result = result
-      .replace(/\bpasta integrale\b/gi,      "Pasta di riso integrale")
-      .replace(/\bpasta\b/gi,                "Pasta di riso")
-      .replace(/\bpane integrale\b/gi,       "Pane senza glutine")
-      .replace(/\bpane\b(?! senza glutine)/gi, "Pane senza glutine")
-      .replace(/\bfiocchi d'avena\b/gi,      "Fiocchi di riso")
-      .replace(/\bavena\b/gi,                "Fiocchi di riso")
-      .replace(/\bfarro\b/gi,                "Riso integrale")
-      .replace(/\borzo perlato\b/gi,         "Riso basmati")
-      .replace(/\borzo\b/gi,                 "Riso basmati")
-      .replace(/\bbulgur\b/gi,               "Riso basmati")
-      .replace(/\bcous cous\b/gi,            "Riso basmati")
-      .replace(/\bseitan\b/gi,               "Legumi cotti")
-      .replace(/\bgranola\b/gi,              "Riso soffiato")
-      .replace(/\bmuesli\b/gi,               "Riso soffiato")
-      .replace(/\benglish muffin\b/gi,       "Pane senza glutine")
-      .replace(/\bfrench toast\b/gi,         "Toast senza glutine")
-      .replace(/\bpancake\b/gi,              "Pancake senza glutine")
-      .replace(/\bwaffle\b/gi,               "Waffle senza glutine")
-      .replace(/\bgallette di riso\b/gi,     "Gallette di riso")
-      .replace(/\bcrackers\b/gi,             "Gallette di riso")
-      .replace(/\bgrissini\b/gi,             "Gallette di mais");
-  }
-
-  // ── Frutta secca ─────────────────────────────────────────────────────────
-  if (isNutFree) {
-    result = result
-      .replace(/\bmandorle?\b/gi,            "Semi di girasole")
-      .replace(/\bnoci pecan\b/gi,           "Semi di zucca")
-      .replace(/\bnoci\b/gi,                 "Semi di zucca")
-      .replace(/\bpistacchi\b/gi,            "Semi di girasole")
-      .replace(/\banacardi\b/gi,             "Semi di girasole")
-      .replace(/\bnocciole?\b/gi,            "Semi di girasole")
-      .replace(/\barachidi\b/gi,             "Semi di girasole")
-      .replace(/\bpinoli\b/gi,               "Semi di girasole")
-      .replace(/\bburro di mandorle\b/gi,    "Crema di semi di girasole")
-      .replace(/\bburro di arachidi\b/gi,    "Crema di semi di girasole");
-  }
-
-  if (isPeanutFree) {
-    result = result
-      .replace(/\barachidi\b/gi,             "Semi di girasole")
-      .replace(/\bburro di arachidi\b/gi,    "Crema di semi di girasole");
-  }
-
-  if (isSesameFree) {
-    result = result
-      .replace(/\bsemi di sesamo\b/gi,       "Semi di zucca")
-      .replace(/\bsesamo\b/gi,               "Semi di zucca")
-      .replace(/\btahini\b/gi,               "Hummus")
-      .replace(/\btahina\b/gi,               "Hummus");
-  }
-
-  if (isSeedFree) {
-    result = result
-      .replace(/\bsemi di chia\b/gi,         "Fiocchi di riso")
-      .replace(/\bsemi di lino\b/gi,         "Fiocchi di riso")
-      .replace(/\bsemi di canapa\b/gi,       "Fiocchi di riso")
-      .replace(/\bsemi di zucca\b/gi,        "Fiocchi di riso")
-      .replace(/\bsemi di girasole\b/gi,     "Fiocchi di riso")
-      .replace(/\bmix di semi\b/gi,          "Fiocchi di riso")
-      .replace(/\bcrema di semi di girasole\b/gi, "Hummus");
-  }
-
-  // ── Soia ─────────────────────────────────────────────────────────────────
-  if (isSoyFree) {
-    result = result
-      .replace(/\btofu\b/gi,                 "Hummus")
-      .replace(/\btempeh\b/gi,               "Ceci cotti")
-      .replace(/\bedamame\b/gi,              "Piselli freschi")
-      .replace(/\blatte di soia\b/gi,        "Latte di avena")
-      .replace(/\byogurt di soia\b/gi,       "Yogurt di cocco");
-  }
-
-  // ── Ingredienti specifici esclusi dall'utente ─────────────────────────────
-  if (isChickenFree && !isFishFree) {
-    result = result
-      .replace(/\bpetto di pollo alla griglia\b/gi, "Petto di tacchino alla griglia")
-      .replace(/\bpollo al curry\b/gi,       "Tacchino al curry")
-      .replace(/\bpollo al limone\b/gi,      "Tacchino al limone")
-      .replace(/\bpollo arrosto\b/gi,        "Tacchino arrosto")
-      .replace(/\bpollo\b/gi,                "Tacchino");
-  }
-  if (isBeefFree) {
-    result = result
-      .replace(/\bmanzo magro alla griglia\b/gi, "Petto di pollo alla griglia")
-      .replace(/\btagliata di manzo\b/gi,    "Petto di pollo alla piastra")
-      .replace(/\bmanzo\b/gi,                "Petto di pollo");
-  }
-  if (isPorkFree) {
-    result = result
-      .replace(/\bprosciutto crudo\b/gi,     "Bresaola")
-      .replace(/\bpancetta\b/gi,             "Bresaola")
-      .replace(/\bmaiale\b/gi,               "Petto di pollo");
-  }
-  if (isAvocadoFree) {
-    result = result
-      .replace(/\bavocado\b/gi,              "Hummus");
-  }
-
-  // Patologie / condizioni cliniche: sostituzioni conservative per fallback locali.
-  // Il backend resta la fonte principale per generare piani completi e coerenti.
-  if (isDiabetesSafe) {
-    result = result
-      .replace(/\bmiele\b/gi,                 "Cannella")
-      .replace(/\bdatteri\b/gi,               "Frutti rossi")
-      .replace(/\bsucco di arancia\b/gi,      "Arancia intera")
-      .replace(/\bsucco\b/gi,                 "Frutta intera")
-      .replace(/\briso soffiato\b/gi,         "Fiocchi di avena certificati senza glutine")
-      .replace(/\bzucchero\b/gi,              "Cannella");
-  }
-
-  if (isHypertensionSafe) {
-    result = result
-      .replace(/\bsalmone affumicato\b/gi,    "Salmone fresco")
-      .replace(/\bbresaola\b/gi,              "Petto di tacchino fresco")
-      .replace(/\bprosciutto\b/gi,            "Petto di pollo")
-      .replace(/\bsalame\b/gi,                "Petto di pollo")
-      .replace(/\bsalsa di soia\b/gi,         "Limone e olio EVO");
-  }
-
-  if (isCholesterolSafe) {
-    result = result
-      .replace(/\bburro di ghee\b/gi,         "Olio EVO a fine cottura")
-      .replace(/\bburro\b/gi,                 "Olio EVO a crudo")
-      .replace(/\bgrana\b/gi,                 "Lievito nutritivo")
-      .replace(/\bparmigiano\b/gi,            "Lievito nutritivo")
-      .replace(/\bpecorino\b/gi,              "Lievito nutritivo")
-      .replace(/\bformaggio stagionato\b/gi,  "Ricotta magra")
-      .replace(/\bmanzo\b/gi,                 "Petto di pollo");
-  }
-
-  if (isLowFodmapSafe) {
-    const fodmapProtein = isEggFree ? (isChickenFree ? "Tofu compatto" : "Petto di pollo") : "Uova";
-    result = result
-      .replace(/\bhummus\b/gi,                fodmapProtein)
-      .replace(/\bceci\b/gi,                  fodmapProtein)
-      .replace(/\blenticchie\b/gi,            fodmapProtein)
-      .replace(/\bfagioli\b/gi,               fodmapProtein)
-      .replace(/\blegumi\b/gi,                fodmapProtein)
-      .replace(/\byogurt(?:\s+(?:greco|di soia|di cocco|vegetale|senza lattosio))?\b/gi, "Yogurt senza lattosio")
-      .replace(/\bkefir\b/gi,                 "Yogurt senza lattosio")
-      .replace(/\bricotta\b/gi,               "Yogurt senza lattosio")
-      .replace(/\bmela\b/gi,                  "Kiwi")
-      .replace(/\bpera\b|\bpere\b/gi,         "Kiwi")
-      .replace(/\bmango\b/gi,                 "Frutti rossi")
-      .replace(/\bavocado\b/gi,               "Olio EVO")
-      .replace(/\bpane\b(?! senza glutine)/gi,"Riso basmati")
-      .replace(/\bpasta\b/gi,                 "Riso basmati")
-      .replace(/\bfarro\b/gi,                 "Riso basmati")
-      .replace(/\borzo\b/gi,                  "Riso basmati")
-      .replace(/\bcous cous\b/gi,             "Riso basmati");
-  }
-
-  if (isRefluxSafe) {
-    result = result
-      .replace(/\bcaff[eè]\b/gi,              "Tisana")
-      .replace(/\bcacao\b/gi,                 "Cannella")
-      .replace(/\bcioccolato\b/gi,            "Frutti rossi")
-      .replace(/\barancia\b/gi,               "Kiwi")
-      .replace(/\bsucco\b/gi,                 "Acqua")
-      .replace(/\bpomodorini?\b/gi,           "Zucchine")
-      .replace(/\bpomodoro\b/gi,              "Zucchine")
-      .replace(/\bcurry\b/gi,                 "Erbe aromatiche")
-      .replace(/\blimone\b/gi,                "Erbe aromatiche")
-      .replace(/\bmenta\b/gi,                 "Basilico");
-  }
-
-  if (isHistamineSafe) {
-    const histamineProtein = isEggFree ? (isChickenFree ? "Riso basmati" : "Petto di pollo") : "Uova";
-    result = result
-      .replace(/\bkefir\b/gi,                 "Riso basmati")
-      .replace(/\byogurt\b/gi,                "Riso basmati")
-      .replace(/\bricotta\b/gi,               histamineProtein)
-      .replace(/\bformaggio\b/gi,             histamineProtein)
-      .replace(/\bpomodorini?\b/gi,           "Zucchine")
-      .replace(/\bpomodoro\b/gi,              "Zucchine")
-      .replace(/\bspinaci\b/gi,               "Carote")
-      .replace(/\bavocado\b/gi,               "Olio EVO")
-      .replace(/\bcioccolato\b/gi,            "Frutti rossi")
-      .replace(/\bcacao\b/gi,                 "Cannella")
-      .replace(/\btonno\b/gi,                 "Petto di pollo")
-      .replace(/\bsgombro\b/gi,               "Petto di pollo")
-      .replace(/\bsalmone affumicato\b/gi,    "Petto di pollo");
-  }
-
-  if (isGoutSafe) {
-    const goutProtein = isEggFree ? (isChickenFree ? "Yogurt greco" : "Petto di pollo") : "Uova";
-    result = result
-      .replace(/\bmanzo\b/gi,                 "Petto di pollo")
-      .replace(/\bvitello\b/gi,               "Petto di pollo")
-      .replace(/\btonno\b/gi,                 goutProtein)
-      .replace(/\bsalmone\b/gi,               "Petto di pollo")
-      .replace(/\bsgombro\b/gi,               "Petto di pollo")
-      .replace(/\bgamberi\b/gi,               "Petto di pollo")
-      .replace(/\bpolpo\b/gi,                 "Petto di pollo");
-  }
-
-  if (isRenalCaution) {
-    result = result
-      .replace(/\bwhey\b/gi,                  "Yogurt greco")
-      .replace(/\bproteine in polvere\b/gi,   "Yogurt greco")
-      .replace(/\bshake proteico\b/gi,        "Yogurt greco")
-      .replace(/\balbumi\b/gi,                "Uova");
-  }
-
-  if (isNickelSafe) {
-    result = result
-      .replace(/\bceci\b/gi,                  "Riso basmati")
-      .replace(/\blenticchie\b/gi,            "Riso basmati")
-      .replace(/\bfagioli\b/gi,               "Riso basmati")
-      .replace(/\blegumi\b/gi,                "Riso basmati")
-      .replace(/\bhummus\b/gi,                "Riso basmati")
-      .replace(/\bsoia\b/gi,                  "Riso basmati")
-      .replace(/\btofu\b/gi,                  "Petto di pollo")
-      .replace(/\btempeh\b/gi,                "Petto di pollo")
-      .replace(/\bedamame\b/gi,               "Riso basmati")
-      .replace(/\bavena\b/gi,                 "Riso basmati")
-      .replace(/\bcacao\b/gi,                 "Cannella")
-      .replace(/\bcioccolato\b/gi,            "Frutti rossi")
-      .replace(/\bmandorle?\b/gi,             "Olio EVO")
-      .replace(/\bnoci\b/gi,                  "Olio EVO")
-      .replace(/\bsemi\b/gi,                  "Olio EVO")
-      .replace(/\bspinaci\b/gi,               "Zucchine")
-      .replace(/\bpomodorini?\b/gi,           "Zucchine")
-      .replace(/\bpomodoro\b/gi,              "Zucchine");
-  }
-
-  return result;
-}
-
-// Applica sostituzione stagionale a una singola stringa ingrediente
-function applySeasonalSub(item, month) {
-  if (!month) return item;
-  const season = (month === 12 || month <= 2) ? "winter"
-               : month <= 5 ? "spring"
-               : month <= 8 ? "summer" : "autumn";
-  let result = item;
-  for (const [key, offMonths] of Object.entries(PRODUCE_OFF_SEASON)) {
-    if (!offMonths.includes(month)) continue;        // in stagione, nessuna modifica
-    if (!result.toLowerCase().includes(key)) continue; // non presente in questo item
-    const sub = SEASONAL_SUBS[key];
-    if (!sub) continue;
-    const replacement = sub[season];
-    if (!replacement || replacement === key) continue;
-    // Sostituzione mantenendo la capitalizzazione originale
-    result = result.replace(new RegExp(key, 'gi'), (match) => {
-      if (/[A-Za-z]/.test(match[0]) && match[0] === match[0].toUpperCase()) {
-        return replacement.charAt(0).toUpperCase() + replacement.slice(1);
-      }
-      return replacement;
-    });
-    break; // una sostituzione per item per evitare conflitti
-  }
-  return result;
-}
-
-function applyDietSub(item, diet) {
-  if (!diet || diet === 'omnivore') return item;
-  const lower = item.toLowerCase();
-  const isPescatarian = diet === 'pescatarian';
-  const isVeg = diet === 'vegetarian' || diet === 'vegan';
-  const isVegan = diet === 'vegan';
-
-  if (isPescatarian) {
-    if (lower.includes('petto di pollo alla griglia')) return item.replace(/petto di pollo alla griglia/i,'Filetto di merluzzo alla griglia');
-    if (lower.includes('petto di pollo')) return item.replace(/petto di pollo/i,'Filetto di tonno');
-    if (lower.includes('pollo al curry')) return item.replace(/pollo al curry/i,'Gamberi al curry');
-    if (lower.includes('pollo al limone')) return item.replace(/pollo al limone/i,'Merluzzo al limone');
-    if (lower.includes('pollo arrosto')) return item.replace(/pollo arrosto/i,'Orata al forno');
-    if (lower.includes('pollo')) return item.replace(/pollo/i,'Pesce bianco');
-    if (lower.includes('tacchino ai ferri')) return item.replace(/tacchino ai ferri/i,'Tonno fresco ai ferri');
-    if (lower.includes('tacchino')) return item.replace(/tacchino/i,'Tonno fresco');
-    if (lower.includes('manzo magro')) return item.replace(/manzo magro/i,'Salmone');
-    if (lower.includes('manzo')) return item.replace(/manzo/i,'Sgombro');
-    return item;
-  }
-
-  if (isVeg) {
-    if (lower.includes('petto di pollo alla griglia')) return item.replace(/petto di pollo alla griglia/i,'Tofu alla griglia');
-    if (lower.includes('petto di pollo')) return item.replace(/petto di pollo/i,'Tofu');
-    if (lower.includes('pollo al curry')) return item.replace(/pollo al curry/i,'Tofu al curry');
-    if (lower.includes('pollo al limone')) return item.replace(/pollo al limone/i,'Tofu al limone');
-    if (lower.includes('pollo arrosto')) return item.replace(/pollo arrosto/i,'Seitan arrosto');
-    if (lower.includes('pollo')) return item.replace(/pollo/i,'Tofu grigliato');
-    if (lower.includes('tacchino ai ferri')) return item.replace(/tacchino ai ferri/i,'Seitan ai ferri');
-    if (lower.includes('tacchino')) return item.replace(/tacchino/i,'Seitan');
-    if (lower.includes('salmone affumicato')) return item.replace(/salmone affumicato/i,'Tofu affumicato');
-    if (lower.includes('salmone')) return item.replace(/salmone/i,'Tempeh grigliato');
-    if (lower.includes('sgombro')) return item.replace(/sgombro/i,'Tofu marinato');
-    if (lower.includes('merluzzo')) return item.replace(/merluzzo/i,'Tofu al forno');
-    if (lower.includes('orata')) return item.replace(/orata/i,'Seitan al cartoccio');
-    if (lower.includes('branzino')) return item.replace(/branzino/i,'Tofu al cartoccio');
-    if (lower.includes('tonno fresco')) return item.replace(/tonno fresco/i,'Tempeh alla piastra');
-    if (lower.includes('tonno')) return item.replace(/tonno/i,'Ceci al naturale');
-    if (lower.includes('gamberi')) return item.replace(/gamberi/i,'Edamame');
-    if (lower.includes('manzo magro')) return item.replace(/manzo magro/i,'Seitan');
-    if (lower.includes('manzo')) return item.replace(/manzo/i,'Legumi misti');
-  }
-  if (isVegan) {
-    if (lower.includes('uova strapazzate')) return item.replace(/uova strapazzate/i,'Tofu strapazzato');
-    if (lower.includes('uova sode')) return item.replace(/uova sode/i,'Tofu sodo');
-    if (lower.includes('uovo in camicia')) return item.replace(/uovo in camicia/i,'Tofu morbido al vapore');
-    if (lower.startsWith('omelette')) return 'Frittata di farina di ceci e verdure';
-    if (lower.includes('frittata con verdure (2 uova)')) return 'Frittata di farina di ceci e verdure';
-    if (lower.includes('frittata')) return item.replace(/frittata/i,'Frittata di ceci');
-    if (lower.includes('pancake proteici') && lower.includes('albume')) return 'Pancake vegani (avena+semi di chia) (2 pz)';
-    if (lower.includes('yogurt greco 0%')) return item.replace(/yogurt greco 0%/i,'Yogurt di soia naturale');
-    if (lower.includes('yogurt greco')) return item.replace(/yogurt greco/i,'Yogurt di soia');
-    if (lower.includes('yogurt')) return item.replace(/yogurt/i,'Yogurt di soia');
-    if (lower.includes('skyr')) return item.replace(/skyr/i,'Yogurt di cocco');
-    if (lower.includes('kefir')) return item.replace(/kefir/i,'Kefir di cocco');
-    if (lower.includes('ricotta vaccina')) return item.replace(/ricotta vaccina/i,'Ricotta di mandorle');
-    if (lower.includes('ricotta magra')) return item.replace(/ricotta magra/i,'Tofu morbido');
-    if (lower.includes('ricotta')) return item.replace(/ricotta/i,'Ricotta di mandorle');
-    if (lower.includes('fiocchi di latte')) return item.replace(/fiocchi di latte/i,'Tofu sbriciolato');
-    if (lower.includes('formaggio fresco')) return item.replace(/formaggio fresco/i,'Formaggio vegano');
-    if (lower.includes('latte di mandorla') || lower.includes('latte di avena') || lower.includes('latte di soia') || lower.includes('latte di cocco')) return item;
-    if (lower.includes('latte parzialmente scremato')) return item.replace(/latte parzialmente scremato/i,'Latte di avena');
-    if (lower.includes('latte')) return item.replace(/latte/i,'Latte di avena');
-    if (lower.includes('smoothie bowl (banana, avena, latte)')) return "Smoothie bowl (banana, avena, latte di avena)";
-    if (lower.includes('miele grezzo')) return item.replace(/miele grezzo/i,"Sciroppo d'agave");
-    if (lower.includes('miele')) return item.replace(/miele/i,"Sciroppo d'acero");
-  }
-  return item;
-}
-
-function getDietMeals(diet, month, allergyText) {
-  // month: 1–12, default = mese corrente
-  const m = (month !== undefined && month !== null) ? month : (new Date().getMonth() + 1);
-  const base = WEEKLY_MEALS.omnivore;
-
-  // Applica sostituzione dietetica + stagionale + filtro allergeni su ogni item
-  const applyAll  = (it) => applyAllergyFilter(applySeasonalSub(applyDietSub(it, diet), m), allergyText);
-  const applySeas = (it) => applyAllergyFilter(applySeasonalSub(it, m), allergyText);
-
-  return base.map(dayMeal => {
-    const newDay = {};
-    for (const [mealKey, meal] of Object.entries(dayMeal)) {
-      if (!meal || typeof meal !== 'object') { newDay[mealKey] = meal; continue; }
-      const applyFn = (!diet || diet === 'omnivore') ? applySeas : applyAll;
-      newDay[mealKey] = {
-        ...meal,
-        items: meal.items ? meal.items.map(applyFn) : meal.items,
-        alts: meal.alts ? Object.fromEntries(
-          Object.entries(meal.alts).map(([k, arr]) =>
-            [k, Array.isArray(arr) ? arr.map(applyFn) : arr]
-          )
-        ) : meal.alts,
-      };
-    }
-    return newDay;
-  });
-}
-
-function adaptMealForUserProfile(meal, slotId, userData) {
-  if (!meal?.items?.length) return meal;
-  const diet = userData?.diet || "omnivore";
-  const isActiveOmnivore = diet === "omnivore" && userData?.workoutDays && userData.workoutDays !== "0";
-  if (!isActiveOmnivore) return meal;
-
-  const proteinBySlot = {
-    colazione: "Uova strapazzate (2) o yogurt greco (150g)",
-    snack_m: "Bresaola o tacchino - 80g",
-    pranzo: "Petto di pollo o tonno fresco - 150g",
-    cena: "Salmone, merluzzo o uova - 160g",
-    snack: "Yogurt greco o skyr - 170g",
-    snack_n: "Ricotta magra o skyr - 150g",
-  };
-  const plantPrimary = /\b(seitan|tofu|tempeh|edamame|burger vegetale|burger di vegetali|soia|vegan[oa]|vegetal[ei])\b/i;
-  let changed = false;
-  const items = meal.items.map((item, idx) => {
-    if (idx !== 0 || !plantPrimary.test(String(item))) return item;
-    changed = true;
-    return proteinBySlot[slotId] || "Proteina magra animale - 150g";
-  });
-  if (!changed) return meal;
-  return {
-    ...meal,
-    items,
-    why: "Pasto adattato al profilo onnivoro e all'allenamento: priorita a proteine complete, sazieta e aderenza pratica.",
-    whyEN: "Meal adapted to an omnivore training profile: priority to complete proteins, satiety and practical adherence.",
-  };
-}
-
-
 function normalizeShoppingName(name) {
   return formatFoodText(name).toLowerCase()
     .replace(/\b(integrali?|bio|fresc[oa]|natural[ei]|magr[oa]|affumicat[oa]|0%|grezzo|secch[oi])\b/g,'')
@@ -12253,44 +11516,26 @@ function getMealReasonText(meal, lang, userData) {
 }
 
 function getVisibleMealEntriesForDay({ userData, plan, dayIndex = 0, times: providedTimes = null }) {
-  const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
-  const dayMeals = dietMeals[dayIndex] || dietMeals[0] || {};
-  const bfKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
   const slots = getMealSlots(plan?.mealCount || 4);
   const times = providedTimes || plan?.mealTimes || ["08:00","13:00","16:30","20:00"];
   const aiMealList = getAiMealListForDay(plan, dayIndex, slots, times);
-
-  const fallbackMealEntries = slots.map((slot, index) => {
-    let meal;
-    if (slot.id === "colazione") meal = dayMeals[bfKey] || dayMeals.colazione_dolce;
-    else if (slot.id === "pranzo") meal = dayMeals.pranzo;
-    else if (slot.id === "cena") meal = dayMeals.cena;
-    else if (slot.id === "snack") meal = dayMeals.snack;
-    else if (slot.id === "snack_m") meal = dayMeals.snack_m;
-    else if (slot.id === "snack_n") meal = dayMeals.snack_n;
-
-    return {
-      ...slot,
-      time: times[index] || "--:--",
-      meal: meal || dayMeals.snack || { items: [], alts: [], macros: { cal: 0, p: 0, c: 0, f: 0 } },
-      workoutLabel: null,
-      carbTargetPct: getCarbTargetPct(userData?.trainingTime, slot.id, userData?.sport),
-    };
-  });
-
-  const baseEntries = aiMealList
-    ? aiMealList.map((meal) => ({ ...meal, meal: meal.data }))
-    : fallbackMealEntries;
-
-  return baseEntries.map((entry) => ({
-    ...entry,
-    meal: adaptMealForUserProfile(entry.meal, entry.id, userData),
-  }));
+  return (aiMealList || []).map((meal) => ({ ...meal, meal: meal.data }));
 }
 
 const SHOPPING_CATEGORIES = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
 
 function addShoppingItemToTotals(totals, item) {
+  if (item && typeof item === "object" && item.ingredient_id !== undefined && item.ingredient_id !== null) {
+    const quantity = Number(item.selected_quantity_g ?? item.scaled_quantity_g ?? item.portion_g ?? item.portionG ?? item.quantity_g ?? item.quantity ?? 0);
+    const name = item.ingredient_name || item.name || item.display_name || "Ingrediente";
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    const key = `ingredient:${item.ingredient_id}|g`;
+    if (!totals[key]) {
+      totals[key] = { ingredientId: Number(item.ingredient_id), dispName: name, total: 0, unit: "g", cat: getShoppingCategory(name) };
+    }
+    totals[key].total += quantity;
+    return;
+  }
   const parsed = parseShoppingIngredient(item);
   if (!parsed.key) return;
   if (!totals[parsed.key]) {
@@ -12329,10 +11574,7 @@ function getShoppingByDay(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
     const totals = {};
 
     entries.forEach((entry) => {
-      (entry.meal?.items || []).forEach((item, itemIndex) => {
-        const display = appliedSwaps?.[`${dayIndex}-${entry.id}-${itemIndex}`] || formatFoodText(item);
-        addShoppingItemToTotals(totals, display);
-      });
+      (entry.meal?.items || []).forEach((item) => addShoppingItemToTotals(totals, item));
     });
 
     return {
@@ -12354,273 +11596,7 @@ function mergeShoppingDayBreakdown(days = []) {
 
 function getPersonalizedShopping(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
   const dayBreakdown = getShoppingByDay(userData, plan, appliedSwaps, weeklyPlans);
-  if (dayBreakdown.length) return mergeShoppingDayBreakdown(dayBreakdown);
-  return {};
-
-  if (plan?.aiEnginePlan?.mealStructure?.days?.length) {
-    const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
-    const result = {};
-    cats.forEach(c => { result[c] = []; });
-
-    const totals = {};
-    const swaps = appliedSwaps || {};
-    const add = (item, fallbackKey) => {
-      const display = swaps[fallbackKey] || formatFoodText(item);
-      const parsed = parseShoppingIngredient(display);
-      if (!parsed.key) return;
-      if (!totals[parsed.key]) totals[parsed.key] = { dispName: parsed.name, total: 0, unit: parsed.unit, cat: parsed.cat };
-      totals[parsed.key].total += parsed.qty;
-    };
-
-    // SYNC Oggi ↔ Settimana ↔ Spesa: il giorno corrente aggrega dal
-    // piano-ingredienti reale del backend (la stessa fonte mostrata in Oggi
-    // e in Settimana), non dalla struttura AI teorica — un'unica verità.
-    const todayIdx = (new Date().getDay()+6)%7;
-    const todayIngredientMeals = getIngredientMealListForDay(plan, []) || null;
-
-    plan.aiEnginePlan.mealStructure.days.forEach((day, dayIndex) => {
-      if (dayIndex === todayIdx && todayIngredientMeals?.length) {
-        todayIngredientMeals.forEach((mealEntry) => {
-          const slotId = mealEntry.id || 'meal';
-          (mealEntry.data?.items || []).forEach((item, itemIndex) => add(item, `${dayIndex}-${slotId}-${itemIndex}`));
-        });
-        return;
-      }
-      (day.meals || []).forEach((meal) => {
-        const slotId = AI_SLOT_IDS[meal.slot] || meal.slot || 'meal';
-        (meal.ingredients || []).forEach((item, itemIndex) => add(item, `${dayIndex}-${slotId}-${itemIndex}`));
-      });
-    });
-
-    Object.values(totals).forEach(({dispName, total, unit, cat}) => {
-      result[cat].push(`${dispName}${formatShoppingQuantity(total, unit)}`);
-    });
-
-    cats.forEach(c => { if (!result[c]?.length) delete result[c]; });
-    return result;
-  }
-
-  const diet  = (userData?.diet || "omnivore").toLowerCase();
-  const allrg = (userData?.allergies || "").toLowerCase();
-  const isVegan  = diet.includes("vegan");
-  const isVeget  = isVegan || diet.includes("vegetar");
-  const noFish   = /pesce|fish|crostac|seafood|mollusch|salmone|tonno|gamberi|sgombro|merluzzo|orata|branzino|spigola/.test(allrg);
-  const noEgg    = /uov|egg|albume/.test(allrg) || isVegan;
-  const noMilk   = /latt|lattosio|dairy|milk|formagg|yogurt|ricotta|kefir/.test(allrg) || isVegan;
-  const noGluten = /glutin|celiac|celiach|frumento|grano\b|segale|farro|orzo\b|bulgur|seitan|kamut/.test(allrg);
-  const noNuts   = /frutta secca|noci\b|mandorl|arachid|pistacch|nocciole?|anacard|pinoli|pecan|nuts\b/.test(allrg);
-  const noPeanut = /arachid|peanut/.test(allrg) || noNuts;
-  const noSesame = /sesamo|tahini|tahina|sesame/.test(allrg);
-  const noSeeds  = /semi\b|seeds?\b|chia|lino|canapa|zucca|girasole/.test(allrg);
-  const noSoy    = /soia|soy|tofu|tempeh|edamame/.test(allrg);
-  const hasDiabetes = /diabet|insulino|insulin|glicem|glycem|prediabet/.test(allrg);
-  const hasHypertension = /pressione alta|ipertension|hypertension|blood pressure/.test(allrg);
-  const hasCholesterol = /colesterol|cholesterol|ipercolesterol|ldl/.test(allrg);
-  const hasLowFodmap = /colon irritabile|ibs|fodmap|intestino irritabile|gonfiore cronico/.test(allrg);
-  const hasReflux = /reflusso|gastrite|gerd|acidit|reflux/.test(allrg);
-  const hasHistamine = /istamina|histamine/.test(allrg);
-  const hasGout = /gotta|gout|uric|acido urico|iperuricemia/.test(allrg);
-  const hasRenalCaution = /renale|rene|kidney|renal|nefropat|dialisi/.test(allrg);
-  const hasNickel = /nichel|nickel/.test(allrg);
-  const s = Math.min(2, Math.max(0.6, (plan?.calories || 2000) / 2000));
-
-  // ── Estrai ingredienti direttamente da WEEKLY_MEALS ──
-  const weekMeals = getDietMeals(diet, null, userData?.allergies);
-
-  // Parse item string → array di {name, qty, unit}
-  const _parse = (str) => {
-    const out = [];
-    // Match: "Name (qty unit [extra text])" — più occorrenze per stringa
-    const re = /([A-Za-zÀ-ÿ'\s%&°\/]+?)\s*\(\s*(?:[¼½¾]\s*(?:,\s*)?)?(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|cl|pz)?\b[^)]*\)/gi;
-    let m;
-    while ((m = re.exec(str)) !== null) {
-      let raw = m[1].trim();
-      const qty  = parseFloat((m[2]||'1').replace(',','.')) || 1;
-      const unit = (m[3]||'pz').toLowerCase();
-      // Rimuovi descrittori di cottura/preparazione
-      raw = raw
-        .replace(/\b(alla|al|allo|agli|alle)\s+(griglia|piastra|forno|vapore|cartoccio|curry|limone|rosmarino|timo|arrosto|padella|wok)\b/gi,'')
-        .replace(/\b(strapazzat[aeiou]|in camicia|poché|bolliti?|caldi?|arrosto|crudi?|affumicat[oa]|magr[oa]|parz\.?\s*scremati?|scremati?|integrali?|fresc[oa]|secch[oi]|bio|naturali?|light)\b/gi,'')
-        .replace(/\s*\d+%\s*/g,'')
-        .replace(/\s+/g,' ')
-        .replace(/\s*(e|con|di|al|alla|a|in|per)$/i,'').trim();
-      raw = raw.replace(/^(e|con|di|al|alla|a|in|per)\s+/i,'').trim();
-      if (!raw || raw.length < 2) continue;
-      raw = raw.charAt(0).toUpperCase() + raw.slice(1);
-      out.push({name: raw, qty, unit});
-    }
-    // Item senza parentesi = condimento q.b.
-    if (out.length === 0 && str && !str.includes('(')) {
-      const clean = str.trim().replace(/^[-•·]\s*/,'');
-      if (clean.length > 1) out.push({name: clean, qty: 1, unit: 'qb'});
-    }
-    return out;
-  };
-
-  // Normalizza per deduplicazione
-  const _key = (name) => name.toLowerCase()
-    .replace(/\b(integrali?|bio|fresc[oa]|natural[ei]|magr[oa]|affumicat[oa]|0%|grezzo|secch[oi])\b/g,'')
-    .replace(/\d+%/g,'').replace(/\s+/g,' ').trim();
-
-  // Categoria per ingrediente
-  const _cat = (name) => {
-    const n = name.toLowerCase();
-    if (/\b(pollo|tacchino|salmone|tonno|sgombro|merluzzo|orata|branzino|spigola|gamberi?|crostac|manzo|tagliata|bistecca|bresaola|carne|maiale|prosciutto|uov[ao]|albumi|skyr|yogurt|kefir|ricotta|fiocchi di latt|cottage|tofu|tempeh|edamame|seitan|mozzarella|parmigian|pecorino|grana|formaggio|latte(?! di [a-z])|whey)\b/.test(n)) return "Proteine";
-    if (/\b(riso|avena|quinoa|farro|pasta|orzo|cous.?cous|pane|lenticchi|ceci|fagioli|legumi|granola|crackers|gallette|muesli|bulgur|miglio|soba|polenta|farina|fiocchi|grano saraceno|amaranto|kamut|english muffin|pancake|waffle|french toast)\b/.test(n)) return "Cereali & Legumi";
-    if (/\b(spinaci|broccoli|zucchine?|peperoni|carote?|pomodorini?|pomodori?|rucola|cetrioli?|finocchi?|patate?|asparagi|fagiolini|melanzane?|insalata|funghi|bieta|cavolo|cavolfiore|cavoletti|songino|radicchio|verdure?|piselli|sedano|porro|cipolla|aglio|barbabietola|carciofi|indivia|lattuga|misticanza|wakame|cavolo kale|pak choi)\b/.test(n)) return "Verdure fresche";
-    if (/\b(banana|banane|mele?|mango|frutti di bosco|avocado|kiwi|arancia|arance|pere?|ananas|limone|limoni|dattero|datteri|fichi|cocco(?! rapé)|lamponi|mirtilli|fragole|albicocche|uva|pesche?|melone|mandarini|frutto di stagione)\b/.test(n)) return "Frutta";
-    if (/\b(olio|mandorle?|noci|noce|pistacchi|anacardi|pinoli|semi(?! di soia)|sesamo|burro di arachidi|burro di mandorle|tahini|olive?|cioccolato|cacao|cocco rapé|nocciole?)\b/.test(n)) return "Grassi & Semi";
-    return "Condimenti & Altro";
-  };
-
-  // Accumula quantità
-  const totals = {};
-  const toBase = (qty, unit) => unit==='kg'?qty*1000:unit==='l'?qty*1000:qty;
-  const addIng = (name, qty, unit) => {
-    const k = _key(name);
-    if (!k || k.length < 2) return;
-    if (!totals[k]) totals[k] = {dispName: name, total: 0, unit, cat: _cat(name)};
-    totals[k].total += toBase(qty, unit);
-  };
-
-  weekMeals.forEach((day, di) => {
-    // Alterna colazione per non sovrastimare entrambe le versioni
-    const bfKey = di % 2 === 0 ? 'colazione_dolce' : 'colazione_salata';
-    ['pranzo','cena','snack','snack_m','snack_n', bfKey].forEach(mk => {
-      const meal = day[mk];
-      if (!meal?.items) return;
-      meal.items.forEach(item => {
-        _parse(item).forEach(({name, qty, unit}) => {
-          const n = name.toLowerCase();
-          if (noFish && /salmone|tonno|sgombro|merluzzo|orata|branzino|spigola|gamberi?|crostac/i.test(n)) return;
-          if (noEgg  && /uov[ao]|albumi/i.test(n)) return;
-          if (noMilk && /\b(yogurt|ricotta|mozzarella|parmigian|formaggio|skyr|kefir|latte(?! di [a-z]))\b/i.test(n)) return;
-          if (noGluten && /\b(pane|pasta|avena|farro|orzo|bulgur|cous|seitan|granola|muesli|crackers|muffin|pancake|waffle|toast)\b/i.test(n)) return;
-          if (noNuts && /\b(mandorl|noci|noce|pistacchi|anacardi|pinoli|nocciole?)\b/i.test(n)) return;
-          if (noPeanut && /arachid|burro di arachidi/i.test(n)) return;
-          if (noSesame && /sesamo|tahini|tahina/i.test(n)) return;
-          if (noSeeds && /\b(semi|chia|lino|canapa|zucca|girasole)\b/i.test(n)) return;
-          if (noSoy && /\b(soia|tofu|tempeh|edamame)\b/i.test(n)) return;
-          if (hasDiabetes && /\b(miele|datteri|succo|riso soffiato|zucchero|sciroppo)\b/i.test(n)) return;
-          if (hasHypertension && /(affumicat|bresaola|prosciutto|salame|salsa di soia|dado|\bsale\b)/i.test(n)) return;
-          if (hasCholesterol && /\b(burro|ghee|pancetta|salame|prosciutto|grana|parmigiano|pecorino|formaggio stagionato)\b/i.test(n)) return;
-          if (hasLowFodmap && /\b(ceci|lenticchie|fagioli|legumi|hummus|latte|yogurt|kefir|ricotta|mela|pera|mango|avocado|pane|pasta|farro|orzo|cous)\b/i.test(n)) return;
-          if (hasReflux && /\b(caff|cacao|cioccolato|arancia|succo|pomodoro|pomodorini|curry|limone|menta)\b/i.test(n)) return;
-          if (hasHistamine && /\b(kefir|yogurt|formaggio|ricotta|pomodoro|pomodorini|spinaci|avocado|cioccolato|cacao|tonno|sgombro|salmone affumicato)\b/i.test(n)) return;
-          if (hasGout && /(manzo|vitello|bovino|sgombro|tonno|salmone|gamberi|polpo|crostac|frutti di mare)/i.test(n)) return;
-          if (hasRenalCaution && /\b(whey|proteine in polvere|shake proteico|alto contenuto proteico)\b/i.test(n)) return;
-          if (hasNickel && /\b(ceci|lenticchie|fagioli|legumi|soia|tofu|tempeh|edamame|avena|farro|orzo|cacao|cioccolato|noci|mandorle|semi|spinaci|pomodoro|pomodorini)\b/i.test(n)) return;
-          addIng(name, qty, unit);
-        });
-      });
-    });
-  });
-
-  // Formatta con scala
-  const _fmt = (total, unit) => {
-    if (unit === 'qb') return null;
-    if (unit === 'pz') return `${Math.max(1, Math.round(total * s))}pz`;
-    const v = Math.max(50, Math.round(total * s / 50) * 50);
-    if ((unit==='g'||unit==='kg') && v>=1000) { const k=v/1000; return `${k%1===0?k:k.toFixed(1)}kg`; }
-    if ((unit==='ml'||unit==='l') && v>=1000) { const l=v/1000; return `${l%1===0?l:l.toFixed(1)}l`; }
-    return `${v}${unit}`;
-  };
-
-  const cats = ["Proteine","Cereali & Legumi","Verdure fresche","Frutta","Grassi & Semi","Condimenti & Altro"];
-  const result = {};
-  cats.forEach(c => { result[c] = []; });
-
-  Object.values(totals).forEach(({dispName, total, unit, cat}) => {
-    const fmtQty = _fmt(total, unit);
-    result[cat].push(fmtQty ? `${dispName} (${fmtQty})` : dispName);
-  });
-
-  cats.forEach(c => { if (!result[c]?.length) delete result[c]; });
-  return result;
-}
-
-// Unisce due liste personalizzate sommando le quantità degli articoli in comune
-function shoppingItemBase(item) {
-  const text = formatFoodText(item)
-    .replace(/\([^)]*\)/g, '')
-    .replace(/\s*-\s*\d+(?:[,.]\d+)?\s*(g|kg|ml|l|pz|media|medio|tazzina|cucchiaino)\b/i, '')
-    .trim();
-  return normalizeShoppingName(text);
-}
-
-function estimateIngredientMacros(item) {
-  const text = formatFoodText(item);
-  const lower = text.toLowerCase();
-  const match = text.match(/-\s*(\d+(?:[,.]\d+)?)\s*(g|kg|ml|l|pz|media|medio)/i);
-  let qty = match ? parseFloat(match[1].replace(',','.')) : 100;
-  const unit = match ? match[2].toLowerCase() : 'g';
-  if (unit === 'kg' || unit === 'l') qty *= 1000;
-  if (unit === 'pz' || unit === 'media' || unit === 'medio') qty *= 100;
-
-  const table = [
-    [/pollo|tacchino|tonno|merluzzo|branzino|nasello|gamberi|bresaola/, {cal:120,p:24,c:0,f:2}],
-    [/salmone|sgombro|trota/, {cal:200,p:22,c:0,f:12}],
-    [/uova/, {cal:140,p:12,c:1,f:10}],
-    [/tofu|tempeh|seitan|edamame/, {cal:145,p:16,c:8,f:6}],
-    [/yogurt greco|skyr|ricotta|fiocchi di latte|kefir/, {cal:85,p:11,c:5,f:2}],
-    [/proteine/, {cal:380,p:75,c:8,f:5}],
-    [/riso|pasta|quinoa|cous cous|orzo|farro|avena|granola|pane|wrap|piadina|gallette|crackers|crema di riso/, {cal:350,p:10,c:70,f:3}],
-    [/patate|zucca/, {cal:85,p:2,c:19,f:0}],
-    [/ceci|lenticchie|fagioli|legumi|hummus/, {cal:145,p:8,c:20,f:3}],
-    [/olio evo|olio/, {cal:900,p:0,c:0,f:100}],
-    [/avocado|noci|mandorle|semi|tahina|burro di arachidi|olive/, {cal:580,p:15,c:15,f:50}],
-    [/banana|mela|pera|kiwi|fragole|mirtilli|frutti|lamponi|mango|arancia|datteri/, {cal:70,p:1,c:16,f:0}],
-    [/zucchine|broccoli|spinaci|carote|verdure|insalata|pomodoro|cetrioli|peperoni|funghi|asparagi|finocchi|fagiolini|mais/, {cal:35,p:2,c:6,f:0}]
-  ];
-  const found = table.find(([rx]) => rx.test(lower));
-  if (!found) return {cal:0,p:0,c:0,f:0};
-  const per100 = found[1];
-  const factor = Math.max(0, qty) / 100;
-  return {
-    cal: Math.round(per100.cal * factor),
-    p: Math.round(per100.p * factor),
-    c: Math.round(per100.c * factor),
-    f: Math.round(per100.f * factor)
-  };
-}
-
-function getAdjustedMealMacros(dayIndex, mealKey, meal, swaps) {
-  const base = meal?.macros || {cal:0,p:0,c:0,f:0};
-  return (meal?.items || []).reduce((acc, item, itemIndex) => {
-    const key = `${dayIndex}-${mealKey}-${itemIndex}`;
-    if (!swaps?.[key]) return acc;
-    const oldMx = estimateIngredientMacros(item);
-    const newMx = estimateIngredientMacros(swaps[key]);
-    return {
-      cal: Math.max(0, acc.cal - oldMx.cal + newMx.cal),
-      p: Math.max(0, acc.p - oldMx.p + newMx.p),
-      c: Math.max(0, acc.c - oldMx.c + newMx.c),
-      f: Math.max(0, acc.f - oldMx.f + newMx.f)
-    };
-  }, {...base});
-}
-
-function ownedShoppingKey(userData) {
-  return `dubi_shopping_owned_${userData?.dubiCode || getAuthEmail() || "guest"}`;
-}
-
-function rememberOwnedShoppingIngredient(userData, item) {
-  try {
-    const key = ownedShoppingKey(userData);
-    const existing = JSON.parse(localStorage.getItem(key) || "[]");
-    const base = shoppingItemBase(item);
-    if (base && !existing.includes(base)) localStorage.setItem(key, JSON.stringify([...existing, base]));
-  } catch(e) {}
-}
-
-function hasOwnedShoppingIngredient(userData, item) {
-  try {
-    const existing = JSON.parse(localStorage.getItem(ownedShoppingKey(userData)) || "[]");
-    const base = shoppingItemBase(item);
-    return Boolean(base && existing.includes(base));
-  } catch(e) {
-    return false;
-  }
+  return dayBreakdown.length ? mergeShoppingDayBreakdown(dayBreakdown) : {};
 }
 
 function flattenShoppingItems(userData, plan, swaps, weeklyPlans = []) {
@@ -13624,23 +12600,8 @@ function getAskDubiTodayMeals(plan, userData = {}) {
   const dayIdx = (new Date().getDay()+6)%7;
   const slots = getMealSlots(plan?.mealCount || 4);
   const times = plan?.mealTimes || ["08:00","13:00","16:30","20:00"];
-  const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
-  const dayMeals = dietMeals[dayIdx] || dietMeals[0] || {};
-  const breakfastKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
   const aiMealList = getAiMealListForDay(plan, dayIdx, slots, times);
-  const fallbackMealList = slots.map((sl, i) => {
-    let meal;
-    if (sl.id === "colazione") meal = dayMeals[breakfastKey] || dayMeals.colazione_dolce;
-    else if (sl.id === "pranzo") meal = dayMeals.pranzo;
-    else if (sl.id === "cena") meal = dayMeals.cena;
-    else if (sl.id === "snack") meal = dayMeals.snack;
-    else if (sl.id === "snack_m") meal = dayMeals.snack_m || dayMeals.snack;
-    else if (sl.id === "snack_n") meal = dayMeals.snack_n || dayMeals.snack;
-    return {...sl, time: times[i] || "--:--", data: meal || dayMeals.snack || null};
-  });
-  const mealList = (aiMealList || fallbackMealList)
-    .filter(meal => meal?.data)
-    .map(meal => ({...meal, data: adaptMealForUserProfile(meal.data, meal.id, userData)}));
+  const mealList = (aiMealList || []).filter(meal => meal?.data);
   const totals = mealList.reduce((acc, meal) => {
     const mx = meal.data?.macros || {};
     return {
@@ -13803,39 +12764,6 @@ function buildAskDubiPlanAuditAnswer(q, userData, plan, lang = "it") {
   };
 }
 
-function buildAskDubiReplacementMeal(mealId, userData, plan, lang = "it") {
-  const dayIdx = (new Date().getDay()+6)%7;
-  const dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
-  const slots = getMealSlots(plan?.mealCount || 4);
-  const current = getTodayMealForAskDubi(plan, mealId, userData);
-  const currentName = current?.data?.name || "";
-  const breakfastKey = userData?.breakfastPref === "salata" ? "colazione_salata" : "colazione_dolce";
-  const mealKey = mealId === "colazione" ? breakfastKey : mealId;
-  const candidates = [];
-
-  for (let offset = 1; offset <= 7; offset += 1) {
-    const day = dietMeals[(dayIdx + offset) % 7] || {};
-    const candidate = day[mealKey] || day[mealId] || day.snack;
-    if (candidate && candidate.name !== currentName) candidates.push(candidate);
-  }
-
-  const base = candidates[0] || (dietMeals[dayIdx]?.[mealKey]) || current?.data;
-  if (!base) return null;
-  const adapted = adaptMealForUserProfile(base, mealId, userData);
-  const targetMacros = current?.data?.macros || adapted.macros || {cal:0,p:0,c:0,f:0};
-  return {
-    ...adapted,
-    name: adapted.name,
-    macros: targetMacros,
-    why: getRuntimeCopy("askdubi.replacementWhy", {
-      kcal: targetMacros.cal || 0,
-      p: targetMacros.p || 0,
-      c: targetMacros.c || 0,
-      f: targetMacros.f || 0,
-    }, lang)
-  };
-}
-
 function compactAskDubiMealForAgent(meal, lang = "it") {
   const macros = meal?.scaledMacros || meal?.data?.macros || {};
   return {
@@ -13861,20 +12789,7 @@ function hydrateAskDubiBackendAnswer(answer, userData, plan, lang = "it") {
 
   if (next.planChange?.action === "replace_meal") {
     const mealId = next.planChange.mealId || detectMealSlotFromText(`${next.title} ${(next.body||[]).join(" ")}`, plan) || "cena";
-    const replacementMeal = buildAskDubiReplacementMeal(mealId, userData, plan, lang);
-    if (replacementMeal) {
-      const label = getAskDubiMealLabel(mealId, lang);
-      next.planChange = {
-        ...next.planChange,
-        mealId,
-        replacement: { data: replacementMeal },
-        banner: next.planChange.banner || `${label} sostituita · macro mantenuti`,
-        planNote: next.planChange.planNote || `DUBI sostituisce ${label} mantenendo calorie e macronutrienti del pasto originale.`,
-        confirmLabel: next.planChange.confirmLabel || `Si, cambia ${label}`,
-      };
-    } else {
-      next.planChange = null;
-    }
+    next.planChange = { ...next.planChange, mealId, replacement: null };
   }
 
   return next;
@@ -13977,89 +12892,44 @@ function detectPlanChange(t, plan, userData, lang = "it") {
   const hasReplacementIntent = /(non mi piace|non voglio|odio|stufo|stufa|cambia|cambiami|sostituisci|sostituire|swap|alternativa|replace|change.*meal|don't like|do not like|vorrei.*(altro|altor|divers|camb|alternativ)|voglio.*(altro|altor|divers|camb|alternativ)|mangiare.*(altro|altor|divers)|mangiarmi.*(altro|altor|divers)|preferirei.*(altro|altor|divers))/i.test(t);
   const mealToReplace = hasReplacementIntent ? detectMealSlotFromText(t, plan) : null;
   if (mealToReplace) {
-    const replacementMeal = buildAskDubiReplacementMeal(mealToReplace, userData, plan, lang);
-    if (replacementMeal) {
-      return {
-        action: "replace_meal",
-        mealId: mealToReplace,
-        replacement: { data: replacementMeal },
-        banner: "Pasto sostituito · macro mantenuti",
-        planNote: `Ho preparato un'alternativa per ${mealToReplace.replace("_"," ")} mantenendo lo stesso blocco di calorie e macronutrienti del pasto originale.`,
-        confirmLabel: "Sì, cambia questo pasto"
-      };
-    }
+    return {
+      action: "replace_meal",
+      mealId: mealToReplace,
+      replacement: null,
+      banner: "Sostituzione sicura dal catalogo DUBI",
+      planNote: "La sostituzione viene selezionata dal backend tra ricette complete compatibili con il profilo.",
+      confirmLabel: "Sì, cambia questo pasto"
+    };
   }
 
-  // Sveglio tardi → salta colazione, aggiunge spuntino extra metà mattina
+  // Meal timing changes require a canonical backend regeneration.
   if (/(svegliato|alzato|dormito).*(tardi|mezzogiorno|pranzo|ora di pranzo|a pranzo)|mi.*sveglio.*tard|noon|wake.*up.*late/i.test(t) ||
       /(colazione.*salto|salto.*colazione|non.*colazione.*stamatt|non riesco.*colazione|impossibile.*colazione)/i.test(t)) {
     return {
-      action: "skip_meal",
-      mealId: "colazione",
-      banner: "Colazione rimossa · aggiunto Spuntino Extra per recuperare i nutrienti",
-      planNote: "Ho rimosso la colazione e aggiunto uno Spuntino Extra mattutino con gli stessi nutrienti, così raggiungi comunque tutti i tuoi obiettivi giornalieri.",
-      confirmLabel: "Sì, aggiorna il piano",
-      extraMeal: {
-        id: "extra_colazione",
-        label: "Spuntino Extra · DUBI",
-        icon: "star",
-        time: "10:30",
-        isExtra: true,
-        data: {
-          name: "Spuntino bilanciato compensativo",
-          items: ["Yogurt greco 200g", "Avena 60g", "Banana matura", "Mandorle 20g", "Miele grezzo 10g"],
-          macros: { cal: 440, p: 24, c: 62, f: 13 },
-          why: "Aggiunto da DUBI per compensare la colazione saltata. Yogurt greco e avena forniscono proteine complete e carboidrati a lento rilascio. La banana supporta l'energia mentale, le mandorle i grassi buoni. Consumalo entro le 11:00 per mantenere il ritmo metabolico della giornata."
-        }
-      }
+      action: "regenerate_plan",
+      banner: "Aggiornamento del piano richiesto",
+      planNote: "Per cambiare la struttura dei pasti DUBI deve rigenerare il piano dal catalogo di ricette complete e sicure.",
+      confirmLabel: "Apri Impostazioni",
     };
   }
 
-  // Non riesce a fare pranzo → aggiunge spuntino pomeridiano extra
+  // Never fabricate a compensatory meal in the client.
   if (/(non riesco.*pranzo|salto.*pranzo|pranzo.*salto|senza pranzo|non posso.*pranzo|impossibile.*pranzo)/i.test(t)) {
     return {
-      action: "skip_meal",
-      mealId: "pranzo",
-      banner: "Pranzo rimosso · aggiunto Pasto Extra pomeridiano",
-      planNote: "Ho rimosso il pranzo e aggiunto un pasto proteico nel pomeriggio per garantire che tu raggiunga comunque proteine, carboidrati e calorie target.",
-      confirmLabel: "Sì, aggiorna il piano",
-      extraMeal: {
-        id: "extra_pranzo",
-        label: "Pasto Extra · DUBI",
-        icon: "star",
-        time: "15:30",
-        isExtra: true,
-        data: {
-          name: "Pasto proteico pomeridiano",
-          items: ["Pollo o tonno 150g", "Riso integrale 80g", "Verdure miste 200g", "Olio EVO 10g", "Limone"],
-          macros: { cal: 520, p: 42, c: 58, f: 12 },
-          why: "Aggiunto da DUBI per compensare il pranzo saltato. Proteina magra + carboidrati complessi nel pomeriggio supportano il recupero muscolare e mantengono stabile la glicemia fino a cena."
-        }
-      }
+      action: "regenerate_plan",
+      banner: "Aggiornamento del piano richiesto",
+      planNote: "Per cambiare la struttura dei pasti DUBI deve rigenerare il piano dal catalogo di ricette complete e sicure.",
+      confirmLabel: "Apri Impostazioni",
     };
   }
 
-  // Non riesce a fare cena → aggiunge snack serale proteico
+  // Never fabricate a compensatory meal in the client.
   if (/(non riesco.*cena|salto.*cena|cena.*salto|senza cena|non posso.*cena|sento.*poco.*fame.*sera)/i.test(t)) {
     return {
-      action: "skip_meal",
-      mealId: "cena",
-      banner: "Cena rimossa · aggiunto Snack Serale proteico",
-      planNote: "Ho rimosso la cena e aggiunto uno snack proteico serale leggero per proteggere la massa muscolare durante il digiuno notturno.",
-      confirmLabel: "Sì, aggiorna il piano",
-      extraMeal: {
-        id: "extra_cena",
-        label: "Snack Serale · DUBI",
-        icon: "moon",
-        time: "21:00",
-        isExtra: true,
-        data: {
-          name: "Snack proteico notturno",
-          items: ["Skyr o ricotta 150g", "Frutta secca mista 20g", "Cioccolato fondente 10g"],
-          macros: { cal: 280, p: 22, c: 18, f: 11 },
-          why: "Aggiunto da DUBI come alternativa leggera alla cena. La caseina di skyr/ricotta è a digestione lenta: protegge la massa muscolare durante le ore di sonno senza appesantire la digestione notturna."
-        }
-      }
+      action: "regenerate_plan",
+      banner: "Aggiornamento del piano richiesto",
+      planNote: "Per cambiare la struttura dei pasti DUBI deve rigenerare il piano dal catalogo di ricette complete e sicure.",
+      confirmLabel: "Apri Impostazioni",
     };
   }
 
@@ -14196,21 +13066,12 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
     fats: { title:"Fats in your plan", body:["Fats are essential: hormone production, fat-soluble vitamin absorption (A,D,E,K), brain health.","Priority: MUFA (EVO oil, avocado) and omega-3 (oily fish, walnuts, flaxseed). Limit saturated fat to <10% kcal.","Your plan already includes the optimal amount. Don't cut fats to lose weight: cut total calories."], source:"Mozaffarian, Circulation 2016" },
     muscle: (p_lo, p_hi) => ({ title:"Muscle building: the pillars", body:[`Protein: ${p_lo}–${p_hi}g/day distributed in meals of 25–40g. Protein synthesis lasts 3–5h after each protein meal.`,"Minimal caloric surplus: +200–300 kcal/day for a lean bulk. More surplus = more fat, not more muscle.","Timing: protein meal within 2h of training is optimal (leucine → mTOR → protein synthesis)."], source:"ISSN Protein Position Stand 2017" }),
     fatLoss: { title:"Fat loss: how it really works", body:["Caloric deficit is the necessary condition. 500 kcal/day deficit = ~0.5kg per week on average.","Quality counts: high protein (satiety), fiber (transit + satiating), whole carbs (stable energy without spikes).","Preserving muscle during a cut requires: weight training, adequate protein, not going below BMR×1.1."], source:"Hall et al., Cell Metabolism 2019" },
-    hunger: (n) => ({ title:"Hunger and satiety: what's behind it", body:["Real hunger vs cravings: wait 10 minutes. Cravings pass, real hunger persists.","Anti-hunger strategy: protein at every meal (+satiety 4–6h), fiber (viscous: oats, legumes), water before eating.","Evening hunger? Add a protein snack at dinner: skyr, ricotta, boiled eggs. It's not a mistake, it's strategy."], source:"Leidy et al., Obesity 2015",
-      addableItem: { label:"Evening Protein Snack", description:"Skyr + ricotta for slow-release casein overnight, almonds for healthy fats. Protects muscle mass during the overnight fast without a glycemic spike.",
-        extraMeal:{id:"extra_snack_serale_fame",label:"Evening Snack · DUBI",icon:"moon",time:"21:30",isExtra:true,data:{name:"Anti-hunger evening protein snack",items:["Skyr 150g","Ricotta 50g","Almonds 15g","Cinnamon q.b."],macros:{cal:240,p:24,c:10,f:10},why:"Added by DUBI at your request. The combination of slow-digesting proteins (casein from skyr/ricotta) + unsaturated fats (almonds) maintains satiety for 4–6 hours without disturbing sleep. Source: Leidy et al., Obesity 2015."}}},
-      offerAdd: true }),
+    hunger: (n) => ({ title:"Hunger and satiety: what's behind it", body:["Real hunger vs cravings: wait 10 minutes. Cravings pass, real hunger persists.","Anti-hunger strategy: protein at every meal (+satiety 4–6h), fiber (viscous: oats, legumes), water before eating.","Any plan change must use a complete recipe selected by the DUBI backend."], source:"Leidy et al., Obesity 2015" }),
     water: (w, target) => ({ title:"Personalized hydration", body:[`For ${w}kg bodyweight: target ${target} liters/day at rest.`,"Add 500ml for every 30 minutes of intense training, +200ml for every 5°C above 25°C ambient.","Pale yellow urine = optimal hydration. Dark = drink immediately."], source:"EFSA Water Intake Recommendations 2010" }),
     fasted: { title:"Fasted training", body:["Low intensity (<65% HRmax): ok fasted, fat oxidation slightly increased.","Medium/high intensity: performance drops 5–10% without carbs. 30–60min before eat 20–30g simple carbs (banana, date, toast+honey).","After intense training: P+C meal within 2h to maximize protein synthesis and glycogen restock."], source:"ISSN Nutrient Timing 2017" },
-    energy: (n) => ({ title:"Low energy: most common causes", body:["Probability order: 1st sleep (<7h), 2nd dehydration, 3rd too many simple sugars at breakfast, 4th excessive caloric deficit.","Immediate fix: 500ml water + banana + 10g nuts. Hits 70% of afternoon energy crashes.","If it persists beyond 2 weeks with a correct plan and adequate sleep, check ferritin, vitamin D, TSH with your doctor."], source:"Walker, Sleep & Human Health 2017",
-      addableItem:{label:"Afternoon Energy Snack",description:"Banana + nuts + water: fast-release carbs + fats for sustained energy. Eliminates the afternoon crash in 15–20 minutes.",
-        extraMeal:{id:"extra_energia_pomeriggio",label:"Energy Snack · DUBI",icon:"zap",time:"15:30",isExtra:true,data:{name:"Anti-crash energy snack",items:["Ripe banana","Mixed nuts 20g","Date 1–2 pieces"],macros:{cal:190,p:4,c:32,f:8},why:"Added by DUBI to combat the afternoon energy crash. Banana provides glucose + potassium for muscle function. Nuts add omega-3 fatty acids for concentration. Source: Walker, Sleep & Human Health 2017."}}},
-      offerAdd: true }),
+    energy: (n) => ({ title:"Low energy: most common causes", body:["Probability order: 1st sleep (<7h), 2nd dehydration, 3rd too many simple sugars at breakfast, 4th excessive caloric deficit.","Plan changes must use a complete recipe selected by the DUBI backend.","If it persists beyond 2 weeks with a correct plan and adequate sleep, check ferritin, vitamin D, TSH with your doctor."], source:"Walker, Sleep & Human Health 2017" }),
     plateau: { title:"Plateau and metabolic adaptation", body:["A plateau is physiological: the body adapts and reduces TDEE by 10–15% after 4–8 weeks of deficit.","Strategy: refeed day (1 day at TDEE every 2 weeks) to reset leptin and thyroid hormones.","Track progress with photos + body measurements, not just the scale: weight fluctuates by 1–3kg for water, glycogen, cycle."], source:"Hall et al., Cell Metabolism 2019" },
-    protein: (w, p_lo, p_hi) => ({ title:"Protein: dose, timing, sources", body:[`Target for ${w}kg: ${p_lo}–${p_hi}g/day (1.6–2.2g/kg). Optimal in 4–5 meals of 25–40g each.`,"Leucine is the main trigger for mTOR (protein synthesis): minimum 2.5g per meal (≈25g of protein from chicken/eggs).","Whey post-workout for speed, casein before sleep for overnight anti-catabolism."], source:"ISSN Protein Position Stand 2017",
-      addableItem:{label:"Post-Workout Protein Snack",description:"Greek yogurt + banana: natural whey + carbs to maximize the post-workout anabolic window (within 2h).",
-        extraMeal:{id:"extra_proteico_postwork",label:"Protein Snack · DUBI",icon:"zap",time:"17:00",isExtra:true,data:{name:"Post-workout protein snack",items:["Greek yogurt 200g","Banana","Almonds 15g"],macros:{cal:280,p:26,c:32,f:8},why:"Added by DUBI to maximize post-workout protein synthesis. Greek yogurt provides leucine (mTOR trigger) + banana restores muscle glycogen. Optimal window: within 2h of training. Source: ISSN 2017."}}},
-      offerAdd: true }),
+    protein: (w, p_lo, p_hi) => ({ title:"Protein: dose, timing, sources", body:[`Target for ${w}kg: ${p_lo}–${p_hi}g/day (1.6–2.2g/kg). Optimal in 4–5 meals of 25–40g each.`,"Leucine is the main trigger for mTOR (protein synthesis): minimum 2.5g per meal (≈25g of protein from chicken/eggs).","Any meal addition must use a complete recipe selected by the DUBI backend."], source:"ISSN Protein Position Stand 2017" }),
     mealSkip: { title:"Skipped meal: no drama", body:["One skipped meal compromises nothing. Metabolism doesn't drop after a single meal.","Don't compensate with double portions: you overload digestion and create an insulin spike.","At the next meal add +15–20g of protein and a normal portion of carbs. The plan stays balanced."], source:"ISSN Meal Frequency Review 2017" },
     fallback: (n) => ({ title:`Got it${n?","+n:""}`, body:["That's a good question — let me be precise.","DUBI combines Mifflin-St Jeor, WHO/EFSA/ISSN guidelines and your data to give you personalized answers.","Can you describe the situation better? (e.g. time of day, what you're feeling, which meal is involved) That way I can help you concretely."], source:"DUBI — Scientific method" }),
   };
@@ -14221,21 +13082,15 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
   // ── PRIORITY 0: follow-up che fa riferimento alla risposta precedente ──
   const wantsAdd = /(aggiungi|aggiungerlo|includerlo|includere|mettilo|metti.*piano|aggiorna.*piano|s[iì].*piano|puoi.*aggiunger|voglio.*aggiunger|aggiungilo|inseriscilo|lo.*voglio.*piano|aggiornami|sì.*aggiorna|si.*aggiorna|lo.*aggiungi|yes.*add|ok.*aggiorna)/i.test(t);
   if (context?.addableItem && wantsAdd) {
-    const item = context.addableItem;
     return {
-      title: `Perfetto, aggiungo "${item.label}" al piano`,
-      body: [
-        `Ho inserito lo spuntino nel tuo piano di oggi — troverai "${item.label}" nella lista pasti.`,
-        item.description,
-        `Completalo come gli altri pasti: sarà conteggiato nei macro giornalieri e la barra delle calorie rifletterà 100% quando avrai finito.`,
-      ],
+      title: "Aggiornamento del piano richiesto",
+      body: ["DUBI non costruisce pasti nel frontend. La modifica deve essere generata dal backend usando una ricetta completa e sicura."],
       source: "DUBI · Piano personalizzato",
       planChange: {
-        action: "add_extra",
-        banner: `✦ ${item.label} aggiunto al piano`,
-        planNote: item.description,
-        confirmLabel: `Sì, aggiungi "${item.label}" al piano`,
-        extraMeal: item.extraMeal,
+        action: "regenerate_plan",
+        banner: "Aggiornamento del piano richiesto",
+        planNote: "La modifica richiede una rigenerazione canonica del piano.",
+        confirmLabel: "Apri Impostazioni",
       },
     };
   }
@@ -14483,24 +13338,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
         "Fame serale? Aggiungi uno snack proteico a cena: skyr, ricotta, uova sode. Non è un errore, è strategia.",
       ],
       source: "Leidy et al., Obesity 2015",
-      addableItem: {
-        label: "Snack Serale Proteico",
-        description: "Skyr + ricotta per la caseina lenta notturna, mandorle per i grassi buoni. Protegge la massa muscolare durante il digiuno notturno senza spike glicemico.",
-        extraMeal: {
-          id: "extra_snack_serale_fame",
-          label: "Snack Serale · DUBI",
-          icon: "moon",
-          time: "21:30",
-          isExtra: true,
-          data: {
-            name: "Snack proteico anti-fame serale",
-            items: ["Skyr 150g", "Ricotta 50g", "Mandorle 15g", "Cannella q.b."],
-            macros: { cal: 240, p: 24, c: 10, f: 10 },
-            why: "Aggiunto da DUBI su tua richiesta. La combinazione di proteine a lenta digestione (caseina di skyr/ricotta) + grassi insaturi (mandorle) mantiene sazietà per 4-6 ore senza disturbare il sonno. Fonte: Leidy et al., Obesity 2015."
-          }
-        }
-      },
-      offerAdd: true,
+      offerAdd: false,
     };
   }
 
@@ -14528,24 +13366,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
         "Se persiste oltre 2 settimane con piano corretto e sonno adeguato, valuta ferritina, vitamina D, TSH con il medico.",
       ],
       source: "Walker, Sleep & Human Health 2017",
-      addableItem: {
-        label: "Snack Energetico Pomeridiano",
-        description: "Banana + noci + acqua: carboidrati a rapido rilascio + grassi per energia sostenuta. Elimina il calo pomeridiano in 15-20 minuti.",
-        extraMeal: {
-          id: "extra_energia_pomeriggio",
-          label: "Snack Energetico · DUBI",
-          icon: "zap",
-          time: "15:30",
-          isExtra: true,
-          data: {
-            name: "Snack anti-calo energetico",
-            items: ["Banana matura", "Noci miste 20g", "Dattero 1-2 pezzi"],
-            macros: { cal: 190, p: 4, c: 32, f: 8 },
-            why: "Aggiunto da DUBI per combattere il calo di energia pomeridiano. La banana fornisce glucosio + potassio per la funzione muscolare. Le noci aggiungono acidi grassi omega-3 per la concentrazione. Fonte: Walker, Sleep & Human Health 2017."
-          }
-        }
-      },
-      offerAdd: true,
+      offerAdd: false,
     };
   }
 
@@ -14567,24 +13388,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
         "Whey post-workout per rapidità, caseina prima di dormire per anti-catabolismo notturno.",
       ],
       source: "ISSN Protein Position Stand 2017",
-      addableItem: {
-        label: "Snack Proteico Post-Workout",
-        description: "Yogurt greco + banana: whey naturale + carboidrati per massimizzare la finestra anabolica post-allenamento (entro 2h).",
-        extraMeal: {
-          id: "extra_proteico_postwork",
-          label: "Snack Proteico · DUBI",
-          icon: "zap",
-          time: "17:00",
-          isExtra: true,
-          data: {
-            name: "Snack proteico post-workout",
-            items: ["Yogurt greco 200g", "Banana", "Mandorle 15g"],
-            macros: { cal: 280, p: 26, c: 32, f: 8 },
-            why: "Aggiunto da DUBI per massimizzare la sintesi proteica post-allenamento. Yogurt greco fornisce leucina (trigger mTOR) + la banana ripristina il glicogeno muscolare. Finestra ottimale: entro 2h dall'allenamento. Fonte: ISSN 2017."
-          }
-        }
-      },
-      offerAdd: true,
+      offerAdd: false,
     };
   }
 
@@ -14640,17 +13444,6 @@ const makeAskThreadTitle = (messages) => {
     .trim();
   const words = cleaned.split(" ").filter(Boolean).slice(0, 5);
   return words.join(" ") || "Chat DUBI";
-};
-
-const makeAddablePlanChange = (addableItem, t) => {
-  if (!addableItem?.extraMeal) return null;
-  return {
-    action: "add_extra",
-    banner: `+ ${addableItem.label} aggiunto al piano`,
-    planNote: addableItem.description,
-    confirmLabel: t("askdubi.apply"),
-    extraMeal: addableItem.extraMeal,
-  };
 };
 
 const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) => {
@@ -14858,24 +13651,6 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
                   ))}
                   {a.source && <p style={{fontSize:11,color:T.muted,margin:"8px 0 0"}}>{t("askdubi.fonte")} {a.source}</p>}
                 </div>
-
-                {/* Offerta di aggiunta al piano (senza planChange diretto) */}
-                {a.offerAdd && a.addableItem && !a.planChange && !msg.applied && (
-                  <div style={{padding:"12px 16px",background:T.accentD+"10",border:`1.5px solid ${T.accentD}`,borderRadius:14,marginBottom:4}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-                      <Ico n="refresh" size={13} c={T.accentD}/>
-                      <span style={{fontSize:10,fontWeight:700,color:T.accentD,letterSpacing:0.5}}>{t("askdubi.offer.label")}</span>
-                    </div>
-                    <p style={{fontSize:13,color:T.text,lineHeight:1.5,margin:"0 0 10px"}}>
-                      {t("askdubi.offer.q",{item:a.addableItem.label})}
-                    </p>
-                    <button className="dubi-pressable" data-no-haptic="true" onClick={()=>applyChange(msg.id, makeAddablePlanChange(a.addableItem, t))}
-                      style={{width:"100%",padding:"11px",background:T.accentD,color:"#E8E4DC",border:"none",
-                        borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                      {t("askdubi.apply")}
-                    </button>
-                  </div>
-                )}
 
                 {/* Card adattamento piano (con planChange) */}
                 {a.planChange && !msg.applied && (
@@ -18619,42 +17394,29 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
         skipped: [...new Set([...a.skipped, change.mealId])],
         banner: change.banner,
         note: change.planNote,
-        extraMeals: change.extraMeal
-          ? [...(a.extraMeals||[]).filter(m=>m.id!==change.extraMeal.id), change.extraMeal]
-          : (a.extraMeals||[]),
       }));
       setStatus(s => ({...s, [change.mealId]: "skip"}));
-    } else if (change.action === "skip_and_boost") {
-      setPlanAdaptations(a => ({
-        ...a,
-        skipped: [...new Set([...a.skipped, change.mealId])],
-        banner: change.banner,
-        note: change.planNote,
-        extraMeals: change.extraMeal
-          ? [...(a.extraMeals||[]).filter(m=>m.id!==change.extraMeal.id), change.extraMeal]
-          : (a.extraMeals||[]),
-      }));
-      setStatus(s => ({...s, [change.mealId]: "skip"}));
-    } else if (change.action === "add_extra") {
-      // Aggiunge un pasto extra senza saltare nulla (usato dal follow-up chat)
-      setPlanAdaptations(a => ({
-        ...a,
-        banner: change.banner || a.banner,
-        note: change.planNote || a.note,
-        extraMeals: change.extraMeal
-          ? [...(a.extraMeals||[]).filter(m=>m.id!==change.extraMeal.id), change.extraMeal]
-          : (a.extraMeals||[]),
-      }));
     } else if (change.action === "replace_meal") {
-      setPlanAdaptations(a => ({
-        ...a,
-        banner: change.banner || a.banner,
-        note: change.planNote || a.note,
-        replacements: {
-          ...(a.replacements || {}),
-          [change.mealId]: change.replacement,
-        },
-      }));
+      try {
+        const ingredientPlan = await replaceIngredientPlanMeal(todayDateKey, change.mealId);
+        const updatedPlan = mapIngredientPlanToFrontend(ingredientPlan, userData);
+        setPlan?.(updatedPlan);
+        setPlanAdaptations(a => ({
+          ...a,
+          banner: change.banner || a.banner,
+          note: change.planNote || a.note,
+        }));
+      } catch (error) {
+        const controlled = String(error?.code || "").startsWith("RECIPE_ENGINE_V1_")
+          || error?.payload?.generation_status === "NO_SAFE_MATCH";
+        setPlanAdaptations(a => ({
+          ...a,
+          banner: controlled
+            ? getRuntimeCopy("plan.error.noSafeMatch", null, lang)
+            : getRuntimeCopy("plan.error.generate", null, lang),
+          note: null,
+        }));
+      }
     } else if (change.action === "light_day") {
       setPlanAdaptations(a => ({
         ...a,
@@ -18737,33 +17499,14 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const greeting = getGreeting(userData?.name, isFirstAccess, userData?.gender);
 
   const dayIdx = (new Date().getDay()+6)%7;
-  const _dietMeals = getDietMeals(userData?.diet, null, userData?.allergies);
-  const dayMeals = _dietMeals[dayIdx] || _dietMeals[0];
-  const bfKey = userData.breakfastPref==="salata" ? "colazione_salata" : "colazione_dolce";
 
   const slots = getMealSlots(plan.mealCount || 4);
   // Se Ask DUBI ha ricalcolato gli orari per l'allenamento, usa quelli custom
   const times = planAdaptations.customTimes || plan.mealTimes || ["08:00","13:00","16:30","20:00"];
 
   const aiMealList = getAiMealListForDay(plan, dayIdx, slots, times);
-  const fallbackMealList = slots.map((sl,i) => {
-    let meal;
-    if (sl.id==="colazione") meal = dayMeals[bfKey]||dayMeals.colazione_dolce;
-    else if (sl.id==="pranzo") meal = dayMeals.pranzo;
-    else if (sl.id==="cena") meal = dayMeals.cena;
-    else if (sl.id==="snack") meal = dayMeals.snack;
-    else if (sl.id==="snack_m") meal = dayMeals.snack_m;
-    else if (sl.id==="snack_n") meal = dayMeals.snack_n;
-    const carbPct = getCarbTargetPct(userData?.trainingTime, sl.id, userData?.sport);
-    const adaptSkipped = planAdaptations.skipped.includes(sl.id);
-    return {...sl, time: times[i]||"--:--", data: meal || dayMeals.snack, workoutLabel: null, carbTargetPct: carbPct, adaptSkipped};
-  });
-  const mealList = (aiMealList || fallbackMealList)
-    .map((meal) => {
-      const replacement = planAdaptations.replacements?.[meal.id];
-      const data = replacement?.data || replacement || adaptMealForUserProfile(meal.data, meal.id, userData);
-      return {...meal, data, isReplaced:Boolean(replacement)};
-    })
+  const mealList = (aiMealList || [])
+    .map((meal) => ({...meal, data: meal.data, isReplaced:false}))
     .concat((planAdaptations.extraMeals||[]));
 
   // ── MACRO SCALING — fattori indipendenti per ogni macro ──
@@ -19321,6 +18064,11 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
       {/* Meals */}
       <div style={{padding:"0 24px"}}>
         <p style={{fontSize:11,color:T.muted,letterSpacing:1,marginBottom:12}}>{t("today.meals")}</p>
+        {mealList.length === 0 && (plan?.generationStatus === "NO_SAFE_MATCH" || plan?.controlledFailure) && (
+          <div style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${T.border}`,borderRadius:16,color:T.text,fontSize:13,lineHeight:1.5}}>
+            {getRuntimeCopy("plan.error.noSafeMatch", null, lang)}
+          </div>
+        )}
         {mealList.map(mt => {
           const st = status[mt.id];
           const isOpen = expanded===mt.id;
@@ -19378,29 +18126,6 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
               </button>
               {isOpen && (
                 <div style={{padding:"0 16px 16px"}}>
-                  {mt.id === "colazione" && userData?.breakfastPref !== "none" && (
-                    <div style={{display:"flex",gap:6,marginBottom:12,marginTop:4}}>
-                      {[{id:"dolce",lk:"breakfast.sweet"},{id:"salata",lk:"breakfast.savory"}].map(o => {
-                        const _bfIsSalata = !!(dayMeals?.colazione_salata && mt.data === dayMeals.colazione_salata);
-                        const _bfIsDolce = !!(dayMeals?.colazione_dolce && mt.data === dayMeals.colazione_dolce);
-                        const _bfEff = _bfIsSalata ? "salata" : _bfIsDolce ? "dolce" : (["dolce","salata"].includes(userData?.breakfastPref) ? userData.breakfastPref : null);
-                        const isActive = _bfEff === o.id;
-                        return (
-                          <button key={o.id} onClick={async (e) => {
-                            e.stopPropagation();
-                            if (_bfEff === o.id) return;
-                            const nd = {...userData, breakfastPref: o.id};
-                            setUserData?.(nd);
-                            try { await saveDubiProfile(nd); } catch(err) {}
-                          }}
-                            style={{flex:1,padding:"7px 10px",borderRadius:10,border:`1.5px solid ${isActive?T.accent:T.border}`,background:isActive?T.sel:T.bg,cursor:"pointer",textAlign:"center",fontSize:12,fontWeight:isActive?700:400,color:isActive?T.accentD:T.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-                            <Ico n={o.id==="dolce"?"sunrise":"fork"} size={12} c={isActive?T.accentD:T.muted}/>
-                            {t(o.lk)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
                   <div style={{borderTop:`1px solid ${T.border}`,paddingTop:12,marginBottom:14}}>
                     <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("today.ingredients")}</p>
                     {meal.items.map((item,i)=>{
@@ -19533,7 +18258,8 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
   const { t, lang } = useT();
   const qCopy = getWeeklyQualityCopy(lang);
 
-  const todayIdx = (new Date().getDay()+6)%7;
+  const todayDate = getTodayIsoDate();
+  const todayIdx = (parseIsoDateLocal(todayDate).getDay()+6)%7;
   const [selDay,setSelDay] = useState(todayIdx);
   const [swapOpen,setSwapOpen] = useState(null);
   const [swapNotif,setSwapNotif] = useState(null); // {from, to}
@@ -19567,7 +18293,6 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
   const days = [0,1,2,3,4,5,6].map(i=>t("days.short."+i));
   const weekDates = getCurrentWeekIsoDates();
   const selectedDate = weekDates[selDay] || getTodayIsoDate();
-  const todayDate = getTodayIsoDate();
 
   React.useEffect(() => {
     const incomingCache = buildWeeklyPlanCache(weeklyPlans, plan, todayDate);
@@ -19673,7 +18398,7 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
     ...entry,
     meal: {
       ...entry.meal,
-      macros: getAdjustedMealMacros(selDay, entry.id, entry.meal, swaps)
+      macros: entry.meal?.macros || {cal:0,p:0,c:0,f:0}
     }
   }));
 
@@ -19851,6 +18576,11 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
         {selectedDateLoading && (
           <div style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${T.border}`,borderRadius:16,color:T.muted,fontSize:13}}>
             Caricamento piano...
+          </div>
+        )}
+        {!selectedDateLoading && adjustedMealEntries.length === 0 && selectedPlan?.controlledFailure && (
+          <div style={{marginBottom:10,padding:16,background:T.card,border:`1.5px solid ${T.border}`,borderRadius:16,color:T.text,fontSize:13,lineHeight:1.5}}>
+            {getRuntimeCopy("plan.error.noSafeMatch", null, lang)}
           </div>
         )}
         {adjustedMealEntries.map((entry)=>{
