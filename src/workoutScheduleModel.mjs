@@ -151,3 +151,24 @@ export const buildTodayWorkoutModel = ({ sessions, isoDate, sportLabels = {}, da
     explicit: Boolean(dailyOverride),
   };
 };
+
+export const buildTodayWorkoutCardState = ({ sessions, isoDate, sportLabels = {}, dailyOverride = null, confirmationStatus = 'unconfirmed' } = {}) => {
+  const model = buildTodayWorkoutModel({ sessions, isoDate, sportLabels, dailyOverride });
+  const status = dailyOverride?.state === 'rest'
+    ? 'confirmed_rest'
+    : dailyOverride?.state === 'training'
+      ? 'confirmed_training'
+      : ['confirmed_training', 'confirmed_rest'].includes(confirmationStatus)
+        ? confirmationStatus
+        : 'unconfirmed';
+  const routineSessions = dailyOverride ? [] : model.sessions;
+  return {
+    ...model,
+    confirmationStatus: status,
+    routineSessions,
+    showExpectedRoutine: routineSessions.length > 0 && status !== 'confirmed_rest',
+    showRoutineConfirmationActions: routineSessions.length > 0 && status === 'unconfirmed',
+    showQuestion: routineSessions.length === 0 && status === 'unconfirmed',
+    showConfirmedRest: status === 'confirmed_rest',
+  };
+};

@@ -8,7 +8,8 @@ import "../dubi_legal.js";
 import { API_BASE_URL } from "./config.js";
 import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macroProgressPercent, toggleIngredientCompletion } from "./planConsumptionModel.mjs";
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getExplicitWorkoutLabel, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
-import { buildTodayWorkoutModel, getTrainingSessionForDate, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
+import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
+import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -15398,11 +15399,13 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
   const sportLabels = Object.fromEntries(sportIds.map(sport => [sport, getSportLabel(sport,t)]));
   const overrideStorageKey = `dubi_today_training_override_${userData?.dubiCode || getAuthEmail() || "guest"}_${todayIso}`;
   const planOverride = plan?.ingredientPlan?.daily_training_override || plan?.daily_training_override || null;
+  const planConfirmationStatus = plan?.ingredientPlan?.training_confirmation_status || plan?.training_confirmation_status || "unconfirmed";
   const readStoredOverride = () => {
     try { return JSON.parse(localStorage.getItem(overrideStorageKey) || "null"); } catch (_) { return null; }
   };
   const [dailyOverride,setDailyOverride] = useState(() => planOverride || readStoredOverride());
-  const model = buildTodayWorkoutModel({sessions,isoDate:todayIso,sportLabels,dailyOverride});
+  const [localConfirmationStatus,setLocalConfirmationStatus] = useState(planConfirmationStatus);
+  const model = buildTodayWorkoutCardState({sessions,isoDate:todayIso,sportLabels,dailyOverride,confirmationStatus:localConfirmationStatus});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -15427,6 +15430,10 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
       try { localStorage.setItem(overrideStorageKey,JSON.stringify(planOverride)); } catch (_) {}
     }
   }, [overrideStorageKey,JSON.stringify(planOverride)]);
+
+  useEffect(() => {
+    setLocalConfirmationStatus(planConfirmationStatus);
+  }, [planConfirmationStatus,todayIso]);
 
   useEffect(() => {
     if (!editing) setDraftSessions(defaultSessions());
@@ -15528,6 +15535,25 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
     setMessage("");
   };
 
+  const confirmScheduledTraining = async () => {
+    if (saving) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      await postScheduledTrainingConfirmation({date:todayIso,apiBaseUrl:API_BASE_URL,token:getAuthToken()});
+      setLocalConfirmationStatus("confirmed_training");
+      setPlan?.(current => current?.ingredientPlan
+        ? {...current,ingredientPlan:{...current.ingredientPlan,training_confirmation_status:"confirmed_training"}}
+        : {...current,training_confirmation_status:"confirmed_training"});
+      setMessage(lang === "it" ? "Allenamento confermato. Il piano non è stato rigenerato." : "Training confirmed. The plan was not regenerated.");
+    } catch (error) {
+      console.error("Training confirmation failed:",error);
+      setMessage(lang === "it" ? "Non riesco a confermare l'allenamento." : "Could not confirm training.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const updateDraft = (session) => setDraftSessions(current=>upsertTrainingSession(current,session));
   const addDraftSession = () => setDraftSessions(current=>normalizeTrainingSessions([...current,{
     day_of_week:todayDay,
@@ -15543,23 +15569,28 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
         <div style={{width:40,height:40,borderRadius:12,background:T.sel,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ico n="act" size={18} c={T.accentD}/></div>
         <div style={{flex:1}}>
           <p style={{fontSize:10,fontWeight:900,color:T.muted,letterSpacing:1,margin:"0 0 5px"}}>ALLENAMENTO DI OGGI</p>
-          {!editing && !dailyOverride && <p data-testid="today-training-question" style={{fontSize:14,fontWeight:900,color:T.text,margin:0}}>{lang === "it" ? "Ti alleni oggi?" : "Are you training today?"}</p>}
-          {!editing && dailyOverride && <>
-            {model.status === "multiple" ? model.sessions.map(session=><div key={session.session_index} style={{marginTop:session.session_index===1?0:7}}>
+          {!editing && model.showQuestion && <p data-testid="today-training-question" style={{fontSize:14,fontWeight:900,color:T.text,margin:0}}>{lang === "it" ? "Ti alleni oggi?" : "Are you training today?"}</p>}
+          {!editing && (dailyOverride || model.showExpectedRoutine || model.showConfirmedRest || localConfirmationStatus === "confirmed_training") && <>
+            {!model.showConfirmedRest && model.status === "multiple" ? model.sessions.map(session=><div key={session.session_index} style={{marginTop:session.session_index===1?0:7}}>
               <p style={{fontSize:12,fontWeight:900,color:T.text,margin:0}}>{session.session_index}. {sportLabels[session.sport_id] || session.sport_id}</p>
               <p style={{fontSize:11,color:T.muted,margin:"2px 0 0"}}>{session.start_time} · {session.duration_min} min</p>
             </div>) : <>
-              <p data-testid="today-workout-title" style={{fontSize:14,fontWeight:900,color:T.text,margin:0,textTransform:"capitalize"}}>{model.title}</p>
-              {model.detail && <p data-testid="today-workout-detail" style={{fontSize:12,color:T.muted,margin:"3px 0 0"}}>{model.detail}</p>}
+              <p data-testid="today-workout-title" style={{fontSize:14,fontWeight:900,color:T.text,margin:0,textTransform:"capitalize"}}>{model.showConfirmedRest ? (lang === "it" ? "Oggi non ti alleni" : "No training today") : model.title}</p>
+              {model.detail && !model.showConfirmedRest && <p data-testid="today-workout-detail" style={{fontSize:12,color:T.muted,margin:"3px 0 0"}}>{model.detail}</p>}
             </>}
+            {model.showExpectedRoutine && <p data-testid="today-training-unconfirmed" style={{fontSize:10,fontWeight:900,color:T.accentD,margin:"5px 0 0"}}>{lang === "it" ? "Da confermare" : "To confirm"}</p>}
           </>}
         </div>
-        {!editing && dailyOverride && <button type="button" onClick={beginTrainingEdit}
+        {!editing && (dailyOverride || model.showExpectedRoutine || model.showConfirmedRest || localConfirmationStatus === "confirmed_training") && <button type="button" onClick={beginTrainingEdit}
           style={{border:`1px solid ${T.border}`,background:T.bg,color:T.accentD,borderRadius:10,padding:"7px 9px",fontSize:10,fontWeight:900,cursor:"pointer"}}>
           Modifica
         </button>}
       </div>
-      {!editing && !dailyOverride && <div style={{display:"flex",gap:8,marginTop:12}}>
+      {!editing && model.showRoutineConfirmationActions && <div style={{display:"flex",gap:8,marginTop:12}}>
+        <button data-testid="today-training-yes" type="button" onClick={confirmScheduledTraining} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontWeight:900,cursor:"pointer"}}>{lang === "it" ? "Sì, mi alleno" : "Yes, I am training"}</button>
+        <button data-testid="today-training-no" type="button" onClick={()=>persistState({state:"rest",sessions:[]})} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontWeight:900,cursor:"pointer"}}>{lang === "it" ? "Oggi no" : "Not today"}</button>
+      </div>}
+      {!editing && model.showQuestion && <div style={{display:"flex",gap:8,marginTop:12}}>
         <button data-testid="today-training-yes" type="button" onClick={beginTrainingEdit} style={{flex:1,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontWeight:900,cursor:"pointer"}}>Sì</button>
         <button data-testid="today-training-no" type="button" onClick={()=>persistState({state:"rest",sessions:[]})} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontWeight:900,cursor:"pointer"}}>No</button>
       </div>}
@@ -16612,23 +16643,10 @@ function migrateTodayStatus(oldPlan, newPlan, userData) {
 }
 
 // ── Check-in allenamento del mattino (spec nutrizionista + Enrico):
-// per chi in onboarding ha dichiarato di allenarsi (workout_days > 0), DUBI
-// chiede OGNI mattina finché non risponde: "A che ora ti alleni oggi?"
-// Se l'utente ha più sport dichiarati, chiede anche QUALE sport (o entrambi).
-// La risposta va a POST /api/training/day/confirm {day, sport, time_slot} e il
-// backend posiziona pre/post workout del giorno secondo fascia oraria e sport.
 // ── GIORNI SETTIMANA helper ──
 const WEEK_DAYS_IT = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
 const WEEK_DAYS_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const WEEK_DAYS_KEYS = ["mon","tue","wed","thu","fri","sat","sun"];
-
-// Fasce orarie — 4 fasce (nutrizionista validato)
-const TRAINING_SLOTS = [
-  {id:"morning_fasted", it:"Mattina presto",  en:"Early morning",  sub_it:"06:00–09:00", sub_en:"6–9 AM"},
-  {id:"morning",        it:"Mattina",          en:"Morning",         sub_it:"09:00–12:00", sub_en:"9 AM–12 PM"},
-  {id:"afternoon",      it:"Pomeriggio",       en:"Afternoon",       sub_it:"12:00–18:00", sub_en:"12–6 PM"},
-  {id:"evening",        it:"Sera",             en:"Evening",         sub_it:"18:00–22:00", sub_en:"6–10 PM"},
-];
 
 // ── Card Step 1: Prima apertura — scegli i giorni abituali ──
 const WeeklyTrainingSetupCard = ({userData, onComplete}) => {
@@ -16782,98 +16800,6 @@ const WeeklyTrainingReminderCard = ({userData, planningDay}) => {
   );
 };
 
-// ── Card Step 4: Badge "oggi mi alleno" — appare dopo la conferma giornaliera ──
-const TrainingTodayBadge = ({userData, setPlan}) => {
-  const { lang } = useT();
-  const it = lang === "it";
-  const todayISO = new Date().toISOString().slice(0,10);
-  const answerKey = "dubi_training_answer_" + todayISO;
-  const [editing, setEditing] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
-
-  const raw = localStorage.getItem(answerKey);
-  const answer = (() => {
-    if (!raw) return null;
-    try { const p = JSON.parse(raw); return typeof p === "object" ? p : {time_slot: raw}; }
-    catch(e) { return {time_slot: raw}; }
-  })();
-
-  if (!answer || answer.time_slot === "skip" || !answer.time_slot) return null;
-
-  const slot = TRAINING_SLOTS.find(s => s.id === answer.time_slot);
-  const sports = normalizeSports(userData?.sports, userData?.sport);
-  const rawSport = answer.sport || sports[0] || "";
-  const sportName = rawSport.includes("+") ? (it ? "Piu sport" : "Multi-sport") : rawSport;
-  const sportLabel = sportName ? sportName.charAt(0).toUpperCase() + sportName.slice(1) : (it ? "Allenamento" : "Training");
-  const SPORT_ICONS = {gym:"🏋️",running:"🏃",cycling:"🚴",swimming:"🏊",crossfit:"💪",
-    yoga:"🧘",tennis:"🎾",football:"⚽",basketball:"🏀",boxing:"🥊",powerlifting:"🏋️",
-    padel:"🎾",climbing:"🧗",martial_arts:"🥋",volleyball:"🏐"};
-  const sportIcon = SPORT_ICONS[rawSport] || "⚡";
-
-  const changeSlot = async (newSlot) => {
-    if (busy) return;
-    setBusy(true);
-    const newAnswer = {...answer, time_slot: newSlot};
-    localStorage.setItem(answerKey, JSON.stringify(newAnswer));
-    try {
-      await fetch(API_BASE_URL + "/api/training/day/confirm", {
-        method: "POST",
-        headers: {"Content-Type":"application/json","Authorization":"Bearer " + getAuthToken()},
-        body: JSON.stringify({day: todayISO, answer:"yes", time_slot: newSlot, sport: rawSport})
-      });
-      if (setPlan) {
-        const result = await generateAiPlanFromBackend(userData, {force:true, reason:"training_time_updated"});
-        if (result?.plan) setPlan(result.plan);
-      }
-    } catch(e) {}
-    setBusy(false);
-    setEditing(false);
-  };
-
-  return (
-    <div style={{margin:"16px 16px 0"}}>
-      <div style={{padding:"12px 14px",borderRadius:14,background:T.accentD,
-        display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:20,flexShrink:0}}>{sportIcon}</span>
-        <div style={{flex:1}}>
-          <p style={{margin:0,fontSize:13,fontWeight:800,color:"#E8E4DC",
-            fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:"0.06em",textTransform:"uppercase"}}>
-            {sportLabel}
-          </p>
-          <p style={{margin:"1px 0 0",fontSize:11,color:"rgba(232,228,220,0.65)"}}>
-            {slot ? (it ? slot.it : slot.en) + " · " + (it ? slot.sub_it : slot.sub_en) : ""}
-          </p>
-        </div>
-        <button onClick={()=>setEditing(e=>!e)} disabled={busy}
-          style={{background:"rgba(232,228,220,0.15)",border:"none",borderRadius:8,
-            padding:"6px 10px",cursor:"pointer",fontSize:11,color:"rgba(232,228,220,0.8)",fontWeight:600}}>
-          {editing ? "✕" : (it ? "modifica" : "edit")}
-        </button>
-      </div>
-      {editing && (
-        <div style={{marginTop:6,padding:"10px",borderRadius:12,background:T.card,border:"1px solid " + T.border}}>
-          <p style={{margin:"0 0 8px",fontSize:11,color:T.muted,fontWeight:600,letterSpacing:"0.08em",textTransform:"uppercase"}}>
-            {it ? "Cambia fascia oraria" : "Change time slot"}
-          </p>
-          {TRAINING_SLOTS.map(ts => (
-            <button key={ts.id} onClick={()=>changeSlot(ts.id)} disabled={busy}
-              style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,cursor:"pointer",
-                border:"1.5px solid " + (ts.id===answer.time_slot?T.accentD:T.border),
-                background:ts.id===answer.time_slot?T.accentD:"transparent",opacity:busy?0.6:1}}>
-              <span style={{fontSize:13,fontWeight:700,color:ts.id===answer.time_slot?"#E8E4DC":T.text}}>
-                {it ? ts.it : ts.en}
-              </span>
-              <span style={{fontSize:11,color:ts.id===answer.time_slot?"rgba(232,228,220,0.7)":T.muted}}>
-                {it ? ts.sub_it : ts.sub_en}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 // Helper: chiave settimana (es. "2026-W33")
 function getWeekKey() {
   const d = new Date();
@@ -16881,125 +16807,6 @@ function getWeekKey() {
   const week = Math.ceil(((d-jan1)/86400000 + jan1.getDay()+1)/7);
   return `${d.getFullYear()}-W${week}`;
 }
-
-const MorningTrainingCard = ({userData, setPlan}) => {
-  const { lang } = useT();
-  const it = lang === "it";
-  const todayISO = new Date().toISOString().slice(0,10);
-  const answeredKey = "dubi_training_answer_" + todayISO;
-  const [hidden, setHidden] = React.useState(() => Boolean(localStorage.getItem(answeredKey)));
-  const [busy, setBusy] = React.useState(false);
-  const [chosenSport, setChosenSport] = React.useState(null);
-
-  // Chi si allena? workout_days dichiarato > 0
-  const workoutDaysRaw = String(userData?.workout_days ?? userData?.workoutDays ?? "0");
-  const trains = workoutDaysRaw !== "0" && workoutDaysRaw !== "";
-  const sports = normalizeSports(userData?.sports, userData?.sport);
-  const multiSport = sports.length > 1;
-  const [step, setStep] = React.useState(multiSport ? "ask_sport" : "ask_time");
-
-  // Mostra solo nei giorni dichiarati come allenamento (dal setup settimanale)
-  // Se il setup non è stato fatto → non mostrare (l'utente deve prima dichiarare i giorni)
-  const todayDow = new Date().getDay(); // 0=dom,1=lun,...,6=sab
-  const DOW_TO_KEY = ["sun","mon","tue","wed","thu","fri","sat"];
-  const todayKey2 = DOW_TO_KEY[todayDow];
-  const declaredDays = (() => {
-    try { return JSON.parse(localStorage.getItem("dubi_training_days_setup") || "[]"); } catch(e) { return []; }
-  })();
-  const isTrainingDay = declaredDays.includes(todayKey2);
-
-  if (!trains || hidden || !isTrainingDay) return null;
-
-  const sportLabel = (s) => {
-    try { const t2 = useT().t; const l = t2("sport."+s); return l && l !== "sport."+s ? l : s; } catch(e) { return s; }
-  };
-
-  const timeSlots = TRAINING_SLOTS;
-
-  const submit = async (timeSlot) => {
-    if (busy) return;
-    setBusy(true);
-    const sportToSend = multiSport ? chosenSport : (sports[0] || null);
-    try { localStorage.setItem(answeredKey, JSON.stringify({time_slot:timeSlot, sport:sportToSend})); } catch(e) {}
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/training/day/confirm`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${getAuthToken()}` },
-        body: JSON.stringify({ day: todayISO, answer:"yes", time_slot: timeSlot, sport: sportToSend })
-      });
-      if (res.ok) {
-        // rigenera il piano di oggi con pre/post posizionati
-        try {
-          const result = await generateAiPlanFromBackend(userData, {force:true, reason:"training_confirmed"});
-          if (result?.plan) setPlan(result.plan);
-        } catch(e) {}
-      }
-    } catch(e) {}
-    setBusy(false);
-    setHidden(true);
-  };
-
-  const wrap = (children) => (
-    <div style={{margin:"60px 16px 0",padding:"16px",borderRadius:16,background:T.card,border:"1.5px solid rgba(107,138,100,.55)",boxShadow:"0 2px 14px rgba(107,138,100,.16)"}}>
-      {children}
-    </div>
-  );
-
-  // Step 1 (solo multi-sport): quale sport oggi?
-  if (step === "ask_sport") {
-    return wrap(
-      <React.Fragment>
-        <p style={{margin:"0 0 4px",fontSize:13,fontWeight:800,color:T.text}}>
-          {it ? "Buongiorno! Quale sport oggi?" : "Good morning! Which sport today?"}
-        </p>
-        <p style={{margin:"0 0 12px",fontSize:12,color:T.muted}}>
-          {it ? "Così adatto i pasti pre e post allenamento." : "So I can tailor your pre/post-workout meals."}
-        </p>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {sports.map(s => (
-            <button key={s} onClick={()=>{setChosenSport(s); setStep("ask_time");}}
-              style={{flex:"1 1 45%",minWidth:120,padding:"11px",borderRadius:12,border:`1.5px solid ${T.border}`,background:T.card,color:T.text,fontSize:13,fontWeight:600,cursor:"pointer"}}>
-              {sportLabel(s)}
-            </button>
-          ))}
-          <button onClick={()=>{setChosenSport(sports.join("+")); setStep("ask_time");}}
-            style={{flex:"1 1 100%",padding:"11px",borderRadius:12,border:`1.5px solid ${T.accent}`,background:T.sel,color:T.accentD,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-            {it ? "Entrambi oggi" : "Both today"}
-          </button>
-        </div>
-      </React.Fragment>
-    );
-  }
-
-  // Step 2: a che ora?
-  return wrap(
-    <React.Fragment>
-      <p style={{margin:"0 0 4px",fontSize:13,fontWeight:800,color:T.text}}>
-        {it ? "A che ora ti alleni oggi?" : "What time do you train today?"}
-      </p>
-      <p style={{margin:"0 0 12px",fontSize:12,color:T.muted}}>
-        {busy ? (it ? "Adatto il piano di oggi…" : "Tailoring today's plan…")
-              : (multiSport && chosenSport
-                  ? (it ? `Sport: ${chosenSport === sports.join("+") ? "entrambi" : sportLabel(chosenSport)} — scegli la fascia oraria.` : `Sport: ${chosenSport === sports.join("+") ? "both" : sportLabel(chosenSport)} — pick a time.`)
-                  : (it ? "I pasti pre e post allenamento si posizionano di conseguenza." : "Pre/post-workout meals will be placed accordingly."))}
-      </p>
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {timeSlots.map(ts => (
-          <button key={ts.id} onClick={()=>submit(ts.id)} disabled={busy}
-            style={{width:"100%",padding:"12px 16px",borderRadius:12,
-              border:`1.5px solid ${T.border}`,background:T.card,
-              color:T.text,fontSize:13,fontWeight:600,cursor:busy?"default":"pointer",
-              opacity:busy?.6:1,textAlign:"left",display:"flex",
-              alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontWeight:700}}>{it ? ts.it : ts.en}</span>
-            <span style={{fontSize:11,color:T.muted}}>{it ? ts.sub_it : ts.sub_en}</span>
-          </button>
-        ))}
-      </div>
-    </React.Fragment>
-  );
-};
-
 
 //   'entrambi'/indifferente → chiede subito lo stile (dolce vs salata)
 //   'variabile'             → chiede PRIMA se oggi fa colazione, poi lo stile
