@@ -10,6 +10,7 @@ import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macro
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getExplicitWorkoutLabel, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
 import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
+import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -327,29 +328,35 @@ const BREAKFAST_APP_MAP = { sweet: "dolce", savory: "salata", both: "entrambi", 
 const toCanonicalBreakfast = (value) => canonicalFromMap(value, BREAKFAST_CANONICAL_MAP, "both");
 const toAppBreakfast = (value) => BREAKFAST_APP_MAP[toCanonicalBreakfast(value)] || "entrambi";
 
-const SPORT_KEYS = [
-  // endurance
-  "running","cycling","swimming","triathlon","rowing","kayak","nordic_ski",
-  // team sport
-  "football","basketball","volleyball","tennis","padel","rugby","hockey","handball","baseball","alpine_ski","surf","fencing",
-  // strength
-  "gym","crossfit","powerlifting","climbing","boxing","martial_arts","wrestling","judo","mma","gymnastics","sprint",
-  // low intensity
-  "yoga","pilates","golf","archery","equestrian","dance",
-  // other
-  "other"
-];
+const SPORT_KEYS = ["other", "martial_arts", "archery"];
+let SPORT_CATALOG = [];
+let SPORT_CATALOG_REQUEST = null;
+const loadSportCatalog = async () => {
+  if (SPORT_CATALOG.length) return SPORT_CATALOG;
+  if (!SPORT_CATALOG_REQUEST) SPORT_CATALOG_REQUEST = fetch(`${API_BASE_URL}/api/onboarding/sports`)
+    .then(response => response.ok ? response.json() : Promise.reject(new Error("sport_catalog_unavailable")))
+    .then(data => { SPORT_CATALOG = Array.isArray(data.sports) ? data.sports : []; return SPORT_CATALOG; })
+    .finally(() => { SPORT_CATALOG_REQUEST = null; });
+  return SPORT_CATALOG_REQUEST;
+};
+const knownSport = id => SPORT_KEYS.includes(id) || SPORT_CATALOG.some(sport => sport.sport_id === id);
+const useSportCatalog = () => {
+  const [catalog, setCatalog] = React.useState(SPORT_CATALOG);
+  React.useEffect(() => { loadSportCatalog().then(setCatalog).catch(() => {}); }, []);
+  return catalog;
+};
+const loggedSportMisses = new Set();
 const SPORT_CANONICAL_MAP = {
   // endurance
   corsa:"running", running:"running", run:"running", maratona:"running", marathon:"running", mezzofondo:"running",
-  ciclismo:"cycling", bici:"cycling", cycling:"cycling", bike:"cycling",
+  ciclismo:"cycling_road", bici:"cycling_road", cycling:"cycling_road", bike:"cycling_road",
   nuoto:"swimming", swimming:"swimming",
   triathlon:"triathlon",
   canottaggio:"rowing", rowing:"rowing",
-  canoa:"kayak", kayak:"kayak",
-  "sci di fondo":"nordic_ski", "nordic ski":"nordic_ski",
+  canoa:"canoe_kayak", kayak:"canoe_kayak",
+  "sci di fondo":"cross_country_ski", "nordic ski":"cross_country_ski",
   // team sport
-  calcio:"football", football:"football", soccer:"football",
+  calcio:"soccer", football:"soccer", soccer:"soccer",
   basket:"basketball", basketball:"basketball",
   pallavolo:"volleyball", volleyball:"volleyball",
   tennis:"tennis",
@@ -357,35 +364,37 @@ const SPORT_CANONICAL_MAP = {
   rugby:"rugby",
   hockey:"hockey",
   handball:"handball", pallamano:"handball",
-  baseball:"baseball",
+  baseball:"baseball_softball",
   "sci alpino":"alpine_ski", "alpine skiing":"alpine_ski", sci:"alpine_ski",
-  surf:"surf", kitesurf:"surf",
+  surf:"surfing", kitesurf:"windsurf_kitesurf",
   scherma:"fencing", fencing:"fencing",
   // strength
-  palestra:"gym", gym:"gym", "weight training":"gym", bodybuilding:"gym",
+  palestra:"resistance_training", gym:"resistance_training", "weight training":"resistance_training", bodybuilding:"bodybuilding",
   crossfit:"crossfit",
   powerlifting:"powerlifting",
   arrampicata:"climbing", climbing:"climbing", bouldering:"climbing",
   boxe:"boxing", boxing:"boxing", pugilato:"boxing",
-  "arti marziali":"martial_arts", karate:"martial_arts", taekwondo:"martial_arts", "martial arts":"martial_arts",
+  "arti marziali":"martial_arts", "martial arts":"martial_arts", karate:"karate", taekwondo:"taekwondo",
+  "jiu jitsu":"bjj", "brazilian jiu jitsu":"bjj", "muay thai":"muay_thai",
   lotta:"wrestling", wrestling:"wrestling",
   judo:"judo",
   mma:"mma",
   ginnastica:"gymnastics", gymnastics:"gymnastics", "ginnastica artistica":"gymnastics",
-  sprint:"sprint",
+  sprint:"sprint_track",
   // low intensity
   yoga:"yoga",
   pilates:"pilates",
   golf:"golf",
   "tiro con larco":"archery", "tiro con l arco":"archery", archery:"archery",
-  equitazione:"equestrian", "horse riding":"equestrian", equestrian:"equestrian",
+  equitazione:"horse_riding", "horse riding":"horse_riding", equestrian:"horse_riding",
   danza:"dance", dance:"dance", "danza classica":"dance", balletto:"dance", ballet:"dance",
   // other
   altro:"other", other:"other"
 };
 const toCanonicalSport = (value) => {
+  if (/^custom:[a-z0-9_:-]+$/i.test(String(value || "").trim())) return String(value).trim().toLowerCase();
   const normalized = canonicalFromMap(value, SPORT_CANONICAL_MAP, "");
-  return normalized || cleanCanonicalInput(value);
+  return canonicalSportCatalogId(normalized || cleanCanonicalInput(value));
 };
 const normalizeSports = (sports, legacySport = "") => {
   const values = Array.isArray(sports)
@@ -445,9 +454,10 @@ const formatAllergyList = (value, t) => {
   const items = parseCanonicalList(value);
   return items.length ? items.map(item => getAllergyLabel(item, t)).join(", ") : "—";
 };
-const getSportLabel = (value, t) => {
+const getSportLabel = (value, t, lang = "en") => {
   const key = toCanonicalSport(value);
-  return SPORT_KEYS.includes(key) ? t(`sport.${key}`) : (value || "—");
+  const found = SPORT_CATALOG.find(sport => sport.sport_id === key);
+  return found ? (lang === "it" ? found.name_it : found.name_en) : (SPORT_KEYS.includes(key) ? t(`sport.${key}`) : (value || "—"));
 };
 const formatSportList = (sports, legacySport, t) => {
   const values = normalizeSports(sports, legacySport);
@@ -455,13 +465,9 @@ const formatSportList = (sports, legacySport, t) => {
 };
 const getTrainingTimeLabelLocalized = (value, t) => t(`training.timing.${normalizeTrainingTime(value)}`);
 
-const SPORT_INTERNAL_GROUPS = {
-  running:"endurance_continuous", cycling:"endurance_continuous", swimming:"endurance_continuous", triathlon:"endurance_continuous", rowing:"endurance_continuous", kayak:"endurance_continuous", nordic_ski:"endurance_continuous",
-  football:"intermittent_mixed", basketball:"intermittent_mixed", volleyball:"intermittent_mixed", tennis:"intermittent_mixed", padel:"intermittent_mixed", rugby:"intermittent_mixed", hockey:"intermittent_mixed", handball:"intermittent_mixed", baseball:"intermittent_mixed", alpine_ski:"intermittent_mixed", surf:"intermittent_mixed", fencing:"intermittent_mixed",
-  gym:"strength_power", crossfit:"strength_power", powerlifting:"strength_power", climbing:"strength_power", boxing:"strength_power", martial_arts:"strength_power", wrestling:"strength_power", judo:"strength_power", mma:"strength_power", gymnastics:"strength_power", sprint:"strength_power",
-  yoga:"wellness_skill", pilates:"wellness_skill", golf:"wellness_skill", archery:"wellness_skill", equestrian:"wellness_skill", dance:"wellness_skill"
-};
-const WEIGHT_CLASS_SPORTS = new Set(["boxing","martial_arts","wrestling","judo","mma"]);
+const SPORT_INTERNAL_GROUPS = { martial_arts:"strength_power" };
+const sportInternalGroup = id => SPORT_CATALOG.find(sport => sport.sport_id === id)?.internal_group || SPORT_INTERNAL_GROUPS[id] || null;
+const WEIGHT_CLASS_SPORTS = new Set(["boxing","martial_arts","wrestling","judo","mma","muay_thai","karate","taekwondo","bjj","kickboxing"]);
 const durationToMinutes = (value) => {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
@@ -471,14 +477,16 @@ const durationToMinutes = (value) => {
   const number = Number(text.replace(/[^0-9.]/g, ""));
   return Number.isFinite(number) && number > 0 ? Math.round(number) : null;
 };
-const sportEntryForContract = (sportId, customName = "") => {
+const sportEntryForContract = (sportId, customName = "", details = {}) => {
   const id = toCanonicalSport(sportId || customName);
-  const isCustom = Boolean(id && !SPORT_KEYS.includes(id)) || id === "other";
+  const isCustom = id === "other" || id.startsWith("custom:") || (Boolean(customName) && !knownSport(id));
   return {
     sport_id: isCustom ? "custom" : id,
-    sport_name: isCustom ? (customName || sportId || "Custom sport") : id,
+    sport_name: isCustom ? (details.custom_name || customName || sportId || "Custom sport") : id,
     is_custom: isCustom,
-    custom_name: isCustom ? (customName || sportId || null) : null
+    custom_name: isCustom ? (details.custom_name || customName || sportId || null) : null,
+    ...(isCustom && details.custom_context ? {custom_context:details.custom_context} : {}),
+    ...(details.selection_method ? {selection_method:details.selection_method,searched_text:details.searched_text} : {})
   };
 };
 const getTrainingSessionsFromData = (data = {}) => normalizeTrainingSessions(
@@ -487,13 +495,14 @@ const getTrainingSessionsFromData = (data = {}) => normalizeTrainingSessions(
   ?? data.sportOnboardingContract?.training?.sessions
   ?? data.sport_onboarding_contract?.training?.sessions
   ?? []
-);
+).map(session=>({...session,sport_id:session.sport_id?toCanonicalSport(session.sport_id):session.sport_id}));
 const buildSportOnboardingContract = (data = {}) => {
   const sports = normalizeSports(data.sports, data.sport);
   const primaryId = sports[0] || "";
-  const primary = primaryId ? sportEntryForContract(primaryId, data.customSportName || data.custom_sport_name || "") : null;
-  const secondaries = sports.slice(1).map(id => sportEntryForContract(id));
-  const internalGroup = primary && !primary.is_custom ? SPORT_INTERNAL_GROUPS[primary.sport_id] || null : null;
+  const details = data.sportSelectionMetadata || data.sport_selection_metadata || {};
+  const primary = primaryId ? sportEntryForContract(primaryId, data.customSportName || data.custom_sport_name || "", details[primaryId] || {}) : null;
+  const secondaries = sports.slice(1).map(id => sportEntryForContract(id, "", details[id] || {}));
+  const internalGroup = primary && !primary.is_custom ? sportInternalGroup(primary.sport_id) : null;
   const semanticStatus = !primary ? "UNKNOWN" : primary.is_custom ? "SEMANTIC_MAPPING_REQUIRED" : internalGroup ? "APPROVED" : "UNKNOWN";
   const competitionParticipates = Boolean(data.competitionParticipates ?? data.competition_participates ?? data.goal === "competition");
   const weightClassApplicable = Boolean(primary && WEIGHT_CLASS_SPORTS.has(primary.sport_id));
@@ -573,8 +582,18 @@ const getPlanProfileSignature = (userData = {}) => {
   });
 };
 
-    const normalizeOnboarding = (data) => {
+const normalizeOnboarding = (data) => {
   if (!data) return null;
+
+  const sportContract = data.sport_onboarding_contract || data.sportOnboardingContract || {};
+  const sportSelectionMetadata = data.sportSelectionMetadata || data.sport_selection_metadata || Object.fromEntries(
+    [sportContract.sports?.primary, ...(sportContract.sports?.secondary || [])]
+      .filter(sport => sport?.sport_id && (sport.selection_method || sport.custom_context))
+      .map(sport => [toCanonicalSport(sport.sport_id), {
+        ...(sport.selection_method ? {selection_method:sport.selection_method,searched_text:sport.searched_text} : {}),
+        ...(sport.custom_context ? {custom_context:sport.custom_context,custom_name:sport.custom_name} : {})
+      }])
+  );
 
   const parseHour = (value, fallback) => {
     if (!value) return fallback;
@@ -592,6 +611,7 @@ const getPlanProfileSignature = (userData = {}) => {
     allergies: serializeCanonicalList(data.allergies),
     sports: normalizeSports(data.sports, data.sport),
     sport: normalizeSports(data.sports, data.sport)[0] || "",
+    sportSelectionMetadata,
 
     targetWeight: data.target_weight ?? data.targetWeight ?? null,
     targetBf: data.target_body_fat ?? data.targetBf ?? null,
@@ -14564,6 +14584,7 @@ const RejectionScreen = ({ onBack }) => {
         }
 
         try {
+          await loadSportCatalog().catch(() => {});
           const onboardingResponse = await fetch(`${API_BASE_URL}/api/onboarding/me`, {
             method: "GET",
             headers: { "Authorization": `Bearer ${data.token}` }
@@ -15147,6 +15168,51 @@ const AllergyChipPicker = ({ value, onChange, compact = false }) => {
   );
 };
 
+const SportSearchPicker = ({ value, legacyValue = "", selectionMetadata = {}, onChange }) => {
+  const {lang,t}=useT();
+  const catalog=useSportCatalog();
+  const selected=normalizeSports(value,legacyValue);
+  const [query,setQuery]=useState("");
+  const [customMode,setCustomMode]=useState(false);
+  const [answers,setAnswers]=useState({movement_type:"",usual_duration:"",intensity:"",session_role:""});
+  const matches=searchSports(catalog,query,lang);
+  const result=query.trim()?classifySportSearch(catalog,query):null;
+  const suggestion=result?.kind==="unmatched"?result.suggestion:null;
+  const labels=lang==="it"?["Tipo di movimento","Durata abituale","Intensità","Ruolo della sessione"]:["Movement type","Usual duration","Intensity","Session role"];
+  const keys=["movement_type","usual_duration","intensity","session_role"];
+  const inputStyle={width:"100%",boxSizing:"border-box",padding:11,borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:13};
+  useEffect(()=>{setCustomMode(false);},[query]);
+  useEffect(()=>{
+    const normalized=normalizeSportSearch(query);if(normalized.length<2||matches.length)return undefined;
+    const day=new Date().toISOString().slice(0,10),key=`${normalized}|${day}`;
+    const timer=window.setTimeout(()=>{
+      if(loggedSportMisses.has(key)||!getAuthToken())return;
+      loggedSportMisses.add(key);
+      fetch(`${API_BASE_URL}/api/onboarding/sport-search-miss`,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${getAuthToken()}`},body:JSON.stringify({searched_text:query.trim().slice(0,100),search_date:day})}).catch(()=>{});
+    },450);return()=>window.clearTimeout(timer);
+  },[query,matches.length]);
+  const add=(id,metadata={})=>{if(selected.includes(id)||selected.length>=5)return;onChange([...selected,id],metadata);setQuery("");};
+  const customSave=()=>{
+    if(keys.some(key=>!answers[key].trim()))return;
+    const name=query.trim(),id=`custom:${normalizeSportSearch(name).replace(/\s+/g,"_").slice(0,48)||"unspecified"}`;
+    add(id,{[id]:{custom_name:name,custom_context:answers,selection_method:"CUSTOM_MAPPING_REQUIRED"}});
+    setAnswers({movement_type:"",usual_duration:"",intensity:"",session_role:""});setCustomMode(false);
+  };
+  return <div>
+    <input aria-label={lang==="it"?"Cerca uno sport":"Search sports"} value={query} onChange={event=>setQuery(event.target.value)} placeholder={lang==="it"?"Cerca in italiano o inglese":"Search in Italian or English"} style={inputStyle}/>
+    {!query.trim()&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>{POPULAR_SPORT_IDS.map(id=>{const sport=catalog.find(row=>row.sport_id===id);return sport&&<button type="button" key={id} onClick={()=>add(id)} style={{padding:"7px 10px",borderRadius:999,border:`1px solid ${selected.includes(id)?T.accent:T.border}`,background:selected.includes(id)?T.sel:T.card,color:T.text,fontSize:11,fontWeight:800}}>{lang==="it"?sport.name_it:sport.name_en}</button>;})}</div>}
+    {query.trim()&&matches.length>0&&<div role="listbox" style={{maxHeight:190,overflowY:"auto",marginTop:6,border:`1px solid ${T.border}`,borderRadius:12,background:T.card}}>{matches.slice(0,8).map(sport=><button type="button" role="option" key={sport.sport_id} onClick={()=>add(sport.sport_id)} style={{display:"block",width:"100%",padding:10,border:0,borderBottom:`1px solid ${T.border}`,background:selected.includes(sport.sport_id)?T.sel:"transparent",color:T.text,textAlign:"left",fontSize:12}}>{lang==="it"?sport.name_it:sport.name_en}</button>)}</div>}
+    {query.trim()&&!matches.length&&suggestion&&!customMode&&<div style={{marginTop:10,padding:12,borderRadius:12,background:T.sel,border:`1px solid ${T.border}`}}>
+      <p style={{margin:"0 0 9px",fontSize:12,color:T.text}}>{lang==="it"?`Non ho «${query}» in lista. Il più simile è ${suggestion.name_it}: va bene?`:`I don't have “${query}” in the list. The closest match is ${suggestion.name_en}. Is that right?`}</p>
+      <div style={{display:"flex",gap:8}}><button type="button" onClick={()=>add(suggestion.sport_id,{[suggestion.sport_id]:{selection_method:"USER_CONFIRMED_SUGGESTION",searched_text:query.trim()}})}>{lang==="it"?"Sì":"Yes"}</button><button type="button" onClick={()=>setCustomMode(true)}>{lang==="it"?"No, scelgo io":"No, describe mine"}</button></div>
+    </div>}
+    {query.trim()&&!matches.length&&!suggestion&&!customMode&&<button type="button" onClick={()=>setCustomMode(true)} style={{marginTop:9}}>{lang==="it"?"Non è questo: descrivi il tuo sport":"No match: describe your sport"}</button>}
+    {customMode&&<div style={{display:"grid",gap:7,marginTop:10}}><p style={{fontSize:11,color:T.muted,margin:0}}>{lang==="it"?"La mappatura resta in attesa di valutazione; non vengono dedotte calorie.":"Mapping remains pending review; no calories are inferred."}</p>{keys.map((key,index)=><input key={key} aria-label={labels[index]} placeholder={labels[index]} value={answers[key]} onChange={event=>setAnswers(prev=>({...prev,[key]:event.target.value}))} style={inputStyle}/>)}<button type="button" disabled={keys.some(key=>!answers[key].trim())} onClick={customSave}>{lang==="it"?"Salva sport da valutare":"Save for review"}</button></div>}
+    {selected.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:9}}>{selected.map(id=><button type="button" key={id} onClick={()=>onChange(selected.filter(item=>item!==id))} style={{padding:"6px 9px",borderRadius:999,border:`1px solid ${T.border}`,background:T.sel,color:T.text,fontSize:11}}>{selectionMetadata[id]?.custom_name||catalog.find(item=>item.sport_id===id)?.[lang==="it"?"name_it":"name_en"]||(id.startsWith("custom:")?id.slice(7).replace(/_/g," "):getSportLabel(id,t,lang))} ×</button>)}</div>}
+    <p style={{margin:"9px 2px 0",fontSize:11,fontWeight:800,color:T.accentD}}>{selected.length} / 5 {lang==="it"?"selezionati":"selected"}</p>
+  </div>;
+};
+
 const SportChipPicker = ({ value, legacyValue = "", onChange, compact = false }) => {
   const { t, lang } = useT();
   const [custom, setCustom] = React.useState("");
@@ -15280,8 +15346,9 @@ const WORKOUT_WEEK_DAYS = [
 
 const WorkoutScheduleEditor = ({ sessions = [], sports = [], legacySport = "", onChange, compact = false }) => {
   const { lang, t } = useT();
+  const catalog = useSportCatalog();
   const normalized = normalizeTrainingSessions(sessions);
-  const sportOptions = normalizeSports(sports, legacySport);
+  const sportOptions = [...new Set([...normalizeSports(sports, legacySport), ...catalog.map(item => item.sport_id)])];
   const update = (session) => onChange?.(upsertTrainingSession(normalized, session));
   const addSession = (day) => {
     const daySessions = normalized.filter(session => session.day_of_week === day);
@@ -15330,7 +15397,7 @@ const WorkoutScheduleEditor = ({ sessions = [], sports = [], legacySport = "", o
                 onChange={event=>update({...session,sport_id:event.target.value})}
                 style={{minWidth:0,padding:"10px 8px",borderRadius:10,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:11}}>
                 <option value="">{lang === "it" ? "Sport" : "Sport"}</option>
-                {sportOptions.map(sport => <option key={sport} value={sport}>{getSportLabel(sport,t)}</option>)}
+                {sportOptions.map(sport => <option key={sport} value={sport}>{getSportLabel(sport,t,lang)}</option>)}
               </select>
               <input aria-label={`Ora ${session.day_of_week}-${session.session_index}`} type="time" value={session.start_time || ""}
                 onChange={event=>update({...session,start_time:event.target.value})}
@@ -15372,6 +15439,37 @@ const hasStoredConsumptionForDate = (userData, isoDate) => {
   return false;
 };
 
+const LegacyMartialArtsPrompt = ({userData,setUserData}) => {
+  const {lang}=useT();
+  const catalog=useSportCatalog();
+  const userKey=userData?.dubiCode||userData?.email||getAuthEmail()||"account";
+  const storageKey=`dubi_martial_arts_prompt_seen_${userKey}`;
+  const sports=normalizeSports(userData?.sports,userData?.sport);
+  const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(storageKey)==="1";}catch(_){return false;}});
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState("");
+  useEffect(()=>{try{setDismissed(localStorage.getItem(storageKey)==="1");}catch(_){}},[storageKey]);
+  if(dismissed||!sports.includes("martial_arts"))return null;
+  const disciplines=["boxing","mma","judo","wrestling","muay_thai","karate","taekwondo","bjj"];
+  const finish=()=>{try{localStorage.setItem(storageKey,"1");}catch(_){}setDismissed(true);};
+  const choose=async id=>{
+    const nextSports=sports.map(sport=>sport==="martial_arts"?id:sport);
+    const updated={...userData,sports:nextSports,sport:nextSports[0]||""};
+    setBusy(true);setMessage("");
+    const saved=await saveOnboardingToBackend(updated);
+    setBusy(false);
+    if(saved?.error){setMessage(lang==="it"?"Non sono riuscito a salvare la scelta. Il profilo attuale continua a funzionare.":"Could not save your choice. Your current profile remains active.");return;}
+    setUserData(updated);saveDubiProfile(updated);finish();
+  };
+  return <div data-testid="legacy-martial-arts-prompt" style={{margin:"0 0 14px",padding:14,borderRadius:14,border:`1px solid ${T.border}`,background:T.card}}>
+    <strong style={{fontSize:13,color:T.text}}>{lang==="it"?"Specifica il tuo sport":"Specify your sport"}</strong>
+    <p style={{fontSize:11,color:T.muted,lineHeight:1.45}}>{lang==="it"?"Il tuo profilo esistente continua a funzionare. Se vuoi, scegli la disciplina più precisa.":"Your existing profile keeps working. Choose a more specific discipline if you like."}</p>
+    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{disciplines.map(id=>{const sport=catalog.find(row=>row.sport_id===id);return <button key={id} type="button" disabled={busy} onClick={()=>choose(id)} style={{padding:"7px 9px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontSize:11}}>{sport?(lang==="it"?sport.name_it:sport.name_en):id}</button>;})}</div>
+    <button type="button" onClick={finish} disabled={busy} style={{marginTop:9,border:0,background:"transparent",color:T.muted,fontSize:11}}>{lang==="it"?"Più tardi":"Later"}</button>
+    {message&&<p role="alert" style={{fontSize:11,color:"#9A3D32"}}>{message}</p>}
+  </div>;
+};
+
 const readDateCompletionState = (canonicalKey) => {
   if (typeof localStorage === "undefined") return {};
   try {
@@ -15396,7 +15494,7 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
   const sessions = getTrainingSessionsFromData(userData);
   const todayDay = ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
   const sportIds = normalizeSports(userData?.sports, userData?.sport);
-  const sportLabels = Object.fromEntries(sportIds.map(sport => [sport, getSportLabel(sport,t)]));
+  const sportLabels = Object.fromEntries(sportIds.map(sport => [sport, getSportLabel(sport,t,lang)]));
   const overrideStorageKey = `dubi_today_training_override_${userData?.dubiCode || getAuthEmail() || "guest"}_${todayIso}`;
   const planOverride = plan?.ingredientPlan?.daily_training_override || plan?.daily_training_override || null;
   const planConfirmationStatus = plan?.ingredientPlan?.training_confirmation_status || plan?.training_confirmation_status || "unconfirmed";
@@ -15657,12 +15755,14 @@ const PreferencesStep = ({d, u, page}) => {
 
       {/* Sport */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.sport")}</p>
-      <SportChipPicker
+      <SportSearchPicker
         value={d.sports}
         legacyValue={d.sport}
-        onChange={sports=>{
+        selectionMetadata={d.sportSelectionMetadata||{}}
+        onChange={(sports,metadata)=>{
           u("sports", sports);
           u("sport", sports[0] || "");
+          if(metadata)u("sportSelectionMetadata",{...(d.sportSelectionMetadata||{}),...metadata});
         }}
       />
 
@@ -17561,6 +17661,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
       <TodayWorkoutCard userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan}/>
+      <LegacyMartialArtsPrompt userData={userData} setUserData={setUserData}/>
 
       {/* ── Card mattutine con filtro temporale ──
           Allenamento: solo fino alle 21:30 | Colazione: solo fino a dayStart+3.5h ── */}
@@ -21414,12 +21515,14 @@ const requestDeletionOtp = async () => {
               onChange={value=>{handleProfileFieldChange(selectedProfileDef.key,value);setConfirmProfileSave(false);}}
             />
           ) : selectedProfileDef.type==="sport_chips" ? (
-            <SportChipPicker
+            <SportSearchPicker
               compact
               value={profileForm[selectedProfileDef.key]}
               legacyValue={profileForm.sport}
-              onChange={value=>{
+              selectionMetadata={profileForm.sportSelectionMetadata||{}}
+              onChange={(value,metadata)=>{
                 setProfileForm(prev=>({...prev,[selectedProfileDef.key]:value,sport:value[0] || ""}));
+                if(metadata)setProfileForm(prev=>({...prev,sportSelectionMetadata:{...(prev.sportSelectionMetadata||{}),...metadata}}));
                 setProfileMessage("");
                 setConfirmProfileSave(false);
               }}
@@ -22898,6 +23001,7 @@ function DUBIApp() {
     }
 
     try {
+      await loadSportCatalog().catch(() => {});
       const currentUser = await getCurrentUserFromBackend(token);
       const currentConsentStatus = currentUser?.parental_consent_status || currentUser?.parentalConsentStatus || "not_required";
       if (currentConsentStatus === "pending" || currentConsentStatus === "expired" || currentConsentStatus === "denied") {

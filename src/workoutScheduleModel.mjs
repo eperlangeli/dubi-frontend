@@ -1,3 +1,5 @@
+import { canonicalSportId } from "./sportSearchModel.mjs";
+
 const DAY_MIN = 1;
 const DAY_MAX = 7;
 
@@ -31,7 +33,7 @@ export const normalizeTrainingSessions = (value = []) => {
   const normalized = (Array.isArray(value) ? value : [])
     .map((session) => ({
       day_of_week: asDay(session?.day_of_week ?? session?.dayOfWeek),
-      sport_id: String(session?.sport_id ?? session?.sportId ?? '').trim(),
+      sport_id: canonicalSportId(session?.sport_id ?? session?.sportId ?? ''),
       start_time: normalizeWorkoutStartTime(session?.start_time ?? session?.startTime),
       duration_min: normalizeWorkoutDuration(session?.duration_min ?? session?.duration_minutes ?? session?.durationMinutes),
       session_index: Number(session?.session_index ?? session?.sessionIndex) || 1,
