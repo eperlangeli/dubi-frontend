@@ -11,6 +11,7 @@ import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoadi
 import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
 import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
 import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
+import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -264,7 +265,7 @@ const GOAL_APP_MAP = {
   definition: "definition",
 };
 const toCanonicalGoal = (value) => canonicalFromMap(value, GOAL_CANONICAL_MAP, "maintenance");
-const toAppGoal = (value) => GOAL_APP_MAP[toCanonicalGoal(value)] || value || "maintain";
+const toAppGoal = (value) => GOAL_APP_MAP[toCanonicalGoal(normalizeLegacyGoal(value))] || "maintain";
 
 const DIET_CANONICAL_MAP = {
   onnivoro: "omnivore",
@@ -504,7 +505,6 @@ const buildSportOnboardingContract = (data = {}) => {
   const secondaries = sports.slice(1).map(id => sportEntryForContract(id, "", details[id] || {}));
   const internalGroup = primary && !primary.is_custom ? sportInternalGroup(primary.sport_id) : null;
   const semanticStatus = !primary ? "UNKNOWN" : primary.is_custom ? "SEMANTIC_MAPPING_REQUIRED" : internalGroup ? "APPROVED" : "UNKNOWN";
-  const competitionParticipates = Boolean(data.competitionParticipates ?? data.competition_participates ?? data.goal === "competition");
   const weightClassApplicable = Boolean(primary && WEIGHT_CLASS_SPORTS.has(primary.sport_id));
   return {
     contract_version: "nutrition_engine_onboarding_contract_v1",
@@ -516,9 +516,9 @@ const buildSportOnboardingContract = (data = {}) => {
       double_sessions: Boolean(data.doubleSessions ?? data.double_sessions ?? false)
     },
     competition: {
-      participates: competitionParticipates,
-      competition_date: data.competitionDate ?? data.competition_date ?? null,
-      competition_name: data.competitionName ?? data.competition_name ?? null
+      participates: false,
+      competition_date: null,
+      competition_name: null
     },
     weight_class: {
       applicable: weightClassApplicable,
@@ -565,8 +565,6 @@ const getPlanProfileSignature = (userData = {}) => {
     gender: String(userData.gender || ""),
     age: Number(userData.age || 0),
     height: Number(userData.height || 0),
-    occupation: String(userData.occupation || ""),
-    daily_steps: String(userData.daily_steps ?? userData.dailySteps ?? ""),
     weight: Number(userData.weight || 0),
     diet: String(userData.diet || ""),
     allergies: String(userData.allergies || "").trim().toLowerCase(),
@@ -616,18 +614,11 @@ const normalizeOnboarding = (data) => {
     targetWeight: data.target_weight ?? data.targetWeight ?? null,
     targetBf: data.target_body_fat ?? data.targetBf ?? null,
 
-    competitionSport: data.competition_sport ?? data.competitionSport ?? null,
-    competitionDate: data.competition_date ?? data.competitionDate ?? null,
-
     workoutDays: data.workout_days != null ? String(data.workout_days) : (data.workoutDays || "0"),
     workoutDuration: data.workout_duration ?? data.workoutDuration ?? "45-60",
     workoutIntensity: toAppIntensity(data.workout_intensity ?? data.workoutIntensity ?? "moderata"),
     trainingSessions: getTrainingSessionsFromData(data),
     doubleSessions: Boolean(data.double_sessions ?? data.doubleSessions ?? false),
-    dailySteps: data.daily_steps ?? data.dailySteps ?? "unknown",
-    sedentaryDays: data.sedentary_days ?? data.sedentaryDays ?? 0,
-    dietIntensity: data.diet_intensity ?? data.dietIntensity ?? "balanced",
-
     trainingTime: normalizeTrainingTime(data.training_time ?? data.trainingTime ?? "varies"),
     breakfastPref: toAppBreakfast(data.breakfast_pref ?? data.breakfastPref ?? "both"),
 
@@ -999,18 +990,11 @@ const saveOnboardingToBackend = async (data) => {
     target_weight: data.targetWeight ? Number(data.targetWeight) : null,
     target_body_fat: data.targetBf ? Number(data.targetBf) : null,
 
-    competition_sport: data.competitionSport || null,
-    competition_date: data.competitionDate || null,
-
-    occupation: data.occupation,
     workout_days: parseInt(String(data.workoutDays).split("-")[0], 10),
     workout_duration: data.workoutDuration,
     workout_intensity: canonicalData.workoutIntensity,
-    daily_steps: data.dailySteps,
-    sedentary_days: parseInt(String(data.sedentaryDays).split("-")[0], 10),
 
     diet: canonicalData.diet,
-    diet_intensity: data.dietIntensity || "balanced",
     allergies: canonicalData.allergies || "",
     sport: canonicalData.sport || "",
     sports: canonicalData.sports,
@@ -3371,18 +3355,18 @@ const TRANSLATIONS = {
 
     // Activity
     "act.intro": "Il livello di attività non dipende solo dal lavoro — una persona sedentaria che si allena regolarmente ha un fabbisogno diverso. DUBI valuta più variabili.",
-    "act.q1": "1. DURANTE LA GIORNATA, COSA FAI?",
-    "act.q2": "2. QUANTI GIORNI A SETTIMANA TI ALLENI?",
-    "act.q3": "3. DURATA MEDIA ALLENAMENTO",
-    "act.q4": "4. INTENSITÀ MEDIA",
-    "act.q5": "5. PASSI MEDI GIORNALIERI",
-    "act.q6": "6. GIORNI REALMENTE SEDENTARI A SETTIMANA",
-    "act.occ.sedentary": "Seduto quasi tutto il giorno",
-    "act.occ.sedentary.note": "Ufficio, studio, guida",
-    "act.occ.mixed": "Alterno seduto e in piedi",
-    "act.occ.walking": "Cammino spesso durante la giornata",
-    "act.occ.active": "Lavoro fisicamente attivo",
-    "act.occ.heavy": "Lavoro manuale intenso / pesante",
+
+    "act.q2": "QUANTI GIORNI A SETTIMANA TI ALLENI?",
+    "act.q3": "DURATA MEDIA ALLENAMENTO",
+    "act.q4": "INTENSITÀ MEDIA",
+
+
+
+
+
+
+
+
     "act.dur.short": "Meno di 30 min",
     "act.dur.mid1": "30–45 min",
     "act.dur.mid2": "45–60 min",
@@ -3394,7 +3378,7 @@ const TRANSLATIONS = {
     "act.int.moderate.note": "Palestra, corsa leggera, fitness",
     "act.int.high": "Alta",
     "act.int.high.note": "HIIT, corsa intensa, sport competitivi",
-    "act.steps.unknown": "Non lo so",
+
 
     // Preferences
     "pref.diet": "STILE ALIMENTARE",
@@ -3621,8 +3605,8 @@ const TRANSLATIONS = {
     "today.askDubi":"Chiedi a DUBI","today.askDubi.sub":"Domande su dieta, allenamento o adattamenti",
     "today.preWorkout":"PRE-WORKOUT","today.postWorkout":"POST-WORKOUT","today.target":"Target {pct}",
 
-    "goal.competition.t":"Preparazione Gara","goal.competition.d":"Piano agonistico specifico per il tuo sport",
-    "goal.competition.badge":"AGONISMO","goal.competition.lock":"Incluso nella beta gratuita",
+
+
     "goal.target.section":"OBIETTIVO","goal.target.optional":"— opzionale",
     "goal.target.weight":"Peso target","goal.target.bmiAt":"BMI stimato al target:",
     "goal.target.bf":"% Grasso Corporeo target",
@@ -3646,7 +3630,7 @@ const TRANSLATIONS = {
     "src.header":"METODO DUBI","src.title.full":"Fonti scientifiche",
     "src.subtitle.full":"Ogni raccomandazione si fonda su evidenze peer-reviewed e linee guida internazionali.",
     "src.kpi.studies":"studi","src.kpi.bodies":"enti","src.kpi.sport":"sport",
-    "src.tab.principles":"Principi","src.tab.bodies":"Enti","src.tab.studies":"Studi","src.tab.competition":"Agonismo",
+    "src.tab.principles":"Principi","src.tab.bodies":"Enti","src.tab.studies":"Studi",
     "src.principle.quality.t":"Qualità prima della quantità","src.principle.quality.d":"Alimenti integrali, minimamente processati, densità nutrizionale alta.",
     "src.principle.energy.t":"Bilancio energetico intelligente","src.principle.energy.d":"Le calorie contano, ma non sono tutto. Il contesto metabolico è decisivo.",
     "src.principle.adherence.t":"Aderenza > perfezione","src.principle.adherence.d":"Il piano migliore è quello che riesci a seguire a lungo.",
@@ -3672,7 +3656,7 @@ const TRANSLATIONS = {
     "weekly.bf.sweet":"Dolce","weekly.bf.salty":"Salata",
     "today.subtitle.welcome":"Benvenuto nel tuo piano · {n} pasti",
     "prog.trend.onTrack.plain":"In linea con l'obiettivo","prog.trend.slowing.plain":"Plateau rilevato","prog.trend.notYet.plain":"In fase iniziale",
-    "prog.weight.trendN":"TREND {n} SETTIMANE","prog.water.unit":"L/giorno","goal.race.weeksLeft":"{n} SETTIMANE ALLA GARA",
+    "prog.weight.trendN":"TREND {n} SETTIMANE","prog.water.unit":"L/giorno",
     "today.badge.added":"AGGIUNTO DA DUBI","today.badge.removed":"RIMOSSO DA DUBI",
     "wrap.title":"DUBI WRAP","wrap.meals":"pasti completati","wrap.days":"giorni di costanza","wrap.steps":"passi totali",
     "wrap.medal.t":"87% di aderenza al piano","wrap.medal.s":"Tra i risultati più alti monitorati da DUBI",
@@ -3686,14 +3670,14 @@ const TRANSLATIONS = {
     "comp.sport.aesthetic.t":"Estetica / Body","comp.sport.aesthetic.d":"Bodybuilding · Fitness · Physique · Bikini",
     "comp.sport.team.t":"Sport di Squadra","comp.sport.team.d":"Calcio · Basketball · Pallavolo · Hockey",
     "comp.sport.combat.t":"Sport da Combattimento","comp.sport.combat.d":"Boxe · MMA · Judo · Wrestling · Karate",
-    "goal.step.sport.header":"SELEZIONA IL TUO SPORT AGONISTICO","goal.step.race.header":"DATA DELLA GARA / COMPETIZIONE",
-    "goal.step.race.nodate":"Inserisci la data per ricevere un piano periodizzato preciso al giorno",
-    "race.phase.past":"Gara passata","race.phase.past.note":"Imposta una data futura per il piano.",
-    "race.phase.base":"Fase Base","race.phase.base.note":"{weeks} settimane alla gara. Costruzione aerobica/di forza con lieve surplus.",
-    "race.phase.develop":"Fase Sviluppo","race.phase.develop.note":"{weeks} sett. Volume alto, carboidrati elevati, proteine alte.",
-    "race.phase.peak":"Fase Peaking","race.phase.peak.note":"{weeks} sett. Riduzione graduale, affinamento composizione.",
-    "race.phase.taper":"Tapering","race.phase.taper.note":"{weeks} sett. Riduzione volume, carb loading pre-gara.",
-    "race.phase.raceweek":"Race Week","race.phase.raceweek.note":"Settimana della gara. Carb loading, idratazione massima.",
+
+
+
+
+
+
+
+
     "partner.modal.title":"Collega Profilo Partner","partner.modal.sub":"La spesa si calcola su entrambi i piani reali",
     "partner.mycode.label":"IL TUO CODICE DUBI","partner.mycode.copy":"Copia",
     "partner.mycode.note":"Condividi questo codice con il tuo partner. Lui/lei dovrà aprire DUBI sullo stesso dispositivo, completare il suo profilo, e poi inserire qui il tuo codice.",
@@ -3724,7 +3708,7 @@ const TRANSLATIONS = {
     "safety.cta.proceed":"Procedi con \"{goal}\"","safety.cta.choose":"Scegli un obiettivo per continuare →",
     "safety.cta.ok":"Ok, procediamo insieme","safety.cta.edit":"Modifica i miei dati",
     "goal.labels.fatLoss":"Fat Loss","goal.labels.definition":"Definizione","goal.labels.gain":"Massa Muscolare",
-    "goal.labels.maintain":"Mantenimento","goal.labels.competition":"Agonismo",
+    "goal.labels.maintain":"Mantenimento",
     "load.preparing":"Preparazione del piano",
     "ingr.in.plan":"INGREDIENTE NEL TUO PIANO",
     "ingr.macros":"VALORI NUTRIZIONALI",
@@ -3775,7 +3759,7 @@ const TRANSLATIONS = {
     "src.stat.orgs":"enti",
     "src.stat.sports":"sport",
     "src.philosophy.label":"FILOSOFIA DUBI",
-    "src.fonti.gara":"FONTI PREPARAZIONE GARA",
+
     "prog.wrap.title":"Il tuo mese in review",
     "prog.wrap.body":"Grafici animati, traguardi raggiunti e motivazione — condivisibile sui social.",
     "prog.wrap.open":"Apri il tuo WRAP",
@@ -3809,14 +3793,14 @@ TRANSLATIONS.en = {
   "goal.gain.t":"Muscle Mass","goal.gain.d":"Targeted surplus for strength and volume",
   "goal.definition.t":"Definition","goal.definition.d":"Recomposition with light deficit",
   "act.intro":"Activity level isn't only about your job — a sedentary person who trains regularly has different needs. DUBI evaluates several variables.",
-  "act.q1":"1. WHAT DO YOU DO DURING THE DAY?","act.q2":"2. HOW MANY DAYS A WEEK DO YOU TRAIN?","act.q3":"3. AVERAGE WORKOUT DURATION","act.q4":"4. AVERAGE INTENSITY","act.q5":"5. AVERAGE DAILY STEPS","act.q6":"6. TRULY SEDENTARY DAYS PER WEEK",
-  "act.occ.sedentary":"Sitting almost all day","act.occ.sedentary.note":"Office, study, driving",
-  "act.occ.mixed":"I alternate sitting and standing","act.occ.walking":"I walk often during the day","act.occ.active":"Physically active job","act.occ.heavy":"Intense / heavy manual work",
+  "act.q2":"HOW MANY DAYS A WEEK DO YOU TRAIN?","act.q3":"AVERAGE WORKOUT DURATION","act.q4":"AVERAGE INTENSITY",
+
+
   "act.dur.short":"Less than 30 min","act.dur.mid1":"30–45 min","act.dur.mid2":"45–60 min","act.dur.long":"60–90 min","act.dur.xlong":"More than 90 min",
   "act.int.light":"Light","act.int.light.note":"Walking, stretching, light yoga",
   "act.int.moderate":"Moderate","act.int.moderate.note":"Gym, light running, fitness",
   "act.int.high":"High","act.int.high.note":"HIIT, intense running, competitive sports",
-  "act.steps.unknown":"I don't know",
+
   "pref.diet":"DIET STYLE","pref.diet.omni":"Omnivore","pref.diet.omni.d":"Meat, fish, dairy, eggs",
   "pref.diet.veg":"Vegetarian","pref.diet.veg.d":"Dairy and eggs, no meat or fish",
   "pref.diet.pesc":"Pescatarian","pref.diet.pesc.d":"Fish, eggs and dairy, no meat",
@@ -3909,8 +3893,8 @@ TRANSLATIONS.en = {
   "today.askDubi":"Ask DUBI","today.askDubi.sub":"Questions about diet, training or adaptations",
   "today.preWorkout":"PRE-WORKOUT","today.postWorkout":"POST-WORKOUT","today.target":"Target {pct}",
 
-  "goal.competition.t":"Competition Prep","goal.competition.d":"Sport-specific competition plan",
-  "goal.competition.badge":"COMPETITION","goal.competition.lock":"Included in the free beta",
+
+
   "goal.target.section":"GOAL","goal.target.optional":"— optional",
   "goal.target.weight":"Target weight","goal.target.bmiAt":"Estimated BMI at target:",
   "goal.target.bf":"Target body fat %",
@@ -3934,7 +3918,7 @@ TRANSLATIONS.en = {
   "src.header":"DUBI METHOD","src.title.full":"Scientific sources",
   "src.subtitle.full":"Every recommendation is grounded in peer-reviewed evidence and international guidelines.",
   "src.kpi.studies":"studies","src.kpi.bodies":"bodies","src.kpi.sport":"sport",
-  "src.tab.principles":"Principles","src.tab.bodies":"Bodies","src.tab.studies":"Studies","src.tab.competition":"Competition",
+  "src.tab.principles":"Principles","src.tab.bodies":"Bodies","src.tab.studies":"Studies",
   "src.principle.quality.t":"Quality over quantity","src.principle.quality.d":"Whole, minimally processed foods, high nutrient density.",
   "src.principle.energy.t":"Smart energy balance","src.principle.energy.d":"Calories count, but they aren't everything. Metabolic context is decisive.",
   "src.principle.adherence.t":"Adherence > perfection","src.principle.adherence.d":"The best plan is the one you can follow long-term.",
@@ -3958,11 +3942,11 @@ TRANSLATIONS.en = {
   "today.subtitle.welcome":"Welcome to your plan · {n} meals",
 
   "safety.why.notFit":"WHY YOUR GOAL ISN'T A FIT","safety.choose.goal":"CHOOSE YOUR GOAL",
-  "prog.weekly.compare":"CURRENT vs PREVIOUS WEEK","src.competition.intro":"5 competition-specific sources — <strong>4 new</strong> added with the Competition goal, 1 already in the app.",
+  "prog.weekly.compare":"CURRENT vs PREVIOUS WEEK",
   "shop.partner.note":"Quantities calculated from both profiles' real plans. Items exclusive to one plan show the owner's code.",
   "safety.actionRequired":"Action required","safety.actionRequired.sub":"Pick one of the goals below to unlock your plan.","safety.recommended":"RECOMMENDED",
   "prog.trend.onTrack.plain":"On track","prog.trend.slowing.plain":"Plateau detected","prog.trend.notYet.plain":"Initial phase",
-  "prog.weight.trendN":"{n}-WEEK TREND","prog.water.unit":"L/day","goal.race.weeksLeft":"{n} WEEKS TO RACE",
+  "prog.weight.trendN":"{n}-WEEK TREND","prog.water.unit":"L/day",
   "today.badge.added":"ADDED BY DUBI","today.badge.removed":"REMOVED BY DUBI",
   "wrap.title":"DUBI WRAP","wrap.meals":"meals completed","wrap.days":"days of consistency","wrap.steps":"total steps",
   "wrap.medal.t":"87% plan adherence","wrap.medal.s":"Among the highest results tracked by DUBI",
@@ -3976,14 +3960,14 @@ TRANSLATIONS.en = {
   "comp.sport.aesthetic.t":"Aesthetic / Body","comp.sport.aesthetic.d":"Bodybuilding · Fitness · Physique · Bikini",
   "comp.sport.team.t":"Team Sports","comp.sport.team.d":"Soccer · Basketball · Volleyball · Hockey",
   "comp.sport.combat.t":"Combat Sports","comp.sport.combat.d":"Boxing · MMA · Judo · Wrestling · Karate",
-  "goal.step.sport.header":"SELECT YOUR COMPETITION SPORT","goal.step.race.header":"COMPETITION / RACE DATE",
-  "goal.step.race.nodate":"Enter the date to receive a day-by-day periodized plan",
-  "race.phase.past":"Race passed","race.phase.past.note":"Set a future date for the plan.",
-  "race.phase.base":"Base Phase","race.phase.base.note":"{weeks} weeks to race. Aerobic/strength building with slight surplus.",
-  "race.phase.develop":"Development Phase","race.phase.develop.note":"{weeks} wks. High volume, elevated carbs, high protein.",
-  "race.phase.peak":"Peaking Phase","race.phase.peak.note":"{weeks} wks. Gradual reduction, composition refinement.",
-  "race.phase.taper":"Tapering","race.phase.taper.note":"{weeks} wks. Volume reduction, pre-race carb loading.",
-  "race.phase.raceweek":"Race Week","race.phase.raceweek.note":"Race week. Carb loading, maximum hydration.",
+
+
+
+
+
+
+
+
   "partner.modal.title":"Link Partner Profile","partner.modal.sub":"Shopping is calculated from both real plans",
   "partner.mycode.label":"YOUR DUBI CODE","partner.mycode.copy":"Copy",
   "partner.mycode.note":"Share this code with your partner. They need to open DUBI on the same device, complete their profile, then enter your code here.",
@@ -4014,7 +3998,7 @@ TRANSLATIONS.en = {
   "safety.cta.proceed":"Continue with \"{goal}\"","safety.cta.choose":"Choose a goal to continue →",
   "safety.cta.ok":"Ok, let\'s go","safety.cta.edit":"Edit my data",
   "goal.labels.fatLoss":"Fat Loss","goal.labels.definition":"Definition","goal.labels.gain":"Muscle Mass",
-  "goal.labels.maintain":"Maintenance","goal.labels.competition":"Competition",
+  "goal.labels.maintain":"Maintenance",
   "load.preparing":"Preparing your plan",
 
   "ingr.in.plan":"INGREDIENT IN YOUR PLAN",
@@ -4066,7 +4050,7 @@ TRANSLATIONS.en = {
   "src.stat.orgs":"organisations",
   "src.stat.sports":"sports",
   "src.philosophy.label":"DUBI PHILOSOPHY",
-  "src.fonti.gara":"COMPETITION SOURCES",
+
   "prog.wrap.title":"Your month in review",
   "prog.wrap.body":"Animated charts, milestones achieved and motivation — shareable on social media.",
   "prog.wrap.open":"Open your WRAP",
@@ -4102,14 +4086,14 @@ TRANSLATIONS.fr = {
   "goal.gain.t":"Masse musculaire","goal.gain.d":"Surplus ciblé pour force et volume",
   "goal.definition.t":"Définition","goal.definition.d":"Recomposition avec léger déficit",
   "act.intro":"Le niveau d'activité ne dépend pas que du travail — une personne sédentaire qui s'entraîne régulièrement a des besoins différents. DUBI évalue plusieurs variables.",
-  "act.q1":"1. QUE FAIS-TU PENDANT LA JOURNÉE ?","act.q2":"2. COMBIEN DE JOURS PAR SEMAINE T'ENTRAÎNES-TU ?","act.q3":"3. DURÉE MOYENNE D'ENTRAÎNEMENT","act.q4":"4. INTENSITÉ MOYENNE","act.q5":"5. PAS QUOTIDIENS MOYENS","act.q6":"6. JOURS VRAIMENT SÉDENTAIRES PAR SEMAINE",
-  "act.occ.sedentary":"Assis presque toute la journée","act.occ.sedentary.note":"Bureau, étude, conduite",
-  "act.occ.mixed":"J'alterne assis et debout","act.occ.walking":"Je marche souvent dans la journée","act.occ.active":"Travail physiquement actif","act.occ.heavy":"Travail manuel intense / lourd",
+  "act.q2":"COMBIEN DE JOURS PAR SEMAINE T'ENTRAÎNES-TU ?","act.q3":"DURÉE MOYENNE D'ENTRAÎNEMENT","act.q4":"INTENSITÉ MOYENNE",
+
+
   "act.dur.short":"Moins de 30 min","act.dur.mid1":"30–45 min","act.dur.mid2":"45–60 min","act.dur.long":"60–90 min","act.dur.xlong":"Plus de 90 min",
   "act.int.light":"Léger","act.int.light.note":"Marche, étirement, yoga doux",
   "act.int.moderate":"Modéré","act.int.moderate.note":"Salle, course légère, fitness",
   "act.int.high":"Élevé","act.int.high.note":"HIIT, course intense, sports compétitifs",
-  "act.steps.unknown":"Je ne sais pas",
+
   "pref.diet":"STYLE ALIMENTAIRE","pref.diet.omni":"Omnivore","pref.diet.omni.d":"Viande, poisson, produits laitiers, œufs",
   "pref.diet.veg":"Végétarien","pref.diet.veg.d":"Laitiers et œufs, sans viande ni poisson",
   "pref.diet.vegan":"Végan","pref.diet.vegan.d":"Aliments d'origine végétale uniquement",
@@ -4172,8 +4156,8 @@ TRANSLATIONS.fr = {
   "today.askDubi":"Demande à DUBI","today.askDubi.sub":"Questions sur l'alimentation, l'entraînement ou les adaptations",
   "today.preWorkout":"PRÉ-ENTRAÎNEMENT","today.postWorkout":"POST-ENTRAÎNEMENT","today.target":"Objectif {pct}",
 
-  "goal.competition.t":"Préparation Compétition","goal.competition.d":"Plan compétitif spécifique à ton sport",
-  "goal.competition.badge":"COMPÉTITION","goal.competition.lock":"Inclus dans la beta gratuite",
+
+
   "goal.target.section":"OBJECTIF","goal.target.optional":"— optionnel",
   "goal.target.weight":"Poids cible","goal.target.bmiAt":"IMC estimé au cible :",
   "goal.target.bf":"% de masse grasse cible",
@@ -4197,7 +4181,7 @@ TRANSLATIONS.fr = {
   "src.header":"MÉTHODE DUBI","src.title.full":"Sources scientifiques",
   "src.subtitle.full":"Chaque recommandation s'appuie sur des preuves évaluées par les pairs et des directives internationales.",
   "src.kpi.studies":"études","src.kpi.bodies":"organismes","src.kpi.sport":"sports",
-  "src.tab.principles":"Principes","src.tab.bodies":"Organismes","src.tab.studies":"Études","src.tab.competition":"Compétition",
+  "src.tab.principles":"Principes","src.tab.bodies":"Organismes","src.tab.studies":"Études",
   "src.principle.quality.t":"Qualité avant quantité","src.principle.quality.d":"Aliments entiers, peu transformés, à forte densité nutritionnelle.",
   "src.principle.energy.t":"Équilibre énergétique intelligent","src.principle.energy.d":"Les calories comptent, mais ce n'est pas tout. Le contexte métabolique est décisif.",
   "src.principle.adherence.t":"Adhérence > perfection","src.principle.adherence.d":"Le meilleur plan est celui que tu peux suivre longtemps.",
@@ -4221,11 +4205,11 @@ TRANSLATIONS.fr = {
   "today.subtitle.welcome":"Bienvenue dans ton plan · {n} repas",
 
   "safety.why.notFit":"POURQUOI TON OBJECTIF NE CONVIENT PAS","safety.choose.goal":"CHOISIS TON OBJECTIF",
-  "prog.weekly.compare":"SEMAINE COURANTE vs PRÉCÉDENTE","src.competition.intro":"5 sources spécifiques à la compétition — <strong>4 nouvelles</strong> avec l'objectif Compétition, 1 déjà dans l'app.",
+  "prog.weekly.compare":"SEMAINE COURANTE vs PRÉCÉDENTE",
   "shop.partner.note":"Quantités calculées d'après les plans réels des deux profils. Les articles exclusifs à un plan affichent le code du propriétaire.",
   "safety.actionRequired":"Action requise","safety.actionRequired.sub":"Choisis l'un des objectifs ci-dessous pour débloquer ton plan.","safety.recommended":"RECOMMANDÉ",
   "prog.trend.onTrack.plain":"Sur la bonne voie","prog.trend.slowing.plain":"Plateau détecté","prog.trend.notYet.plain":"Phase initiale",
-  "prog.weight.trendN":"TENDANCE {n} SEMAINES","prog.water.unit":"L/jour","goal.race.weeksLeft":"{n} SEMAINES AVANT LA COURSE",
+  "prog.weight.trendN":"TENDANCE {n} SEMAINES","prog.water.unit":"L/jour",
   "today.badge.added":"AJOUTÉ PAR DUBI","today.badge.removed":"SUPPRIMÉ PAR DUBI",
   "wrap.title":"DUBI WRAP","wrap.meals":"repas complétés","wrap.days":"jours de constance","wrap.steps":"pas au total",
   "wrap.medal.t":"87% d'adhérence au plan","wrap.medal.s":"Parmi les meilleurs résultats suivis par DUBI",
@@ -4305,21 +4289,21 @@ TRANSLATIONS.fr = {
   "comp.sport.team.d":"Football · Basket-ball · Volley-ball · Hockey",
   "comp.sport.combat.t":"Sports de combat",
   "comp.sport.combat.d":"Boxe · MMA · Judo · Lutte · Karaté",
-  "goal.step.sport.header":"CHOISISSEZ VOTRE SPORT DE COMPÉTITION",
-  "goal.step.race.header":"DATE DE COMPÉTITION / COURSE",
-  "goal.step.race.nodate":"Saisissez la date pour recevoir un plan périodisé au jour le jour",
-  "race.phase.past":"Course réussie",
-  "race.phase.past.note":"Fixez une date future pour le plan.",
-  "race.phase.base":"Phase de base",
-  "race.phase.base.note":"{weeks} semaines avant la course. Renforcement aérobie/force avec léger surplus.",
-  "race.phase.develop":"Phase de développement",
-  "race.phase.develop.note":"{weeks} sem. Volume élevé, glucides élevés, haute teneur en protéines.",
-  "race.phase.peak":"Phase de pointe",
-  "race.phase.peak.note":"{weeks} sem. Réduction progressive, affinement de la composition.",
-  "race.phase.taper":"Effilé",
-  "race.phase.taper.note":"{weeks} sem. Réduction du volume, chargement en glucides avant la course.",
-  "race.phase.raceweek":"Semaine de course",
-  "race.phase.raceweek.note":"Semaine de course. Chargement en glucides, hydratation maximale.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"Lier le profil partenaire",
   "partner.modal.sub":"La liste de courses se calcule sur les deux plans reels",
   "partner.mycode.label":"TON CODE DUBI",
@@ -4376,7 +4360,7 @@ TRANSLATIONS.fr = {
   "goal.labels.definition":"Définition",
   "goal.labels.gain":"Masse musculaire",
   "goal.labels.maintain":"Entretien",
-  "goal.labels.competition":"Concurrence",
+
   "load.preparing":"Préparer votre plan",
   "ingr.in.plan":"INGREDIENT DANS TON PLAN",
   "ingr.macros":"VALEURS NUTRITIONNELLES",
@@ -4427,7 +4411,7 @@ TRANSLATIONS.fr = {
   "src.stat.orgs":"organisations",
   "src.stat.sports":"sport",
   "src.philosophy.label":"PHILOSOPHIE DUBI",
-  "src.fonti.gara":"SOURCES PREPARATION COMPETITION",
+
   "prog.wrap.title":"Votre mois en revue",
   "prog.wrap.body":"Graphiques animés, étapes franchies et motivation – partageables sur les réseaux sociaux.",
   "prog.wrap.open":"Ouvrez votre WRAP",
@@ -4459,14 +4443,14 @@ TRANSLATIONS.es = {
   "goal.gain.t":"Masa Muscular","goal.gain.d":"Superávit dirigido a fuerza y volumen",
   "goal.definition.t":"Definición","goal.definition.d":"Recomposición con déficit ligero",
   "act.intro":"El nivel de actividad no depende solo del trabajo — una persona sedentaria que entrena con regularidad tiene necesidades distintas. DUBI evalúa varias variables.",
-  "act.q1":"1. ¿QUÉ HACES DURANTE EL DÍA?","act.q2":"2. ¿CUÁNTOS DÍAS POR SEMANA ENTRENAS?","act.q3":"3. DURACIÓN MEDIA DEL ENTRENAMIENTO","act.q4":"4. INTENSIDAD MEDIA","act.q5":"5. PASOS DIARIOS MEDIOS","act.q6":"6. DÍAS REALMENTE SEDENTARIOS POR SEMANA",
-  "act.occ.sedentary":"Sentado casi todo el día","act.occ.sedentary.note":"Oficina, estudio, conducción",
-  "act.occ.mixed":"Alterno sentado y de pie","act.occ.walking":"Camino mucho durante el día","act.occ.active":"Trabajo físicamente activo","act.occ.heavy":"Trabajo manual intenso / pesado",
+  "act.q2":"¿CUÁNTOS DÍAS POR SEMANA ENTRENAS?","act.q3":"DURACIÓN MEDIA DEL ENTRENAMIENTO","act.q4":"INTENSIDAD MEDIA",
+
+
   "act.dur.short":"Menos de 30 min","act.dur.mid1":"30–45 min","act.dur.mid2":"45–60 min","act.dur.long":"60–90 min","act.dur.xlong":"Más de 90 min",
   "act.int.light":"Ligera","act.int.light.note":"Caminar, estirar, yoga suave",
   "act.int.moderate":"Moderada","act.int.moderate.note":"Gimnasio, carrera ligera, fitness",
   "act.int.high":"Alta","act.int.high.note":"HIIT, carrera intensa, deportes competitivos",
-  "act.steps.unknown":"No lo sé",
+
   "pref.diet":"ESTILO ALIMENTARIO","pref.diet.omni":"Omnívoro","pref.diet.omni.d":"Carne, pescado, lácteos, huevos",
   "pref.diet.veg":"Vegetariano","pref.diet.veg.d":"Lácteos y huevos, sin carne ni pescado",
   "pref.diet.vegan":"Vegano","pref.diet.vegan.d":"Solo alimentos de origen vegetal",
@@ -4529,8 +4513,8 @@ TRANSLATIONS.es = {
   "today.askDubi":"Pregunta a DUBI","today.askDubi.sub":"Preguntas sobre dieta, entrenamiento o adaptaciones",
   "today.preWorkout":"PRE-ENTRENAMIENTO","today.postWorkout":"POST-ENTRENAMIENTO","today.target":"Objetivo {pct}",
 
-  "goal.competition.t":"Preparación Competición","goal.competition.d":"Plan específico de competición para tu deporte",
-  "goal.competition.badge":"COMPETICIÓN","goal.competition.lock":"Incluido en la beta gratuita",
+
+
   "goal.target.section":"OBJETIVO","goal.target.optional":"— opcional",
   "goal.target.weight":"Peso objetivo","goal.target.bmiAt":"IMC estimado al objetivo:",
   "goal.target.bf":"% Grasa corporal objetivo",
@@ -4554,7 +4538,7 @@ TRANSLATIONS.es = {
   "src.header":"MÉTODO DUBI","src.title.full":"Fuentes científicas",
   "src.subtitle.full":"Cada recomendación se basa en evidencia revisada por pares y directrices internacionales.",
   "src.kpi.studies":"estudios","src.kpi.bodies":"entidades","src.kpi.sport":"deportes",
-  "src.tab.principles":"Principios","src.tab.bodies":"Entidades","src.tab.studies":"Estudios","src.tab.competition":"Competición",
+  "src.tab.principles":"Principios","src.tab.bodies":"Entidades","src.tab.studies":"Estudios",
   "src.principle.quality.t":"Calidad antes que cantidad","src.principle.quality.d":"Alimentos integrales, mínimamente procesados, alta densidad nutricional.",
   "src.principle.energy.t":"Balance energético inteligente","src.principle.energy.d":"Las calorías cuentan, pero no lo son todo. El contexto metabólico es decisivo.",
   "src.principle.adherence.t":"Adherencia > perfección","src.principle.adherence.d":"El mejor plan es el que puedes seguir a largo plazo.",
@@ -4578,11 +4562,11 @@ TRANSLATIONS.es = {
   "today.subtitle.welcome":"Bienvenido a tu plan · {n} comidas",
 
   "safety.why.notFit":"POR QUÉ TU OBJETIVO NO ENCAJA","safety.choose.goal":"ELIGE TU OBJETIVO",
-  "prog.weekly.compare":"SEMANA ACTUAL vs ANTERIOR","src.competition.intro":"5 fuentes específicas de competición — <strong>4 nuevas</strong> con el objetivo Competición, 1 ya en la app.",
+  "prog.weekly.compare":"SEMANA ACTUAL vs ANTERIOR",
   "shop.partner.note":"Cantidades calculadas a partir de los planes reales de ambos perfiles. Los artículos exclusivos de un plan muestran el código del propietario.",
   "safety.actionRequired":"Acción requerida","safety.actionRequired.sub":"Elige uno de los objetivos para desbloquear tu plan.","safety.recommended":"RECOMENDADO",
   "prog.trend.onTrack.plain":"En línea con el objetivo","prog.trend.slowing.plain":"Plateau detectado","prog.trend.notYet.plain":"Fase inicial",
-  "prog.weight.trendN":"TENDENCIA {n} SEMANAS","prog.water.unit":"L/día","goal.race.weeksLeft":"{n} SEMANAS PARA LA COMPETICIÓN",
+  "prog.weight.trendN":"TENDENCIA {n} SEMANAS","prog.water.unit":"L/día",
   "today.badge.added":"AÑADIDO POR DUBI","today.badge.removed":"ELIMINADO POR DUBI",
   "wrap.title":"DUBI WRAP","wrap.meals":"comidas completadas","wrap.days":"días de constancia","wrap.steps":"pasos totales",
   "wrap.medal.t":"87% de adherencia al plan","wrap.medal.s":"Entre los mejores resultados monitorizados por DUBI",
@@ -4662,21 +4646,21 @@ TRANSLATIONS.es = {
   "comp.sport.team.d":"Fútbol · Baloncesto · Voleibol · Hockey",
   "comp.sport.combat.t":"Deportes de combate",
   "comp.sport.combat.d":"Boxeo · MMA · Judo · Lucha Libre · Karate",
-  "goal.step.sport.header":"SELECCIONA TU DEPORTE DE COMPETENCIA",
-  "goal.step.race.header":"COMPETICIÓN / FECHA DE CARRERA",
-  "goal.step.race.nodate":"Ingrese la fecha para recibir un plan periodizado día a día",
-  "race.phase.past":"Carrera pasada",
-  "race.phase.past.note":"Establezca una fecha futura para el plan.",
-  "race.phase.base":"Fase básica",
-  "race.phase.base.note":"{weeks} semanas para competir. Aeróbico/desarrollo de fuerza con ligero excedente.",
-  "race.phase.develop":"Fase de desarrollo",
-  "race.phase.develop.note":"{weeks} semanas. Alto volumen, carbohidratos elevados, alto contenido de proteínas.",
-  "race.phase.peak":"Fase de pico",
-  "race.phase.peak.note":"{weeks} semanas. Reducción gradual, refinamiento de la composición.",
-  "race.phase.taper":"Disminución",
-  "race.phase.taper.note":"{weeks} semanas. Reducción de volumen, carga de carbohidratos antes de la carrera.",
-  "race.phase.raceweek":"Semana de carrera",
-  "race.phase.raceweek.note":"Semana de carreras. Carga de carbohidratos, máxima hidratación.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"Vincular perfil de pareja",
   "partner.modal.sub":"La compra se calcula con ambos planes reales",
   "partner.mycode.label":"TU CODIGO DUBI",
@@ -4733,7 +4717,7 @@ TRANSLATIONS.es = {
   "goal.labels.definition":"Definición",
   "goal.labels.gain":"masa muscular",
   "goal.labels.maintain":"Mantenimiento",
-  "goal.labels.competition":"Competencia",
+
   "load.preparing":"Preparando tu plan",
   "ingr.in.plan":"INGREDIENTE EN TU PLAN",
   "ingr.macros":"VALORES NUTRICIONALES",
@@ -4784,7 +4768,7 @@ TRANSLATIONS.es = {
   "src.stat.orgs":"organizaciones",
   "src.stat.sports":"deportes",
   "src.philosophy.label":"FILOSOFIA DUBI",
-  "src.fonti.gara":"FUENTES PREPARACION COMPETICION",
+
   "prog.wrap.title":"Tu mes en repaso",
   "prog.wrap.body":"Gráficos animados, hitos alcanzados y motivación, que se pueden compartir en las redes sociales.",
   "prog.wrap.open":"Abre tu ENVOLTURA",
@@ -4816,14 +4800,14 @@ TRANSLATIONS.de = {
   "goal.gain.t":"Muskelmasse","goal.gain.d":"Gezielter Überschuss für Kraft und Volumen",
   "goal.definition.t":"Definition","goal.definition.d":"Rekomposition mit leichtem Defizit",
   "act.intro":"Aktivitätsniveau hängt nicht nur vom Beruf ab — wer sitzend arbeitet aber regelmäßig trainiert, hat andere Bedürfnisse. DUBI berücksichtigt mehrere Variablen.",
-  "act.q1":"1. WAS MACHST DU TAGSÜBER?","act.q2":"2. WIE VIELE TAGE PRO WOCHE TRAINIERST DU?","act.q3":"3. DURCHSCHNITTLICHE TRAININGSDAUER","act.q4":"4. DURCHSCHNITTLICHE INTENSITÄT","act.q5":"5. TÄGLICHE SCHRITTE IM SCHNITT","act.q6":"6. WIRKLICH SITZENDE TAGE PRO WOCHE",
-  "act.occ.sedentary":"Fast den ganzen Tag sitzend","act.occ.sedentary.note":"Büro, Studium, Fahren",
-  "act.occ.mixed":"Im Wechsel sitzend und stehend","act.occ.walking":"Ich gehe oft tagsüber","act.occ.active":"Körperlich aktiver Beruf","act.occ.heavy":"Intensive / schwere körperliche Arbeit",
+  "act.q2":"WIE VIELE TAGE PRO WOCHE TRAINIERST DU?","act.q3":"DURCHSCHNITTLICHE TRAININGSDAUER","act.q4":"DURCHSCHNITTLICHE INTENSITÄT",
+
+
   "act.dur.short":"Weniger als 30 Min","act.dur.mid1":"30–45 Min","act.dur.mid2":"45–60 Min","act.dur.long":"60–90 Min","act.dur.xlong":"Mehr als 90 Min",
   "act.int.light":"Leicht","act.int.light.note":"Gehen, Dehnen, sanftes Yoga",
   "act.int.moderate":"Mittel","act.int.moderate.note":"Fitnessstudio, leichtes Laufen, Fitness",
   "act.int.high":"Hoch","act.int.high.note":"HIIT, intensives Laufen, Wettkampfsport",
-  "act.steps.unknown":"Weiß nicht",
+
   "pref.diet":"ERNÄHRUNGSSTIL","pref.diet.omni":"Omnivor","pref.diet.omni.d":"Fleisch, Fisch, Milchprodukte, Eier",
   "pref.diet.veg":"Vegetarisch","pref.diet.veg.d":"Milchprodukte und Eier, kein Fleisch/Fisch",
   "pref.diet.vegan":"Vegan","pref.diet.vegan.d":"Nur pflanzliche Lebensmittel",
@@ -4886,8 +4870,8 @@ TRANSLATIONS.de = {
   "today.askDubi":"Frag DUBI","today.askDubi.sub":"Fragen zu Ernährung, Training oder Anpassungen",
   "today.preWorkout":"PRE-WORKOUT","today.postWorkout":"POST-WORKOUT","today.target":"Ziel {pct}",
 
-  "goal.competition.t":"Wettkampfvorbereitung","goal.competition.d":"Sportspezifischer Wettkampfplan",
-  "goal.competition.badge":"WETTKAMPF","goal.competition.lock":"In der kostenlosen Beta enthalten",
+
+
   "goal.target.section":"ZIEL","goal.target.optional":"— optional",
   "goal.target.weight":"Zielgewicht","goal.target.bmiAt":"Geschätzter BMI am Ziel:",
   "goal.target.bf":"Körperfett-Ziel %",
@@ -4911,7 +4895,7 @@ TRANSLATIONS.de = {
   "src.header":"DUBI-METHODE","src.title.full":"Wissenschaftliche Quellen",
   "src.subtitle.full":"Jede Empfehlung basiert auf Peer-Review-Evidenz und internationalen Richtlinien.",
   "src.kpi.studies":"Studien","src.kpi.bodies":"Stellen","src.kpi.sport":"Sportarten",
-  "src.tab.principles":"Prinzipien","src.tab.bodies":"Stellen","src.tab.studies":"Studien","src.tab.competition":"Wettkampf",
+  "src.tab.principles":"Prinzipien","src.tab.bodies":"Stellen","src.tab.studies":"Studien",
   "src.principle.quality.t":"Qualität vor Quantität","src.principle.quality.d":"Vollwertige, minimal verarbeitete Lebensmittel mit hoher Nährstoffdichte.",
   "src.principle.energy.t":"Intelligente Energiebilanz","src.principle.energy.d":"Kalorien zählen, sind aber nicht alles. Der metabolische Kontext ist entscheidend.",
   "src.principle.adherence.t":"Konsequenz > Perfektion","src.principle.adherence.d":"Der beste Plan ist der, den du lange durchhältst.",
@@ -4935,11 +4919,11 @@ TRANSLATIONS.de = {
   "today.subtitle.welcome":"Willkommen zu deinem Plan · {n} Mahlzeiten",
 
   "safety.why.notFit":"WARUM DEIN ZIEL NICHT PASST","safety.choose.goal":"WÄHLE DEIN ZIEL",
-  "prog.weekly.compare":"AKTUELLE vs VORWOCHE","src.competition.intro":"5 wettkampfspezifische Quellen — <strong>4 neue</strong> mit dem Wettkampf-Ziel, 1 bereits in der App.",
+  "prog.weekly.compare":"AKTUELLE vs VORWOCHE",
   "shop.partner.note":"Mengen aus den echten Plänen beider Profile berechnet. Plan-exklusive Artikel zeigen den Code des Besitzers.",
   "safety.actionRequired":"Aktion erforderlich","safety.actionRequired.sub":"Wähle eines der unten stehenden Ziele, um deinen Plan freizuschalten.","safety.recommended":"EMPFOHLEN",
   "prog.trend.onTrack.plain":"Auf Kurs","prog.trend.slowing.plain":"Plateau erkannt","prog.trend.notYet.plain":"Anfangsphase",
-  "prog.weight.trendN":"{n}-WOCHEN-TREND","prog.water.unit":"L/Tag","goal.race.weeksLeft":"{n} WOCHEN BIS ZUM WETTKAMPF",
+  "prog.weight.trendN":"{n}-WOCHEN-TREND","prog.water.unit":"L/Tag",
   "today.badge.added":"VON DUBI HINZUGEFÜGT","today.badge.removed":"VON DUBI ENTFERNT",
   "wrap.title":"DUBI WRAP","wrap.meals":"Mahlzeiten erledigt","wrap.days":"Tage Konsequenz","wrap.steps":"Schritte gesamt",
   "wrap.medal.t":"87% Plan-Treue","wrap.medal.s":"Unter den besten von DUBI getrackten Ergebnissen",
@@ -5019,21 +5003,21 @@ TRANSLATIONS.de = {
   "comp.sport.team.d":"Fußball · Basketball · Volleyball · Hockey",
   "comp.sport.combat.t":"Kampfsport",
   "comp.sport.combat.d":"Boxen · MMA · Judo · Wrestling · Karate",
-  "goal.step.sport.header":"WÄHLEN SIE IHREN WETTKAMPF-SPORT",
-  "goal.step.race.header":"WETTBEWERBS-/RENNDATUM",
-  "goal.step.race.nodate":"Geben Sie das Datum ein, um einen tagesaktuellen, periodisierten Plan zu erhalten",
-  "race.phase.past":"Rennen bestanden",
-  "race.phase.past.note":"Legen Sie ein zukünftiges Datum für den Plan fest.",
-  "race.phase.base":"Basisphase",
-  "race.phase.base.note":"{weeks} Wochen bis zum Rennen. Aerobic/Kraftaufbau mit leichtem Überschuss.",
-  "race.phase.develop":"Entwicklungsphase",
-  "race.phase.develop.note":"{weeks} Wo. Hohes Volumen, hohe Kohlenhydrate, hoher Proteingehalt.",
-  "race.phase.peak":"Höhepunktphase",
-  "race.phase.peak.note":"{weeks} Wo. Allmähliche Reduzierung, Verfeinerung der Komposition.",
-  "race.phase.taper":"Verjüngung",
-  "race.phase.taper.note":"{weeks} Wo. Volumenreduzierung, Kohlenhydratbeladung vor dem Rennen.",
-  "race.phase.raceweek":"Rennwoche",
-  "race.phase.raceweek.note":"Rennwoche. Kohlenhydratladung, maximale Flüssigkeitszufuhr.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"Partnerprofil verknupfen",
   "partner.modal.sub":"Die Einkaufsliste wird aus beiden echten Planen berechnet",
   "partner.mycode.label":"DEIN DUBI-CODE",
@@ -5090,7 +5074,7 @@ TRANSLATIONS.de = {
   "goal.labels.definition":"Definition",
   "goal.labels.gain":"Muskelmasse",
   "goal.labels.maintain":"Wartung",
-  "goal.labels.competition":"Wettbewerb",
+
   "load.preparing":"Bereiten Sie Ihren Plan vor",
   "ingr.in.plan":"ZUTAT IN DEINEM PLAN",
   "ingr.macros":"NAHRWERTE",
@@ -5141,7 +5125,7 @@ TRANSLATIONS.de = {
   "src.stat.orgs":"Organisationen",
   "src.stat.sports":"Sport",
   "src.philosophy.label":"DUBI-PHILOSOPHIE",
-  "src.fonti.gara":"QUELLEN WETTKAMPFVORBEREITUNG",
+
   "prog.wrap.title":"Ihr Monatsrückblick",
   "prog.wrap.body":"Animierte Diagramme, erreichte Meilensteine und Motivation – zum Teilen in sozialen Medien.",
   "prog.wrap.open":"Öffnen Sie Ihren WRAP",
@@ -5173,14 +5157,14 @@ TRANSLATIONS.ar = {
   "goal.gain.t":"الكتلة العضلية","goal.gain.d":"فائض موجَّه للقوة والحجم",
   "goal.definition.t":"التنشيف","goal.definition.d":"إعادة التركيب مع عجز خفيف",
   "act.intro":"مستوى النشاط لا يعتمد على العمل فقط — الشخص الذي يعمل جالساً ولكنه يتدرب بانتظام له احتياجات مختلفة. تأخذ DUBI عدة متغيرات بعين الاعتبار.",
-  "act.q1":"١. ماذا تفعل خلال اليوم؟","act.q2":"٢. كم يوماً في الأسبوع تتدرب؟","act.q3":"٣. متوسط مدة التدريب","act.q4":"٤. متوسط الشدة","act.q5":"٥. متوسط الخطوات اليومية","act.q6":"٦. أيام الجلوس الفعلي في الأسبوع",
-  "act.occ.sedentary":"جالس معظم اليوم","act.occ.sedentary.note":"مكتب، دراسة، قيادة",
-  "act.occ.mixed":"أتنقل بين الجلوس والوقوف","act.occ.walking":"أمشي كثيراً خلال اليوم","act.occ.active":"عمل نشط بدنياً","act.occ.heavy":"عمل يدوي شاق",
+  "act.q2":"كم يوماً في الأسبوع تتدرب؟","act.q3":"متوسط مدة التدريب","act.q4":"متوسط الشدة",
+
+
   "act.dur.short":"أقل من 30 دقيقة","act.dur.mid1":"30–45 دقيقة","act.dur.mid2":"45–60 دقيقة","act.dur.long":"60–90 دقيقة","act.dur.xlong":"أكثر من 90 دقيقة",
   "act.int.light":"خفيف","act.int.light.note":"مشي، تمدد، يوغا خفيفة",
   "act.int.moderate":"معتدل","act.int.moderate.note":"صالة رياضية، جري خفيف، لياقة",
   "act.int.high":"شديد","act.int.high.note":"HIIT، جري قوي، رياضات تنافسية",
-  "act.steps.unknown":"لا أعرف",
+
   "pref.diet":"النمط الغذائي","pref.diet.omni":"شامل","pref.diet.omni.d":"لحم وسمك وألبان وبيض",
   "pref.diet.veg":"نباتي","pref.diet.veg.d":"ألبان وبيض، بدون لحم أو سمك",
   "pref.diet.vegan":"نباتي صرف","pref.diet.vegan.d":"أطعمة نباتية فقط",
@@ -5243,8 +5227,8 @@ TRANSLATIONS.ar = {
   "today.askDubi":"اسأل DUBI","today.askDubi.sub":"أسئلة حول الغذاء والتدريب والتعديلات",
   "today.preWorkout":"قبل التمرين","today.postWorkout":"بعد التمرين","today.target":"الهدف {pct}",
 
-  "goal.competition.t":"الإعداد للمنافسة","goal.competition.d":"خطة محددة للمنافسة في رياضتك",
-  "goal.competition.badge":"منافسة","goal.competition.lock":"مشمول في النسخة التجريبية المجانية",
+
+
   "goal.target.section":"الهدف","goal.target.optional":"— اختياري",
   "goal.target.weight":"الوزن المستهدف","goal.target.bmiAt":"كتلة الجسم المتوقعة عند الهدف:",
   "goal.target.bf":"نسبة الدهون المستهدفة %",
@@ -5268,7 +5252,7 @@ TRANSLATIONS.ar = {
   "src.header":"منهج DUBI","src.title.full":"المصادر العلمية",
   "src.subtitle.full":"كل توصية مبنية على أدلة محكَّمة وإرشادات دولية.",
   "src.kpi.studies":"دراسة","src.kpi.bodies":"جهة","src.kpi.sport":"رياضات",
-  "src.tab.principles":"المبادئ","src.tab.bodies":"الجهات","src.tab.studies":"الدراسات","src.tab.competition":"المنافسة",
+  "src.tab.principles":"المبادئ","src.tab.bodies":"الجهات","src.tab.studies":"الدراسات",
   "src.principle.quality.t":"الجودة قبل الكمية","src.principle.quality.d":"أطعمة كاملة وقليلة المعالجة وعالية الكثافة الغذائية.",
   "src.principle.energy.t":"توازن الطاقة الذكي","src.principle.energy.d":"السعرات تُحسب، لكنها ليست كل شيء. السياق الأيضي حاسم.",
   "src.principle.adherence.t":"الالتزام > الكمال","src.principle.adherence.d":"أفضل خطة هي التي يمكنك اتباعها على المدى الطويل.",
@@ -5292,11 +5276,11 @@ TRANSLATIONS.ar = {
   "today.subtitle.welcome":"مرحباً بك في خطتك · {n} وجبات",
 
   "safety.why.notFit":"لماذا هدفك غير مناسب","safety.choose.goal":"اختر هدفك",
-  "prog.weekly.compare":"الأسبوع الحالي مقابل السابق","src.competition.intro":"5 مصادر خاصة بالمنافسة — <strong>4 جديدة</strong> مع هدف المنافسة، 1 موجود في التطبيق.",
+  "prog.weekly.compare":"الأسبوع الحالي مقابل السابق",
   "shop.partner.note":"الكميات محسوبة من الخطتين الفعليتين لكلا الحسابين. العناصر الحصرية لخطة واحدة تظهر برمز صاحبها.",
   "safety.actionRequired":"إجراء مطلوب","safety.actionRequired.sub":"اختر أحد الأهداف أدناه لفتح خطتك.","safety.recommended":"موصى به",
   "prog.trend.onTrack.plain":"على المسار الصحيح","prog.trend.slowing.plain":"تم اكتشاف ثبات","prog.trend.notYet.plain":"المرحلة الأولى",
-  "prog.weight.trendN":"اتجاه {n} أسابيع","prog.water.unit":"لتر/اليوم","goal.race.weeksLeft":"{n} أسابيع حتى المنافسة",
+  "prog.weight.trendN":"اتجاه {n} أسابيع","prog.water.unit":"لتر/اليوم",
   "today.badge.added":"أضافها DUBI","today.badge.removed":"أزالها DUBI",
   "wrap.title":"DUBI WRAP","wrap.meals":"وجبات مكتملة","wrap.days":"أيام ثبات","wrap.steps":"خطوات إجمالية",
   "wrap.medal.t":"87% التزام بالخطة","wrap.medal.s":"من أعلى النتائج التي يتتبعها DUBI",
@@ -5376,21 +5360,21 @@ TRANSLATIONS.ar = {
   "comp.sport.team.d":"كرة القدم · كرة السلة · الكرة الطائرة · الهوكي",
   "comp.sport.combat.t":"الرياضات القتالية",
   "comp.sport.combat.d":"الملاكمة · الفنون القتالية المختلطة · الجودو · المصارعة · الكاراتيه",
-  "goal.step.sport.header":"اختر الرياضة المنافسة لك",
-  "goal.step.race.header":"تاريخ المنافسة/السباق",
-  "goal.step.race.nodate":"أدخل التاريخ لتلقي خطة دورية يومًا بعد يوم",
-  "race.phase.past":"مر السباق",
-  "race.phase.past.note":"حدد تاريخًا مستقبليًا للخطة.",
-  "race.phase.base":"المرحلة الأساسية",
-  "race.phase.base.note":"{weeks} أسابيع للسباق. الهوائية / بناء القوة مع فائض طفيف.",
-  "race.phase.develop":"مرحلة التطوير",
-  "race.phase.develop.note":"{weeks} أسابيع. حجم كبير، كربوهيدرات مرتفعة، نسبة عالية من البروتين.",
-  "race.phase.peak":"مرحلة الذروة",
-  "race.phase.peak.note":"{weeks} أسابيع. التخفيض التدريجي، وصقل التكوين.",
-  "race.phase.taper":"التناقص",
-  "race.phase.taper.note":"{weeks} أسابيع. تقليل الحجم، تحميل الكربوهيدرات قبل السباق.",
-  "race.phase.raceweek":"أسبوع السباق",
-  "race.phase.raceweek.note":"أسبوع السباق. تحميل الكربوهيدرات، أقصى قدر من الترطيب.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"ربط ملف الشريك",
   "partner.modal.sub":"قائمة التسوق تحسب من الخطتين الفعليتين",
   "partner.mycode.label":"رمز DUBI الخاص بك",
@@ -5447,7 +5431,7 @@ TRANSLATIONS.ar = {
   "goal.labels.definition":"التعريف",
   "goal.labels.gain":"كتلة العضلات",
   "goal.labels.maintain":"الصيانة",
-  "goal.labels.competition":"المنافسة",
+
   "load.preparing":"إعداد خطتك",
   "ingr.in.plan":"المكون في خطتك",
   "ingr.macros":"القيم الغذائية",
@@ -5498,7 +5482,7 @@ TRANSLATIONS.ar = {
   "src.stat.orgs":"المنظمات",
   "src.stat.sports":"رياضة",
   "src.philosophy.label":"فلسفة DUBI",
-  "src.fonti.gara":"مصادر التحضير للمنافسة",
+
   "prog.wrap.title":"شهرك قيد المراجعة",
   "prog.wrap.body":"الرسوم البيانية المتحركة والمعالم التي تم تحقيقها والتحفيز - يمكن مشاركتها على وسائل التواصل الاجتماعي.",
   "prog.wrap.open":"افتح ملف التفاف الخاص بك",
@@ -5530,14 +5514,14 @@ TRANSLATIONS.pt = {
   "goal.gain.t":"Massa Muscular","goal.gain.d":"Superávit dirigido para força e volume",
   "goal.definition.t":"Definição","goal.definition.d":"Recomposição com défice ligeiro",
   "act.intro":"O nível de atividade não depende apenas do trabalho — uma pessoa sedentária que treina regularmente tem necessidades diferentes. A DUBI avalia várias variáveis.",
-  "act.q1":"1. O QUE FAZES DURANTE O DIA?","act.q2":"2. QUANTOS DIAS POR SEMANA TREINAS?","act.q3":"3. DURAÇÃO MÉDIA DO TREINO","act.q4":"4. INTENSIDADE MÉDIA","act.q5":"5. PASSOS DIÁRIOS MÉDIOS","act.q6":"6. DIAS REALMENTE SEDENTÁRIOS POR SEMANA",
-  "act.occ.sedentary":"Sentado quase todo o dia","act.occ.sedentary.note":"Escritório, estudo, condução",
-  "act.occ.mixed":"Alterno sentado e em pé","act.occ.walking":"Caminho muito durante o dia","act.occ.active":"Trabalho fisicamente ativo","act.occ.heavy":"Trabalho manual intenso / pesado",
+  "act.q2":"QUANTOS DIAS POR SEMANA TREINAS?","act.q3":"DURAÇÃO MÉDIA DO TREINO","act.q4":"INTENSIDADE MÉDIA",
+
+
   "act.dur.short":"Menos de 30 min","act.dur.mid1":"30–45 min","act.dur.mid2":"45–60 min","act.dur.long":"60–90 min","act.dur.xlong":"Mais de 90 min",
   "act.int.light":"Leve","act.int.light.note":"Caminhada, alongamento, yoga suave",
   "act.int.moderate":"Moderada","act.int.moderate.note":"Ginásio, corrida leve, fitness",
   "act.int.high":"Alta","act.int.high.note":"HIIT, corrida intensa, desportos competitivos",
-  "act.steps.unknown":"Não sei",
+
   "pref.diet":"ESTILO ALIMENTAR","pref.diet.omni":"Omnívoro","pref.diet.omni.d":"Carne, peixe, lacticínios, ovos",
   "pref.diet.veg":"Vegetariano","pref.diet.veg.d":"Lacticínios e ovos, sem carne nem peixe",
   "pref.diet.vegan":"Vegano","pref.diet.vegan.d":"Apenas alimentos de origem vegetal",
@@ -5600,8 +5584,8 @@ TRANSLATIONS.pt = {
   "today.askDubi":"Pergunta à DUBI","today.askDubi.sub":"Perguntas sobre dieta, treino ou adaptações",
   "today.preWorkout":"PRÉ-TREINO","today.postWorkout":"PÓS-TREINO","today.target":"Alvo {pct}",
 
-  "goal.competition.t":"Preparação Competição","goal.competition.d":"Plano competitivo específico para o teu desporto",
-  "goal.competition.badge":"COMPETIÇÃO","goal.competition.lock":"Incluido na beta gratuita",
+
+
   "goal.target.section":"OBJETIVO","goal.target.optional":"— opcional",
   "goal.target.weight":"Peso alvo","goal.target.bmiAt":"IMC estimado ao alvo:",
   "goal.target.bf":"% Gordura corporal alvo",
@@ -5625,7 +5609,7 @@ TRANSLATIONS.pt = {
   "src.header":"MÉTODO DUBI","src.title.full":"Fontes científicas",
   "src.subtitle.full":"Cada recomendação assenta em evidência revista por pares e diretrizes internacionais.",
   "src.kpi.studies":"estudos","src.kpi.bodies":"entidades","src.kpi.sport":"desportos",
-  "src.tab.principles":"Princípios","src.tab.bodies":"Entidades","src.tab.studies":"Estudos","src.tab.competition":"Competição",
+  "src.tab.principles":"Princípios","src.tab.bodies":"Entidades","src.tab.studies":"Estudos",
   "src.principle.quality.t":"Qualidade antes da quantidade","src.principle.quality.d":"Alimentos integrais, minimamente processados, alta densidade nutricional.",
   "src.principle.energy.t":"Equilíbrio energético inteligente","src.principle.energy.d":"As calorias contam, mas não são tudo. O contexto metabólico é decisivo.",
   "src.principle.adherence.t":"Adesão > perfeição","src.principle.adherence.d":"O melhor plano é o que consegues seguir a longo prazo.",
@@ -5649,11 +5633,11 @@ TRANSLATIONS.pt = {
   "today.subtitle.welcome":"Bem-vindo ao teu plano · {n} refeições",
 
   "safety.why.notFit":"PORQUE O TEU OBJETIVO NÃO SE ADEQUA","safety.choose.goal":"ESCOLHE O TEU OBJETIVO",
-  "prog.weekly.compare":"SEMANA ATUAL vs ANTERIOR","src.competition.intro":"5 fontes específicas de competição — <strong>4 novas</strong> com o objetivo Competição, 1 já na app.",
+  "prog.weekly.compare":"SEMANA ATUAL vs ANTERIOR",
   "shop.partner.note":"Quantidades calculadas a partir dos planos reais de ambos os perfis. Os artigos exclusivos de um plano mostram o código do proprietário.",
   "safety.actionRequired":"Ação necessária","safety.actionRequired.sub":"Escolhe um dos objetivos abaixo para desbloquear o teu plano.","safety.recommended":"RECOMENDADO",
   "prog.trend.onTrack.plain":"No caminho certo","prog.trend.slowing.plain":"Plateau detetado","prog.trend.notYet.plain":"Fase inicial",
-  "prog.weight.trendN":"TENDÊNCIA {n} SEMANAS","prog.water.unit":"L/dia","goal.race.weeksLeft":"{n} SEMANAS PARA A COMPETIÇÃO",
+  "prog.weight.trendN":"TENDÊNCIA {n} SEMANAS","prog.water.unit":"L/dia",
   "today.badge.added":"ADICIONADO PELA DUBI","today.badge.removed":"REMOVIDO PELA DUBI",
   "wrap.title":"DUBI WRAP","wrap.meals":"refeições concluídas","wrap.days":"dias de consistência","wrap.steps":"passos totais",
   "wrap.medal.t":"87% de adesão ao plano","wrap.medal.s":"Entre os melhores resultados acompanhados pela DUBI",
@@ -5733,21 +5717,21 @@ TRANSLATIONS.pt = {
   "comp.sport.team.d":"Futebol · Basquetebol · Voleibol · Hóquei",
   "comp.sport.combat.t":"Esportes de Combate",
   "comp.sport.combat.d":"Boxe · MMA · Judô · Luta livre · Karatê",
-  "goal.step.sport.header":"SELECIONE SEU ESPORTE DE COMPETIÇÃO",
-  "goal.step.race.header":"COMPETIÇÃO / DATA DA CORRIDA",
-  "goal.step.race.nodate":"Insira a data para receber um plano periodizado dia a dia",
-  "race.phase.past":"Corrida passada",
-  "race.phase.past.note":"Defina uma data futura para o plano.",
-  "race.phase.base":"Fase Básica",
-  "race.phase.base.note":"{weeks} semanas para a corrida. Construção aeróbica/de força com ligeiro excedente.",
-  "race.phase.develop":"Fase de Desenvolvimento",
-  "race.phase.develop.note":"{weeks} semanas. Alto volume, carboidratos elevados, alto teor de proteínas.",
-  "race.phase.peak":"Fase de Pico",
-  "race.phase.peak.note":"{weeks} semanas. Redução gradual, refinamento da composição.",
-  "race.phase.taper":"Afinando",
-  "race.phase.taper.note":"{weeks} semanas. Redução de volume, carregamento de carboidratos pré-corrida.",
-  "race.phase.raceweek":"Semana da Corrida",
-  "race.phase.raceweek.note":"Semana de corrida. Carregamento de carboidratos, hidratação máxima.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"Ligar perfil parceiro",
   "partner.modal.sub":"A lista de compras e calculada a partir dos dois planos reais",
   "partner.mycode.label":"O TEU CODIGO DUBI",
@@ -5804,7 +5788,7 @@ TRANSLATIONS.pt = {
   "goal.labels.definition":"Definição",
   "goal.labels.gain":"Massa Muscular",
   "goal.labels.maintain":"Manutenção",
-  "goal.labels.competition":"Competição",
+
   "load.preparing":"Preparando seu plano",
   "ingr.in.plan":"INGREDIENTE NO TEU PLANO",
   "ingr.macros":"VALORES NUTRICIONAIS",
@@ -5855,7 +5839,7 @@ TRANSLATIONS.pt = {
   "src.stat.orgs":"organizações",
   "src.stat.sports":"esportes",
   "src.philosophy.label":"FILOSOFIA DUBI",
-  "src.fonti.gara":"FONTES PREPARACAO COMPETICAO",
+
   "prog.wrap.title":"Seu mês em análise",
   "prog.wrap.body":"Gráficos animados, marcos alcançados e motivação — compartilháveis nas redes sociais.",
   "prog.wrap.open":"Abra seu WRAP",
@@ -5887,14 +5871,14 @@ TRANSLATIONS.zh = {
   "goal.gain.t":"增肌","goal.gain.d":"针对力量与体积的盈余",
   "goal.definition.t":"塑形","goal.definition.d":"轻度热量缺口下的体型重构",
   "act.intro":"活动水平不仅取决于工作 — 久坐但定期训练的人需求不同。DUBI 综合多项变量。",
-  "act.q1":"1. 你白天通常做什么？","act.q2":"2. 每周训练几天？","act.q3":"3. 平均训练时长","act.q4":"4. 平均强度","act.q5":"5. 平均每日步数","act.q6":"6. 真正久坐的天数（每周）",
-  "act.occ.sedentary":"几乎整天坐着","act.occ.sedentary.note":"办公室、学习、开车",
-  "act.occ.mixed":"坐立交替","act.occ.walking":"白天经常走动","act.occ.active":"体力活跃的工作","act.occ.heavy":"高强度/重体力劳动",
+  "act.q2":"每周训练几天？","act.q3":"平均训练时长","act.q4":"平均强度",
+
+
   "act.dur.short":"少于30分钟","act.dur.mid1":"30–45分钟","act.dur.mid2":"45–60分钟","act.dur.long":"60–90分钟","act.dur.xlong":"超过90分钟",
   "act.int.light":"轻度","act.int.light.note":"散步、拉伸、轻瑜伽",
   "act.int.moderate":"中等","act.int.moderate.note":"健身房、慢跑、健身",
   "act.int.high":"高强度","act.int.high.note":"HIIT、高强度跑、竞技运动",
-  "act.steps.unknown":"不知道",
+
   "pref.diet":"饮食类型","pref.diet.omni":"杂食","pref.diet.omni.d":"肉、鱼、奶制品、蛋",
   "pref.diet.veg":"素食","pref.diet.veg.d":"奶制品和蛋，无肉无鱼",
   "pref.diet.vegan":"纯素","pref.diet.vegan.d":"仅植物来源食品",
@@ -5957,8 +5941,8 @@ TRANSLATIONS.zh = {
   "today.askDubi":"问 DUBI","today.askDubi.sub":"关于饮食、训练或适配的问题",
   "today.preWorkout":"训练前","today.postWorkout":"训练后","today.target":"目标 {pct}",
 
-  "goal.competition.t":"备赛","goal.competition.d":"针对你运动项目的备赛方案",
-  "goal.competition.badge":"备赛","goal.competition.lock":"已包含在免费测试版中",
+
+
   "goal.target.section":"目标","goal.target.optional":"— 可选",
   "goal.target.weight":"目标体重","goal.target.bmiAt":"目标 BMI 估算：",
   "goal.target.bf":"目标体脂率 %",
@@ -5982,7 +5966,7 @@ TRANSLATIONS.zh = {
   "src.header":"DUBI 方法","src.title.full":"科学来源",
   "src.subtitle.full":"每一条建议均基于同行评审证据与国际指南。",
   "src.kpi.studies":"研究","src.kpi.bodies":"机构","src.kpi.sport":"项运动",
-  "src.tab.principles":"原则","src.tab.bodies":"机构","src.tab.studies":"研究","src.tab.competition":"备赛",
+  "src.tab.principles":"原则","src.tab.bodies":"机构","src.tab.studies":"研究",
   "src.principle.quality.t":"质量优于数量","src.principle.quality.d":"全食物、低加工、营养密度高。",
   "src.principle.energy.t":"智能能量平衡","src.principle.energy.d":"热量重要，但不是全部。代谢背景才是决定因素。",
   "src.principle.adherence.t":"坚持 > 完美","src.principle.adherence.d":"最好的方案是你能长期坚持的方案。",
@@ -6006,11 +5990,11 @@ TRANSLATIONS.zh = {
   "today.subtitle.welcome":"欢迎来到你的方案 · {n} 餐",
 
   "safety.why.notFit":"为何你的目标不合适","safety.choose.goal":"选择你的目标",
-  "prog.weekly.compare":"本周 vs 上周","src.competition.intro":"5 个备赛专属来源 — <strong>4 个新增</strong> 随备赛目标加入，1 个已存在。",
+  "prog.weekly.compare":"本周 vs 上周",
   "shop.partner.note":"数量基于双方真实方案计算。某一方案专属的物品会显示其所有者的编码。",
   "safety.actionRequired":"需要操作","safety.actionRequired.sub":"选择下面其中一个目标以解锁你的方案。","safety.recommended":"推荐",
   "prog.trend.onTrack.plain":"进展顺利","prog.trend.slowing.plain":"出现平台期","prog.trend.notYet.plain":"初始阶段",
-  "prog.weight.trendN":"{n} 周趋势","prog.water.unit":"升/天","goal.race.weeksLeft":"距比赛 {n} 周",
+  "prog.weight.trendN":"{n} 周趋势","prog.water.unit":"升/天",
   "today.badge.added":"由 DUBI 添加","today.badge.removed":"由 DUBI 移除",
   "wrap.title":"DUBI WRAP","wrap.meals":"已完成餐数","wrap.days":"坚持天数","wrap.steps":"总步数",
   "wrap.medal.t":"计划执行率 87%","wrap.medal.s":"DUBI 跟踪记录的最佳结果之一",
@@ -6090,21 +6074,21 @@ TRANSLATIONS.zh = {
   "comp.sport.team.d":"足球·篮球·排球·曲棍球",
   "comp.sport.combat.t":"格斗运动",
   "comp.sport.combat.d":"拳击·综合格斗·柔道·摔跤·空手道",
-  "goal.step.sport.header":"选择您的竞技运动",
-  "goal.step.race.header":"比赛/比赛日期",
-  "goal.step.race.nodate":"输入接收每日定期计划的日期",
-  "race.phase.past":"比赛通过",
-  "race.phase.past.note":"为计划设定一个未来日期。",
-  "race.phase.base":"基础阶段",
-  "race.phase.base.note":"距离比赛还有 {weeks} 周。有氧运动/力量训练，略有剩余。",
-  "race.phase.develop":"开发阶段",
-  "race.phase.develop.note":"{weeks} 周。高容量、高碳水化合物、高蛋白质。",
-  "race.phase.peak":"峰值阶段",
-  "race.phase.peak.note":"{weeks} 周。逐步减少，成分细化。",
-  "race.phase.taper":"逐渐变细",
-  "race.phase.taper.note":"{weeks} 周。减少体积，赛前碳水化合物装载。",
-  "race.phase.raceweek":"比赛周",
-  "race.phase.raceweek.note":"比赛周。碳水化合物负荷，最大限度的水合作用。",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"关联伙伴档案",
   "partner.modal.sub":"购物清单按两个真实计划计算",
   "partner.mycode.label":"你的 DUBI 代码",
@@ -6161,7 +6145,7 @@ TRANSLATIONS.zh = {
   "goal.labels.definition":"定义",
   "goal.labels.gain":"肌肉质量",
   "goal.labels.maintain":"维护保养",
-  "goal.labels.competition":"竞争",
+
   "load.preparing":"准备你的计划",
   "ingr.in.plan":"计划中的食材",
   "ingr.macros":"营养数值",
@@ -6212,7 +6196,7 @@ TRANSLATIONS.zh = {
   "src.stat.orgs":"组织",
   "src.stat.sports":"体育",
   "src.philosophy.label":"DUBI 理念",
-  "src.fonti.gara":"备赛来源",
+
   "prog.wrap.title":"您的回顾月份",
   "prog.wrap.body":"动画图表、实现的里程碑和动机——可在社交媒体上分享。",
   "prog.wrap.open":"打开你的包裹",
@@ -6244,14 +6228,14 @@ TRANSLATIONS.ja = {
   "goal.gain.t":"筋肉量増加","goal.gain.d":"力と量のための狙いを定めた余剰",
   "goal.definition.t":"カット","goal.definition.d":"わずかな赤字でのリコンプ",
   "act.intro":"活動レベルは仕事だけでは決まりません。座り仕事でも定期的に運動する人は必要量が違います。DUBIは複数の変数を評価します。",
-  "act.q1":"1. 日中は何をしていますか？","act.q2":"2. 週に何日トレーニング？","act.q3":"3. 平均トレーニング時間","act.q4":"4. 平均強度","act.q5":"5. 平均歩数（日）","act.q6":"6. 本当に座っている日数（週）",
-  "act.occ.sedentary":"ほぼ一日中座っている","act.occ.sedentary.note":"オフィス・勉強・運転",
-  "act.occ.mixed":"座る・立つを交互","act.occ.walking":"日中よく歩く","act.occ.active":"身体的に活発な仕事","act.occ.heavy":"激しい・重い肉体労働",
+  "act.q2":"週に何日トレーニング？","act.q3":"平均トレーニング時間","act.q4":"平均強度",
+
+
   "act.dur.short":"30分未満","act.dur.mid1":"30–45分","act.dur.mid2":"45–60分","act.dur.long":"60–90分","act.dur.xlong":"90分以上",
   "act.int.light":"軽い","act.int.light.note":"ウォーキング・ストレッチ・軽いヨガ",
   "act.int.moderate":"中","act.int.moderate.note":"ジム・軽いランニング・フィットネス",
   "act.int.high":"高","act.int.high.note":"HIIT・激しいランニング・競技スポーツ",
-  "act.steps.unknown":"わからない",
+
   "pref.diet":"食事スタイル","pref.diet.omni":"雑食","pref.diet.omni.d":"肉・魚・乳製品・卵",
   "pref.diet.veg":"ベジタリアン","pref.diet.veg.d":"乳製品・卵あり、肉魚なし",
   "pref.diet.vegan":"ヴィーガン","pref.diet.vegan.d":"植物性食品のみ",
@@ -6314,8 +6298,8 @@ TRANSLATIONS.ja = {
   "today.askDubi":"DUBIに聞く","today.askDubi.sub":"食事・トレーニング・調整に関する質問",
   "today.preWorkout":"プレワークアウト","today.postWorkout":"ポストワークアウト","today.target":"目標 {pct}",
 
-  "goal.competition.t":"競技準備","goal.competition.d":"あなたの競技に特化したプラン",
-  "goal.competition.badge":"競技","goal.competition.lock":"無料ベータに含まれます",
+
+
   "goal.target.section":"目標","goal.target.optional":"— 任意",
   "goal.target.weight":"目標体重","goal.target.bmiAt":"目標時の推定BMI：",
   "goal.target.bf":"目標体脂肪率 %",
@@ -6339,7 +6323,7 @@ TRANSLATIONS.ja = {
   "src.header":"DUBIメソッド","src.title.full":"科学的根拠",
   "src.subtitle.full":"すべての推奨は査読論文と国際ガイドラインに基づいています。",
   "src.kpi.studies":"件の研究","src.kpi.bodies":"機関","src.kpi.sport":"競技",
-  "src.tab.principles":"原則","src.tab.bodies":"機関","src.tab.studies":"研究","src.tab.competition":"競技",
+  "src.tab.principles":"原則","src.tab.bodies":"機関","src.tab.studies":"研究",
   "src.principle.quality.t":"質は量に勝る","src.principle.quality.d":"加工度の低い丸ごと食品で栄養密度の高いもの。",
   "src.principle.energy.t":"スマートなエネルギーバランス","src.principle.energy.d":"カロリーは重要だが全てではない。代謝の文脈が決定的。",
   "src.principle.adherence.t":"継続 > 完璧","src.principle.adherence.d":"最良のプランは長く続けられるプラン。",
@@ -6363,11 +6347,11 @@ TRANSLATIONS.ja = {
   "today.subtitle.welcome":"あなたのプランへようこそ · {n} 食",
 
   "safety.why.notFit":"あなたの目標が合わない理由","safety.choose.goal":"目標を選択",
-  "prog.weekly.compare":"今週 vs 先週","src.competition.intro":"競技専用の5ソース — <strong>4つ新規</strong> 競技目標で追加、1つは既存。",
+  "prog.weekly.compare":"今週 vs 先週",
   "shop.partner.note":"両プロフィールの実際のプランから計算された数量。片方のみの項目は所有者のコードを表示。",
   "safety.actionRequired":"操作が必要","safety.actionRequired.sub":"以下の目標から1つ選んでプランを解放してください。","safety.recommended":"おすすめ",
   "prog.trend.onTrack.plain":"順調","prog.trend.slowing.plain":"停滞期","prog.trend.notYet.plain":"初期段階",
-  "prog.weight.trendN":"{n}週間トレンド","prog.water.unit":"L/日","goal.race.weeksLeft":"競技まで{n}週間",
+  "prog.weight.trendN":"{n}週間トレンド","prog.water.unit":"L/日",
   "today.badge.added":"DUBIが追加","today.badge.removed":"DUBIが削除",
   "wrap.title":"DUBI WRAP","wrap.meals":"完了した食事","wrap.days":"継続日数","wrap.steps":"総歩数",
   "wrap.medal.t":"プラン遵守率 87%","wrap.medal.s":"DUBIで追跡した最高クラスの結果",
@@ -6447,21 +6431,21 @@ TRANSLATIONS.ja = {
   "comp.sport.team.d":"サッカー・バスケットボール・バレーボール・ホッケー",
   "comp.sport.combat.t":"格闘技",
   "comp.sport.combat.d":"ボクシング・MMA・柔道・レスリング・空手",
-  "goal.step.sport.header":"競技スポーツを選択してください",
-  "goal.step.race.header":"競技会/レース日",
-  "goal.step.race.nodate":"日付を入力すると、その日ごとの定期的なプランが表示されます",
-  "race.phase.past":"レースはパスしました",
-  "race.phase.past.note":"計画の将来の日付を設定します。",
-  "race.phase.base":"ベースフェーズ",
-  "race.phase.base.note":"レースまであと{weeks}週間。エアロビック/ストレングスビルディングでわずかに余剰があります。",
-  "race.phase.develop":"開発段階",
-  "race.phase.develop.note":"{weeks} 週間。大容量、高炭水化物、高タンパク質。",
-  "race.phase.peak":"ピーキングフェーズ",
-  "race.phase.peak.note":"{weeks} 週間。徐々に削減し、構成を洗練させます。",
-  "race.phase.taper":"テーパリング",
-  "race.phase.taper.note":"{weeks} 週間。体積の削減、レース前のカーボローディング。",
-  "race.phase.raceweek":"レースウィーク",
-  "race.phase.raceweek.note":"レースウィーク。カーボローディング、最大限の水分補給。",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"パートナープロフィールを連携",
   "partner.modal.sub":"買い物リストは両方の実際のプランから計算されます",
   "partner.mycode.label":"あなたの DUBI コード",
@@ -6518,7 +6502,7 @@ TRANSLATIONS.ja = {
   "goal.labels.definition":"定義",
   "goal.labels.gain":"筋肉量",
   "goal.labels.maintain":"メンテナンス",
-  "goal.labels.competition":"競争",
+
   "load.preparing":"計画の準備",
   "ingr.in.plan":"プラン内の食材",
   "ingr.macros":"栄養値",
@@ -6569,7 +6553,7 @@ TRANSLATIONS.ja = {
   "src.stat.orgs":"組織",
   "src.stat.sports":"スポーツ",
   "src.philosophy.label":"DUBI の哲学",
-  "src.fonti.gara":"競技準備の出典",
+
   "prog.wrap.title":"あなたの月を振り返る",
   "prog.wrap.body":"アニメーション化されたグラフ、達成したマイルストーン、モチベーション - ソーシャル メディアで共有できます。",
   "prog.wrap.open":"ラップを開く",
@@ -6601,14 +6585,14 @@ TRANSLATIONS.ru = {
   "goal.gain.t":"Мышечная масса","goal.gain.d":"Целевой профицит для силы и объёма",
   "goal.definition.t":"Рельеф","goal.definition.d":"Рекомпозиция с лёгким дефицитом",
   "act.intro":"Уровень активности зависит не только от работы — сидячий человек, регулярно тренирующийся, имеет иные потребности. DUBI учитывает несколько переменных.",
-  "act.q1":"1. ЧТО ТЫ ДЕЛАЕШЬ В ТЕЧЕНИЕ ДНЯ?","act.q2":"2. СКОЛЬКО ДНЕЙ В НЕДЕЛЮ ТРЕНИРУЕШЬСЯ?","act.q3":"3. СРЕДНЯЯ ДЛИТЕЛЬНОСТЬ ТРЕНИРОВКИ","act.q4":"4. СРЕДНЯЯ ИНТЕНСИВНОСТЬ","act.q5":"5. СРЕДНЕЕ ЧИСЛО ШАГОВ","act.q6":"6. ДЕЙСТВИТЕЛЬНО СИДЯЧИХ ДНЕЙ В НЕДЕЛЮ",
-  "act.occ.sedentary":"Сижу почти весь день","act.occ.sedentary.note":"Офис, учёба, вождение",
-  "act.occ.mixed":"Чередую сидя/стоя","act.occ.walking":"Часто хожу в течение дня","act.occ.active":"Физически активная работа","act.occ.heavy":"Тяжёлый ручной труд",
+  "act.q2":"СКОЛЬКО ДНЕЙ В НЕДЕЛЮ ТРЕНИРУЕШЬСЯ?","act.q3":"СРЕДНЯЯ ДЛИТЕЛЬНОСТЬ ТРЕНИРОВКИ","act.q4":"СРЕДНЯЯ ИНТЕНСИВНОСТЬ",
+
+
   "act.dur.short":"Меньше 30 мин","act.dur.mid1":"30–45 мин","act.dur.mid2":"45–60 мин","act.dur.long":"60–90 мин","act.dur.xlong":"Больше 90 мин",
   "act.int.light":"Лёгкая","act.int.light.note":"Ходьба, растяжка, лёгкая йога",
   "act.int.moderate":"Средняя","act.int.moderate.note":"Зал, лёгкий бег, фитнес",
   "act.int.high":"Высокая","act.int.high.note":"HIIT, интенсивный бег, соревновательный спорт",
-  "act.steps.unknown":"Не знаю",
+
   "pref.diet":"СТИЛЬ ПИТАНИЯ","pref.diet.omni":"Всеядный","pref.diet.omni.d":"Мясо, рыба, молочка, яйца",
   "pref.diet.veg":"Вегетарианский","pref.diet.veg.d":"Молочка и яйца, без мяса и рыбы",
   "pref.diet.vegan":"Веганский","pref.diet.vegan.d":"Только растительные продукты",
@@ -6671,8 +6655,8 @@ TRANSLATIONS.ru = {
   "today.askDubi":"Спроси DUBI","today.askDubi.sub":"Вопросы о питании, тренировках и адаптациях",
   "today.preWorkout":"ПЕРЕД ТРЕНИРОВКОЙ","today.postWorkout":"ПОСЛЕ ТРЕНИРОВКИ","today.target":"Цель {pct}",
 
-  "goal.competition.t":"Подготовка к соревнованию","goal.competition.d":"Специальный план под твой вид спорта",
-  "goal.competition.badge":"СОРЕВНОВАНИЕ","goal.competition.lock":"Включено в бесплатную бету",
+
+
   "goal.target.section":"ЦЕЛЬ","goal.target.optional":"— необязательно",
   "goal.target.weight":"Целевой вес","goal.target.bmiAt":"Расчётный ИМТ при цели:",
   "goal.target.bf":"% жира — цель",
@@ -6696,7 +6680,7 @@ TRANSLATIONS.ru = {
   "src.header":"МЕТОД DUBI","src.title.full":"Научные источники",
   "src.subtitle.full":"Каждая рекомендация основана на рецензируемых данных и международных рекомендациях.",
   "src.kpi.studies":"исслед.","src.kpi.bodies":"орган.","src.kpi.sport":"вид. спорта",
-  "src.tab.principles":"Принципы","src.tab.bodies":"Органы","src.tab.studies":"Исследования","src.tab.competition":"Соревнование",
+  "src.tab.principles":"Принципы","src.tab.bodies":"Органы","src.tab.studies":"Исследования",
   "src.principle.quality.t":"Качество важнее количества","src.principle.quality.d":"Цельные, минимально обработанные продукты высокой питательной плотности.",
   "src.principle.energy.t":"Разумный энергобаланс","src.principle.energy.d":"Калории важны, но не всё. Решает метаболический контекст.",
   "src.principle.adherence.t":"Постоянство > совершенство","src.principle.adherence.d":"Лучший план — тот, которого можно придерживаться долго.",
@@ -6720,11 +6704,11 @@ TRANSLATIONS.ru = {
   "today.subtitle.welcome":"Добро пожаловать в твой план · {n} приёмов пищи",
 
   "safety.why.notFit":"ПОЧЕМУ ТВОЯ ЦЕЛЬ НЕ ПОДХОДИТ","safety.choose.goal":"ВЫБЕРИ ЦЕЛЬ",
-  "prog.weekly.compare":"ТЕКУЩАЯ vs ПРЕДЫДУЩАЯ НЕДЕЛЯ","src.competition.intro":"5 специфичных источников для соревнований — <strong>4 новых</strong> с целью Соревнование, 1 уже есть.",
+  "prog.weekly.compare":"ТЕКУЩАЯ vs ПРЕДЫДУЩАЯ НЕДЕЛЯ",
   "shop.partner.note":"Количества рассчитаны по реальным планам обоих профилей. Эксклюзивные позиции показывают код владельца.",
   "safety.actionRequired":"Требуется действие","safety.actionRequired.sub":"Выбери одну из целей ниже, чтобы открыть план.","safety.recommended":"РЕКОМЕНДУЕМ",
   "prog.trend.onTrack.plain":"По плану","prog.trend.slowing.plain":"Плато","prog.trend.notYet.plain":"Начальная фаза",
-  "prog.weight.trendN":"ТРЕНД {n} НЕДЕЛЬ","prog.water.unit":"Л/день","goal.race.weeksLeft":"{n} НЕДЕЛЬ ДО СОРЕВНОВАНИЯ",
+  "prog.weight.trendN":"ТРЕНД {n} НЕДЕЛЬ","prog.water.unit":"Л/день",
   "today.badge.added":"ДОБАВИЛ DUBI","today.badge.removed":"УБРАЛ DUBI",
   "wrap.title":"DUBI WRAP","wrap.meals":"приёмов пищи выполнено","wrap.days":"дней постоянства","wrap.steps":"шагов всего",
   "wrap.medal.t":"87% приверженности плану","wrap.medal.s":"Среди лучших результатов в DUBI",
@@ -6804,21 +6788,21 @@ TRANSLATIONS.ru = {
   "comp.sport.team.d":"Футбол · Баскетбол · Волейбол · Хоккей",
   "comp.sport.combat.t":"Боевые виды спорта",
   "comp.sport.combat.d":"Бокс · ММА · Дзюдо · Борьба · Каратэ",
-  "goal.step.sport.header":"ВЫБЕРИТЕ СОРЕВНОВАНИЕ ВИДА СПОРТА",
-  "goal.step.race.header":"ДАТА СОРЕВНОВАНИЯ/ГОНКИ",
-  "goal.step.race.nodate":"Введите дату, чтобы получить ежедневный периодический план",
-  "race.phase.past":"Гонка пройдена",
-  "race.phase.past.note":"Установите будущую дату для плана.",
-  "race.phase.base":"Базовая фаза",
-  "race.phase.base.note":"{weeks} недель до гонки. Аэробно-силовой комплекс с небольшим избытком.",
-  "race.phase.develop":"Этап разработки",
-  "race.phase.develop.note":"{weeks} нед. Большой объем, повышенное содержание углеводов, высокое содержание белка.",
-  "race.phase.peak":"Пиковая фаза",
-  "race.phase.peak.note":"{weeks} нед. Постепенное сокращение, уточнение состава.",
-  "race.phase.taper":"Сужение",
-  "race.phase.taper.note":"{weeks} нед. Уменьшение объема, загрузка углеводов перед гонкой.",
-  "race.phase.raceweek":"Гоночная неделя",
-  "race.phase.raceweek.note":"Неделя гонок. Углеводная загрузка, максимальное увлажнение.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   "partner.modal.title":"Связать профиль партнера",
   "partner.modal.sub":"Список покупок считается по двум реальным планам",
   "partner.mycode.label":"ТВОЙ КОД DUBI",
@@ -6875,7 +6859,7 @@ TRANSLATIONS.ru = {
   "goal.labels.definition":"Определение",
   "goal.labels.gain":"Мышечная масса",
   "goal.labels.maintain":"Техническое обслуживание",
-  "goal.labels.competition":"Конкуренция",
+
   "load.preparing":"Подготовка вашего плана",
   "ingr.in.plan":"ИНГРЕДИЕНТ В ТВОЕМ ПЛАНЕ",
   "ingr.macros":"ПИЩЕВАЯ ЦЕННОСТЬ",
@@ -6926,7 +6910,7 @@ TRANSLATIONS.ru = {
   "src.stat.orgs":"организации",
   "src.stat.sports":"спорт",
   "src.philosophy.label":"ФИЛОСОФИЯ DUBI",
-  "src.fonti.gara":"ИСТОЧНИКИ ДЛЯ ПОДГОТОВКИ",
+
   "prog.wrap.title":"Обзор вашего месяца",
   "prog.wrap.body":"Анимированные диаграммы, достигнутые результаты и мотивация, которыми можно поделиться в социальных сетях.",
   "prog.wrap.open":"Откройте свою ОБЕРКУ",
@@ -6966,7 +6950,7 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.edit.reason":"Motivo", "set.edit.double":"Confermo, aggiorna DUBI", "set.edit.cancel":"Annulla", "set.edit.success":"Profilo aggiornato. DUBI ha riallineato il piano.", "set.edit.error":"Non sono riuscito a salvare la modifica. Riprova tra poco.",
     "set.edit.selectField":"Seleziona un campo da modificare.", "set.edit.profile":"Profilo", "set.edit.body":"Corpo e obiettivo", "set.edit.training":"Allenamento", "set.edit.nutrition":"Nutrizione", "set.edit.routine":"Routine",
     "set.field.name":"Nome", "set.field.gender":"Sesso", "set.field.age":"Eta", "set.field.height":"Altezza", "set.field.weight":"Peso attuale", "set.field.goal":"Obiettivo", "set.field.targetWeight":"Peso target", "set.field.targetBf":"Body fat target",
-    "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita", "set.field.dailySteps":"Passi medi", "set.field.sedentaryDays":"Giorni sedentari", "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.dayStart":"Inizio giornata", "set.field.dayEnd":"Fine giornata", "set.field.wearable":"Wearable",
+    "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita",   "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.dayStart":"Inizio giornata", "set.field.dayEnd":"Fine giornata", "set.field.wearable":"Wearable",
     "set.reason.energy":"influenza fabbisogno energetico, macro e porzioni.", "set.reason.foods":"influenza selezione ingredienti, allergeni e alternative sicure.", "set.reason.training":"influenza timing dei carboidrati, pasti pre/post workout e recupero.", "set.reason.routine":"influenza orari e distribuzione dei pasti.", "set.reason.profile":"aggiorna i dati profilo senza rigenerare la dieta.",
     "set.quick.goal":"Obiettivo", "set.quick.diet":"Dieta", "set.quick.training":"Allenamento", "set.quick.allergies":"Allergie",
     "set.logout":"Esci", "set.logout.q":"Sei sicuro di voler uscire?", "set.logout.cancel":"Annulla",
@@ -6987,7 +6971,7 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.edit.reason":"Reason", "set.edit.double":"I confirm, update DUBI", "set.edit.cancel":"Cancel", "set.edit.success":"Profile updated. DUBI realigned the plan.", "set.edit.error":"I could not save this change. Please try again shortly.",
     "set.edit.selectField":"Select a field to edit.", "set.edit.profile":"Profile", "set.edit.body":"Body and goal", "set.edit.training":"Training", "set.edit.nutrition":"Nutrition", "set.edit.routine":"Routine",
     "set.field.name":"Name", "set.field.gender":"Gender", "set.field.age":"Age", "set.field.height":"Height", "set.field.weight":"Current weight", "set.field.goal":"Goal", "set.field.targetWeight":"Target weight", "set.field.targetBf":"Target body fat",
-    "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity", "set.field.dailySteps":"Average steps", "set.field.sedentaryDays":"Sedentary days", "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.dayStart":"Day start", "set.field.dayEnd":"Day end", "set.field.wearable":"Wearable",
+    "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity",   "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.dayStart":"Day start", "set.field.dayEnd":"Day end", "set.field.wearable":"Wearable",
     "set.reason.energy":"affects energy needs, macros and portions.", "set.reason.foods":"affects ingredient selection, allergens and safe alternatives.", "set.reason.training":"affects carb timing, pre/post workout meals and recovery.", "set.reason.routine":"affects meal timing and distribution.", "set.reason.profile":"updates profile data without regenerating nutrition.",
     "set.quick.goal":"Goal", "set.quick.diet":"Diet", "set.quick.training":"Training", "set.quick.allergies":"Allergies",
     "set.logout":"Log out", "set.logout.q":"Are you sure you want to log out?", "set.logout.cancel":"Cancel",
@@ -7019,25 +7003,25 @@ const SETTINGS_PROFILE_PATCH_TRANSLATIONS = {
   fr: {
     "set.hero.kicker":"CENTRE PROFIL","set.hero.sub":"Gere les donnees qui guident les plans, repas et adaptations de DUBI.",
     "set.edit.title":"Modification intelligente","set.edit.sub":"Modifie seulement ce dont tu as besoin. Si cela impacte la nutrition, DUBI explique pourquoi avant de mettre a jour le plan.","set.edit.open":"Choisir quoi modifier","set.edit.active":"Editeur de profil","set.edit.close":"Fermer","set.edit.pick":"Que veux-tu mettre a jour?","set.edit.value":"Nouvelle valeur","set.edit.save":"Enregistrer la modification","set.edit.saving":"Enregistrement...","set.edit.confirm":"Confirmer la mise a jour","set.edit.confirmDiet":"Cette modification peut changer calories, macros, ingredients ou distribution des repas.","set.edit.confirmNoDiet":"Cette modification met a jour le profil, mais ne devrait pas changer le plan nutritionnel actuel.","set.edit.reason":"Raison","set.edit.double":"Je confirme, mets DUBI a jour","set.edit.cancel":"Annuler","set.edit.success":"Profil mis a jour. DUBI a realigne le plan.","set.edit.error":"Impossible d'enregistrer la modification. Reessaie bientot.","set.edit.selectField":"Selectionne un champ a modifier.","set.edit.profile":"Profil","set.edit.body":"Corps et objectif","set.edit.training":"Entrainement","set.edit.nutrition":"Nutrition","set.edit.routine":"Routine",
-    "set.field.name":"Nom","set.field.gender":"Sexe","set.field.age":"Age","set.field.height":"Taille","set.field.weight":"Poids actuel","set.field.goal":"Objectif","set.field.targetWeight":"Poids cible","set.field.targetBf":"Masse grasse cible","set.field.workoutDays":"Jours d'entrainement","set.field.workoutDuration":"Duree d'entrainement","set.field.workoutIntensity":"Intensite","set.field.dailySteps":"Pas moyens","set.field.sedentaryDays":"Jours sedentaires","set.field.diet":"Preference alimentaire","set.field.allergies":"Allergies/intolerances","set.field.sport":"Sport","set.field.trainingTime":"Horaire d'entrainement","set.field.breakfastPref":"Petit-dejeuner","set.field.dayStart":"Debut de journee","set.field.dayEnd":"Fin de journee","set.field.wearable":"Wearable",
+    "set.field.name":"Nom","set.field.gender":"Sexe","set.field.age":"Age","set.field.height":"Taille","set.field.weight":"Poids actuel","set.field.goal":"Objectif","set.field.targetWeight":"Poids cible","set.field.targetBf":"Masse grasse cible","set.field.workoutDays":"Jours d'entrainement","set.field.workoutDuration":"Duree d'entrainement","set.field.workoutIntensity":"Intensite","set.field.diet":"Preference alimentaire","set.field.allergies":"Allergies/intolerances","set.field.sport":"Sport","set.field.trainingTime":"Horaire d'entrainement","set.field.breakfastPref":"Petit-dejeuner","set.field.dayStart":"Debut de journee","set.field.dayEnd":"Fin de journee","set.field.wearable":"Wearable",
     "set.reason.energy":"influence les besoins energetiques, macros et portions.","set.reason.foods":"influence le choix des ingredients, allergenes et alternatives sures.","set.reason.training":"influence le timing des glucides, repas pre/post entrainement et recuperation.","set.reason.routine":"influence les horaires et la distribution des repas.","set.reason.profile":"met a jour le profil sans regenerer la nutrition.","set.quick.goal":"Objectif","set.quick.diet":"Regime","set.quick.training":"Entrainement","set.quick.allergies":"Allergies","set.logout":"Se deconnecter","set.logout.q":"Es-tu sur de vouloir te deconnecter?","set.logout.cancel":"Annuler"
   },
   es: {
     "set.hero.kicker":"CENTRO DE PERFIL","set.hero.sub":"Gestiona los datos que guian planes, comidas y adaptaciones de DUBI.",
     "set.edit.title":"Edicion inteligente","set.edit.sub":"Cambia solo lo necesario. Si afecta a la nutricion, DUBI explica por que antes de actualizar el plan.","set.edit.open":"Elegir que modificar","set.edit.active":"Editor de perfil","set.edit.close":"Cerrar","set.edit.pick":"Que quieres actualizar?","set.edit.value":"Nuevo valor","set.edit.save":"Guardar cambio","set.edit.saving":"Guardando...","set.edit.confirm":"Confirmar actualizacion","set.edit.confirmDiet":"Este cambio puede modificar calorias, macros, ingredientes o distribucion de comidas.","set.edit.confirmNoDiet":"Este cambio actualiza el perfil, pero no deberia cambiar el plan nutricional actual.","set.edit.reason":"Motivo","set.edit.double":"Confirmo, actualiza DUBI","set.edit.cancel":"Cancelar","set.edit.success":"Perfil actualizado. DUBI realineo el plan.","set.edit.error":"No pude guardar el cambio. Intentalo mas tarde.","set.edit.selectField":"Selecciona un campo para modificar.","set.edit.profile":"Perfil","set.edit.body":"Cuerpo y objetivo","set.edit.training":"Entrenamiento","set.edit.nutrition":"Nutricion","set.edit.routine":"Rutina",
-    "set.field.name":"Nombre","set.field.gender":"Sexo","set.field.age":"Edad","set.field.height":"Altura","set.field.weight":"Peso actual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso objetivo","set.field.targetBf":"Grasa corporal objetivo","set.field.workoutDays":"Dias de entrenamiento","set.field.workoutDuration":"Duracion del entrenamiento","set.field.workoutIntensity":"Intensidad","set.field.dailySteps":"Pasos medios","set.field.sedentaryDays":"Dias sedentarios","set.field.diet":"Preferencia alimentaria","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Deporte","set.field.trainingTime":"Hora de entrenamiento","set.field.breakfastPref":"Desayuno","set.field.dayStart":"Inicio del dia","set.field.dayEnd":"Fin del dia","set.field.wearable":"Wearable",
+    "set.field.name":"Nombre","set.field.gender":"Sexo","set.field.age":"Edad","set.field.height":"Altura","set.field.weight":"Peso actual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso objetivo","set.field.targetBf":"Grasa corporal objetivo","set.field.workoutDays":"Dias de entrenamiento","set.field.workoutDuration":"Duracion del entrenamiento","set.field.workoutIntensity":"Intensidad","set.field.diet":"Preferencia alimentaria","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Deporte","set.field.trainingTime":"Hora de entrenamiento","set.field.breakfastPref":"Desayuno","set.field.dayStart":"Inicio del dia","set.field.dayEnd":"Fin del dia","set.field.wearable":"Wearable",
     "set.reason.energy":"influye en necesidades energeticas, macros y porciones.","set.reason.foods":"influye en seleccion de ingredientes, alergenos y alternativas seguras.","set.reason.training":"influye en timing de carbohidratos, comidas pre/post entrenamiento y recuperacion.","set.reason.routine":"influye en horarios y distribucion de comidas.","set.reason.profile":"actualiza datos del perfil sin regenerar la nutricion.","set.quick.goal":"Objetivo","set.quick.diet":"Dieta","set.quick.training":"Entrenamiento","set.quick.allergies":"Alergias","set.logout":"Cerrar sesion","set.logout.q":"Seguro que quieres cerrar sesion?","set.logout.cancel":"Cancelar"
   },
   de: {
     "set.hero.kicker":"PROFILZENTRUM","set.hero.sub":"Verwalte die Daten, die DUBI Plane, Mahlzeiten und Anpassungen steuern.",
     "set.edit.title":"Intelligente Bearbeitung","set.edit.sub":"Andere nur, was du brauchst. Wenn es die Ernahrung beeinflusst, erklart DUBI warum, bevor der Plan aktualisiert wird.","set.edit.open":"Auswahlen, was geandert wird","set.edit.active":"Profil-Editor","set.edit.close":"Schliessen","set.edit.pick":"Was mochtest du aktualisieren?","set.edit.value":"Neuer Wert","set.edit.save":"Anderung speichern","set.edit.saving":"Speichern...","set.edit.confirm":"Aktualisierung bestatigen","set.edit.confirmDiet":"Diese Anderung kann Kalorien, Makros, Zutaten oder Mahlzeitenverteilung andern.","set.edit.confirmNoDiet":"Diese Anderung aktualisiert das Profil, sollte aber den aktuellen Ernahrungsplan nicht andern.","set.edit.reason":"Grund","set.edit.double":"Ich bestatige, DUBI aktualisieren","set.edit.cancel":"Abbrechen","set.edit.success":"Profil aktualisiert. DUBI hat den Plan neu ausgerichtet.","set.edit.error":"Anderung konnte nicht gespeichert werden. Bitte erneut versuchen.","set.edit.selectField":"Wahle ein Feld zum Bearbeiten.","set.edit.profile":"Profil","set.edit.body":"Korper und Ziel","set.edit.training":"Training","set.edit.nutrition":"Ernahrung","set.edit.routine":"Routine",
-    "set.field.name":"Name","set.field.gender":"Geschlecht","set.field.age":"Alter","set.field.height":"Grosse","set.field.weight":"Aktuelles Gewicht","set.field.goal":"Ziel","set.field.targetWeight":"Zielgewicht","set.field.targetBf":"Ziel-Korperfett","set.field.workoutDays":"Trainingstage","set.field.workoutDuration":"Trainingsdauer","set.field.workoutIntensity":"Intensitat","set.field.dailySteps":"Durchschnittliche Schritte","set.field.sedentaryDays":"Sitzende Tage","set.field.diet":"Ernahrungspraferenz","set.field.allergies":"Allergien/Unvertraglichkeiten","set.field.sport":"Sport","set.field.trainingTime":"Trainingszeit","set.field.breakfastPref":"Fruhstuck","set.field.dayStart":"Tagesbeginn","set.field.dayEnd":"Tagesende","set.field.wearable":"Wearable",
+    "set.field.name":"Name","set.field.gender":"Geschlecht","set.field.age":"Alter","set.field.height":"Grosse","set.field.weight":"Aktuelles Gewicht","set.field.goal":"Ziel","set.field.targetWeight":"Zielgewicht","set.field.targetBf":"Ziel-Korperfett","set.field.workoutDays":"Trainingstage","set.field.workoutDuration":"Trainingsdauer","set.field.workoutIntensity":"Intensitat","set.field.diet":"Ernahrungspraferenz","set.field.allergies":"Allergien/Unvertraglichkeiten","set.field.sport":"Sport","set.field.trainingTime":"Trainingszeit","set.field.breakfastPref":"Fruhstuck","set.field.dayStart":"Tagesbeginn","set.field.dayEnd":"Tagesende","set.field.wearable":"Wearable",
     "set.reason.energy":"beeinflusst Energiebedarf, Makros und Portionen.","set.reason.foods":"beeinflusst Zutatenwahl, Allergene und sichere Alternativen.","set.reason.training":"beeinflusst Kohlenhydrat-Timing, Pre/Post-Workout-Mahlzeiten und Erholung.","set.reason.routine":"beeinflusst Zeiten und Mahlzeitenverteilung.","set.reason.profile":"aktualisiert Profildaten ohne Ernahrung neu zu generieren.","set.quick.goal":"Ziel","set.quick.diet":"Ernahrung","set.quick.training":"Training","set.quick.allergies":"Allergien","set.logout":"Abmelden","set.logout.q":"Mochtest du dich wirklich abmelden?","set.logout.cancel":"Abbrechen"
   },
   pt: {
     "set.hero.kicker":"CENTRO DE PERFIL","set.hero.sub":"Gere os dados que orientam planos, refeicoes e adaptacoes da DUBI.",
     "set.edit.title":"Edicao inteligente","set.edit.sub":"Altera apenas o que precisas. Se afetar a nutricao, a DUBI explica antes de atualizar o plano.","set.edit.open":"Escolher o que editar","set.edit.active":"Editor de perfil","set.edit.close":"Fechar","set.edit.pick":"O que queres atualizar?","set.edit.value":"Novo valor","set.edit.save":"Guardar alteracao","set.edit.saving":"A guardar...","set.edit.confirm":"Confirmar atualizacao","set.edit.confirmDiet":"Esta alteracao pode mudar calorias, macros, ingredientes ou distribuicao das refeicoes.","set.edit.confirmNoDiet":"Esta alteracao atualiza o perfil, mas nao devera mudar o plano nutricional atual.","set.edit.reason":"Motivo","set.edit.double":"Confirmo, atualizar DUBI","set.edit.cancel":"Cancelar","set.edit.success":"Perfil atualizado. A DUBI realinhou o plano.","set.edit.error":"Nao foi possivel guardar a alteracao. Tenta novamente.","set.edit.selectField":"Seleciona um campo para editar.","set.edit.profile":"Perfil","set.edit.body":"Corpo e objetivo","set.edit.training":"Treino","set.edit.nutrition":"Nutricao","set.edit.routine":"Rotina",
-    "set.field.name":"Nome","set.field.gender":"Sexo","set.field.age":"Idade","set.field.height":"Altura","set.field.weight":"Peso atual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso alvo","set.field.targetBf":"Gordura corporal alvo","set.field.workoutDays":"Dias de treino","set.field.workoutDuration":"Duracao do treino","set.field.workoutIntensity":"Intensidade","set.field.dailySteps":"Passos medios","set.field.sedentaryDays":"Dias sedentarios","set.field.diet":"Preferencia alimentar","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Desporto","set.field.trainingTime":"Horario do treino","set.field.breakfastPref":"Pequeno-almoco","set.field.dayStart":"Inicio do dia","set.field.dayEnd":"Fim do dia","set.field.wearable":"Wearable",
+    "set.field.name":"Nome","set.field.gender":"Sexo","set.field.age":"Idade","set.field.height":"Altura","set.field.weight":"Peso atual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso alvo","set.field.targetBf":"Gordura corporal alvo","set.field.workoutDays":"Dias de treino","set.field.workoutDuration":"Duracao do treino","set.field.workoutIntensity":"Intensidade","set.field.diet":"Preferencia alimentar","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Desporto","set.field.trainingTime":"Horario do treino","set.field.breakfastPref":"Pequeno-almoco","set.field.dayStart":"Inicio do dia","set.field.dayEnd":"Fim do dia","set.field.wearable":"Wearable",
     "set.reason.energy":"influencia necessidades energeticas, macros e porcoes.","set.reason.foods":"influencia escolha de ingredientes, alergenos e alternativas seguras.","set.reason.training":"influencia timing dos hidratos, refeicoes pre/pos-treino e recuperacao.","set.reason.routine":"influencia horarios e distribuicao das refeicoes.","set.reason.profile":"atualiza dados do perfil sem regenerar nutricao.","set.quick.goal":"Objetivo","set.quick.diet":"Dieta","set.quick.training":"Treino","set.quick.allergies":"Alergias","set.logout":"Sair","set.logout.q":"Tens a certeza que queres sair?","set.logout.cancel":"Cancelar"
   },
   ar: {
@@ -7098,7 +7082,7 @@ const I18N_COMPLETION = {
     "askdubi.suggestions.label":"SITUATIONS FREQUENTES","askdubi.support":"Conseiller - Plan - Support","askdubi.info":"Tu peux decrire des situations reelles ou poser des questions de suivi - DUBI garde le contexte et peut <strong style=\"color:#7A9E73\">mettre a jour le plan du jour</strong>.","askdubi.response.label":"REPONSE DUBI","askdubi.fonte":"Source :","askdubi.offer.label":"JE PEUX L'AJOUTER AU PLAN","askdubi.offer.q":"Veux-tu que j'ajoute \"{item}\" au plan d'aujourd'hui ?","askdubi.apply":"Oui, mettre a jour le plan","askdubi.adapt.label":"ADAPTATION DU PLAN","askdubi.updated":"Plan mis a jour","askdubi.updated.sub":"Ferme le panneau pour voir les changements.","askdubi.input.ph":"Decris ta situation ou pose une question...","askdubi.input.ph.followup":"Reponds ou pose une autre question...","askdubi.send":"Envoyer","askdubi.sugg.1":"Je me suis reveille tard, je saute le petit-dejeuner","askdubi.sugg.2":"Je ne peux pas dejeuner aujourd'hui","askdubi.sugg.3":"Puis-je remplacer le poulet par du poisson ?","askdubi.sugg.4":"Comment gerer la faim du soir ?","askdubi.sugg.5":"Je dine dehors ce soir","askdubi.sugg.6":"Quelle quantite d'eau dois-je boire ?",
     "ingr.in.plan":"INGREDIENT DANS TON PLAN","ingr.macros":"VALEURS NUTRITIONNELLES","ingr.benefits.label":"BENEFICES CLES","ingr.tip.label":"CONSEIL DUBI","ingr.source":"Source :","ingr.why":"POURQUOI DANS TON PLAN","ingr.why.text":"Selectionne pour completer le profil nutritionnel du repas et soutenir l'objectif calorique et macro de la journee.","ingr.tip.generic":"Chaque ingredient est choisi pour sa densite nutritionnelle et sa coherence avec le reste du repas.","meal.source.linked":"Source scientifique reliee :","meal.reason.localized":"DUBI a choisi ce repas selon ton creneau, ton objectif calorique et la qualite nutritionnelle : satiete, densite en nutriments, indice glycemique et soutien de la recuperation. Niveau de preuve : eleve.",
     "shop.butcher.title":"Conseil qualite","shop.butcher.text":"Viande, poulet et oeufs sont idealement achetes chez un boucher de confiance. Pour la viande rouge, choisis si possible du grass-fed : plus d'Omega-3 et de CLA que l'elevage intensif.",
-    "src.philosophy.label":"PHILOSOPHIE DUBI","src.fonti.gara":"SOURCES PREPARATION COMPETITION","src.badge.new":"NOUVEAU","src.badge.present":"DEJA PRESENT"
+    "src.philosophy.label":"PHILOSOPHIE DUBI","src.badge.new":"NOUVEAU","src.badge.present":"DEJA PRESENT"
   },
   es: {
     "wd.d.steps.total":"Pasos totales","wd.d.steps.dist":"Distancia","wd.d.steps.goal":"Objetivo","wd.d.steps.streak":"Racha activa","wd.d.steps.streak.v":"5 dias consecutivos","wd.d.steps.unit":" pasos","wd.d.steps.walkcal":"Calorias caminando","wd.d.steps.active":"Minutos activos","wd.d.steps.met":"Equivalente MET",
@@ -7109,7 +7093,7 @@ const I18N_COMPLETION = {
     "askdubi.suggestions.label":"SITUACIONES FRECUENTES","askdubi.support":"Asesor - Plan - Soporte","askdubi.info":"Puedes describir situaciones reales o hacer preguntas de seguimiento; DUBI recuerda el contexto y puede <strong style=\"color:#7A9E73\">actualizar el plan de hoy</strong>.","askdubi.response.label":"RESPUESTA DUBI","askdubi.fonte":"Fuente:","askdubi.offer.label":"PUEDO ANADIRLO AL PLAN","askdubi.offer.q":"Quieres que anada \"{item}\" al plan de hoy?","askdubi.apply":"Si, actualizar el plan","askdubi.adapt.label":"ADAPTACION DEL PLAN","askdubi.updated":"Plan actualizado","askdubi.updated.sub":"Cierra el panel para ver los cambios.","askdubi.input.ph":"Describe tu situacion o haz una pregunta...","askdubi.input.ph.followup":"Responde o haz otra pregunta...","askdubi.send":"Enviar","askdubi.sugg.1":"Me desperte tarde, salto el desayuno","askdubi.sugg.2":"No puedo almorzar hoy","askdubi.sugg.3":"Puedo cambiar pollo por pescado?","askdubi.sugg.4":"Como gestiono el hambre nocturna?","askdubi.sugg.5":"Ceno fuera esta noche","askdubi.sugg.6":"Cuanta agua debo beber?",
     "ingr.in.plan":"INGREDIENTE EN TU PLAN","ingr.macros":"VALORES NUTRICIONALES","ingr.benefits.label":"BENEFICIOS CLAVE","ingr.tip.label":"CONSEJO DUBI","ingr.source":"Fuente:","ingr.why":"POR QUE ESTA EN TU PLAN","ingr.why.text":"Elegido para completar el perfil nutricional de la comida y apoyar el objetivo diario de calorias y macros.","ingr.tip.generic":"Cada ingrediente se elige por densidad nutricional y coherencia con el resto de la comida.","meal.source.linked":"Fuente cientifica vinculada:","meal.reason.localized":"DUBI eligio esta comida segun tu ventana horaria, objetivo calorico y calidad nutricional: saciedad, densidad de nutrientes, indice glucemico y recuperacion. Evidencia: alta.",
     "shop.butcher.title":"Consejo de calidad","shop.butcher.text":"Carne, pollo y huevos se recomiendan de un proveedor de confianza. Para carne roja, elige grass-fed cuando sea posible: mas Omega-3 y CLA que la cria intensiva.",
-    "src.philosophy.label":"FILOSOFIA DUBI","src.fonti.gara":"FUENTES PREPARACION COMPETICION","src.badge.new":"NUEVO","src.badge.present":"YA PRESENTE"
+    "src.philosophy.label":"FILOSOFIA DUBI","src.badge.new":"NUEVO","src.badge.present":"YA PRESENTE"
   },
   de: {
     "wd.d.steps.total":"Schritte gesamt","wd.d.steps.dist":"Distanz","wd.d.steps.goal":"Ziel","wd.d.steps.streak":"Aktive Serie","wd.d.steps.streak.v":"5 Tage in Folge","wd.d.steps.unit":" Schritte","wd.d.steps.walkcal":"Geh-Kalorien","wd.d.steps.active":"Aktive Minuten","wd.d.steps.met":"MET-Aquivalent",
@@ -7120,7 +7104,7 @@ const I18N_COMPLETION = {
     "askdubi.suggestions.label":"HAUFIGE SITUATIONEN","askdubi.support":"Berater - Plan - Support","askdubi.info":"Du kannst reale Situationen beschreiben oder Nachfragen stellen - DUBI merkt sich den Kontext und kann <strong style=\"color:#7A9E73\">den heutigen Plan aktualisieren</strong>.","askdubi.response.label":"DUBI-ANTWORT","askdubi.fonte":"Quelle:","askdubi.offer.label":"ICH KANN ES ZUM PLAN HINZUFUGEN","askdubi.offer.q":"Soll ich \"{item}\" zum heutigen Plan hinzufugen?","askdubi.apply":"Ja, Plan aktualisieren","askdubi.adapt.label":"PLANANPASSUNG","askdubi.updated":"Plan aktualisiert","askdubi.updated.sub":"Schliesse das Panel, um die Anderungen zu sehen.","askdubi.input.ph":"Beschreibe deine Situation oder stelle eine Frage...","askdubi.input.ph.followup":"Antworte oder stelle eine weitere Frage...","askdubi.send":"Senden","askdubi.sugg.1":"Ich bin spat aufgewacht und lasse das Fruhstuck aus","askdubi.sugg.2":"Ich kann heute nicht zu Mittag essen","askdubi.sugg.3":"Kann ich Huhn durch Fisch ersetzen?","askdubi.sugg.4":"Wie gehe ich mit Hunger am Abend um?","askdubi.sugg.5":"Ich esse heute Abend auswarts","askdubi.sugg.6":"Wie viel Wasser soll ich trinken?",
     "ingr.in.plan":"ZUTAT IN DEINEM PLAN","ingr.macros":"NAHRWERTE","ingr.benefits.label":"WICHTIGE VORTEILE","ingr.tip.label":"DUBI-TIPP","ingr.source":"Quelle:","ingr.why":"WARUM IM PLAN","ingr.why.text":"Ausgewahlt, um das Nahrwertprofil der Mahlzeit zu vervollstandigen und dein Tagesziel zu unterstutzen.","ingr.tip.generic":"Jede Zutat wird nach Nahrstoffdichte und Zusammenspiel mit der Mahlzeit ausgewahlt.","meal.source.linked":"Verknupfte wissenschaftliche Quelle:","meal.reason.localized":"DUBI hat diese Mahlzeit nach Zeitfenster, Kalorienziel und Ernahrungsqualitat gewahlt: Sattigung, Nahrstoffdichte, glykämischer Index und Erholung. Evidenz: hoch.",
     "shop.butcher.title":"Qualitatstipp","shop.butcher.text":"Fleisch, Huhn und Eier kaufst du am besten bei einem vertrauenswurdigen Anbieter. Bei rotem Fleisch moglichst grass-fed wahlen: mehr Omega-3 und CLA als Intensivhaltung.",
-    "src.philosophy.label":"DUBI-PHILOSOPHIE","src.fonti.gara":"QUELLEN WETTKAMPFVORBEREITUNG","src.badge.new":"NEU","src.badge.present":"BEREITS VORHANDEN"
+    "src.philosophy.label":"DUBI-PHILOSOPHIE","src.badge.new":"NEU","src.badge.present":"BEREITS VORHANDEN"
   },
   pt: {
     "wd.d.steps.total":"Passos totais","wd.d.steps.dist":"Distancia","wd.d.steps.goal":"Objetivo","wd.d.steps.streak":"Sequencia ativa","wd.d.steps.streak.v":"5 dias consecutivos","wd.d.steps.unit":" passos","wd.d.steps.walkcal":"Calorias de caminhada","wd.d.steps.active":"Minutos ativos","wd.d.steps.met":"Equivalente MET",
@@ -7131,7 +7115,7 @@ const I18N_COMPLETION = {
     "askdubi.suggestions.label":"SITUACOES FREQUENTES","askdubi.support":"Consultor - Plano - Suporte","askdubi.info":"Podes descrever situacoes reais ou fazer perguntas de seguimento - o DUBI guarda o contexto e pode <strong style=\"color:#7A9E73\">atualizar o plano de hoje</strong>.","askdubi.response.label":"RESPOSTA DUBI","askdubi.fonte":"Fonte:","askdubi.offer.label":"POSSO ADICIONAR AO PLANO","askdubi.offer.q":"Queres que adicione \"{item}\" ao plano de hoje?","askdubi.apply":"Sim, atualizar plano","askdubi.adapt.label":"ADAPTACAO DO PLANO","askdubi.updated":"Plano atualizado","askdubi.updated.sub":"Fecha o painel para ver as alteracoes.","askdubi.input.ph":"Descreve a tua situacao ou faz uma pergunta...","askdubi.input.ph.followup":"Responde ou faz outra pergunta...","askdubi.send":"Enviar","askdubi.sugg.1":"Acordei tarde, salto o pequeno-almoco","askdubi.sugg.2":"Nao consigo almocar hoje","askdubi.sugg.3":"Posso trocar frango por peixe?","askdubi.sugg.4":"Como gerir a fome ao fim do dia?","askdubi.sugg.5":"Vou jantar fora hoje","askdubi.sugg.6":"Quanta agua devo beber?",
     "ingr.in.plan":"INGREDIENTE NO TEU PLANO","ingr.macros":"VALORES NUTRICIONAIS","ingr.benefits.label":"BENEFICIOS CHAVE","ingr.tip.label":"DICA DUBI","ingr.source":"Fonte:","ingr.why":"PORQUE ESTA NO PLANO","ingr.why.text":"Selecionado para completar o perfil nutricional da refeicao e apoiar o objetivo diario de calorias e macros.","ingr.tip.generic":"Cada ingrediente e escolhido pela densidade nutricional e coerencia com a refeicao.","meal.source.linked":"Fonte cientifica associada:","meal.reason.localized":"O DUBI escolheu esta refeicao segundo o teu horario, objetivo calorico e qualidade nutricional: saciedade, densidade de nutrientes, indice glicemico e recuperacao. Evidencia: alta.",
     "shop.butcher.title":"Dica de qualidade","shop.butcher.text":"Carne, frango e ovos devem idealmente vir de um fornecedor de confianca. Para carne vermelha, escolhe grass-fed quando possivel: mais Omega-3 e CLA que criacao intensiva.",
-    "src.philosophy.label":"FILOSOFIA DUBI","src.fonti.gara":"FONTES PREPARACAO COMPETICAO","src.badge.new":"NOVO","src.badge.present":"JA PRESENTE"
+    "src.philosophy.label":"FILOSOFIA DUBI","src.badge.new":"NOVO","src.badge.present":"JA PRESENTE"
   }
 };
 ["ar","zh","ja","ru"].forEach(code => {
@@ -7174,19 +7158,19 @@ const I18N_DEEP_COMPLETION = {
     "wd.d.steps.total":"إجمالي الخطوات","wd.d.steps.dist":"المسافة","wd.d.steps.goal":"الهدف","wd.d.steps.streak":"السلسلة النشطة","wd.d.steps.streak.v":"5 أيام متتالية","wd.d.steps.unit":" خطوة","wd.d.steps.walkcal":"سعرات المشي","wd.d.steps.active":"دقائق نشطة","wd.d.steps.met":"مكافئ MET","wd.d.cal.type":"النوع","wd.d.cal.type.v":"النادي - الجزء العلوي","wd.d.cal.duration":"المدة","wd.d.cal.duration.v":"58 دقيقة","wd.d.cal.burned":"السعرات المحروقة","wd.d.cal.avghr":"متوسط النبض","wd.d.cal.maxhr":"أقصى نبض","wd.d.cal.peak":"ذروة الشدة","wd.d.cal.peak.v":"المنطقة 4 (العتبة اللاهوائية)","wd.d.cal.dist":"المسافة","wd.d.zone":"المنطقة","wd.d.sleep.total":"المدة الإجمالية","wd.d.sleep.fell":"وقت النوم","wd.d.sleep.wake":"الاستيقاظ","wd.d.sleep.quality":"الجودة","wd.d.sleep.quality.v":"جيدة (76/100)","wd.d.sleep.hrv":"HRV ليلي","wd.d.sleep.deep":"عميق","wd.d.sleep.light":"خفيف","wd.d.sleep.awake":"يقظة","wd.d.sleep.deepph":"مرحلة النوم العميق","wd.d.sleep.deepph.v":"18% - ضمن الطبيعي (15-25%)","wd.d.sleep.rem.v":"22% - ممتاز للتعافي الذهني","wd.d.sleep.consist":"انتظام الوقت","wd.d.sleep.consist.v":"عال - نفس الوقت 6 من 7 ليال","wd.d.sleep.rec":"توصية","wd.d.sleep.rec.v":"حافظ على الوقت وتجنب الشاشات بعد 22:00","wd.d.hrv.current":"HRV الحالي","wd.d.hrv.baseline":"خطك الأساسي","wd.d.hrv.recovery":"مؤشر التعافي","wd.d.hrv.recovery.v":"جيد - +6% فوق الخط الأساسي","wd.d.hrv.stress":"إجهاد فسيولوجي","wd.d.hrv.stress.v":"منخفض","wd.d.hrv.readiness":"الجاهزية","wd.d.hrv.readiness.v":"78/100 - جاهز لتمرين مكثف","wd.d.hrv.today.v":"يوصى بتمرين عالي الشدة","wd.d.hrv.note.v":"HRV < 40 ms -> يوم تعاف",
     "partner.modal.title":"ربط ملف الشريك","partner.modal.sub":"قائمة التسوق تحسب من الخطتين الفعليتين","partner.mycode.label":"رمز DUBI الخاص بك","partner.mycode.copy":"نسخ","partner.mycode.note":"شارك هذا الرمز مع شريكك. يجب أن يفتح DUBI على نفس الجهاز ويكمل ملفه ثم يدخل رمزك هنا.","partner.code.input.label":"رمز شريكك","partner.code.placeholder":"مثال DK7MXP","partner.code.search":"بحث","partner.notfound.msg":"لم يتم العثور على الرمز. يجب أن يكون الشريك قد أكمل الإعداد وأنشأ رمز DUBI.","partner.same.msg":"هذا رمزك أنت. أدخل رمز شريكك.","partner.idle.msg":"يتم إنشاء رمز DUBI تلقائيا بعد الإعداد. لكل ملف رمز فريد.","partner.found.label":"تم العثور على الملف","partner.found.code":"الرمز: {code}","partner.found.goal":"الهدف","partner.found.kcal":"سعرات/يوم","partner.found.protein":"بروتين/يوم","partner.found.note":"سيتم إنشاء قائمة التسوق بجمع الاحتياجات الفعلية لكلا الملفين.","partner.save.btn":"ربط هذا الملف",
     "askdubi.suggestions.label":"مواقف شائعة","askdubi.support":"مستشار - خطة - دعم","askdubi.info":"يمكنك وصف مواقف حقيقية أو طرح أسئلة متابعة - يتذكر DUBI السياق ويمكنه <strong style=\"color:#7A9E73\">تحديث خطة اليوم</strong>.","askdubi.response.label":"رد DUBI","askdubi.fonte":"المصدر:","askdubi.offer.label":"يمكنني إضافته إلى الخطة","askdubi.offer.q":"هل تريد إضافة \"{item}\" إلى خطة اليوم؟","askdubi.apply":"نعم، حدّث الخطة","askdubi.adapt.label":"تعديل الخطة","askdubi.updated":"تم تحديث الخطة","askdubi.updated.sub":"أغلق اللوحة لرؤية التغييرات.","askdubi.input.ph":"صف موقفك أو اطرح سؤالا...","askdubi.input.ph.followup":"أجب أو اطرح سؤالا آخر...","askdubi.send":"إرسال","askdubi.sugg.1":"استيقظت متأخرا، سأتخطى الفطور","askdubi.sugg.2":"لا أستطيع تناول الغداء اليوم","askdubi.sugg.3":"هل أستطيع استبدال الدجاج بالسمك؟","askdubi.sugg.4":"كيف أتعامل مع الجوع مساء؟","askdubi.sugg.5":"سأتناول العشاء خارج المنزل الليلة","askdubi.sugg.6":"كم يجب أن أشرب من الماء؟",
-    "ingr.in.plan":"المكون في خطتك","ingr.macros":"القيم الغذائية","ingr.benefits.label":"فوائد أساسية","ingr.tip.label":"نصيحة DUBI","ingr.source":"المصدر:","ingr.why":"لماذا في خطتك","ingr.why.text":"تم اختياره لإكمال الملف الغذائي للوجبة ودعم هدف السعرات والماكروز اليومي.","ingr.tip.generic":"كل مكون يختاره DUBI لكثافته الغذائية وتناسقه مع بقية الوجبة.","shop.butcher.title":"نصيحة جودة","shop.butcher.text":"يفضل شراء اللحوم والدجاج والبيض من مورد موثوق. للحوم الحمراء، اختر grass-fed عند الإمكان: أوميغا-3 وCLA أعلى من التربية المكثفة.","src.philosophy.label":"فلسفة DUBI","src.fonti.gara":"مصادر التحضير للمنافسة","trend.card.weight":"الوزن","trend.card.recovery":"التعافي","trend.card.adherence":"الالتزام","trend.card.energy":"الطاقة","trend.back":"العودة إلى الملخص"
+    "ingr.in.plan":"المكون في خطتك","ingr.macros":"القيم الغذائية","ingr.benefits.label":"فوائد أساسية","ingr.tip.label":"نصيحة DUBI","ingr.source":"المصدر:","ingr.why":"لماذا في خطتك","ingr.why.text":"تم اختياره لإكمال الملف الغذائي للوجبة ودعم هدف السعرات والماكروز اليومي.","ingr.tip.generic":"كل مكون يختاره DUBI لكثافته الغذائية وتناسقه مع بقية الوجبة.","shop.butcher.title":"نصيحة جودة","shop.butcher.text":"يفضل شراء اللحوم والدجاج والبيض من مورد موثوق. للحوم الحمراء، اختر grass-fed عند الإمكان: أوميغا-3 وCLA أعلى من التربية المكثفة.","src.philosophy.label":"فلسفة DUBI","trend.card.weight":"الوزن","trend.card.recovery":"التعافي","trend.card.adherence":"الالتزام","trend.card.energy":"الطاقة","trend.back":"العودة إلى الملخص"
   },
   zh: {
     "wd.d.steps.total":"总步数","wd.d.steps.dist":"距离","wd.d.steps.goal":"目标","wd.d.steps.streak":"连续记录","wd.d.steps.streak.v":"连续 5 天","wd.d.steps.unit":" 步","wd.d.steps.walkcal":"步行热量","wd.d.steps.active":"活跃分钟","wd.d.steps.met":"MET 等效","wd.d.cal.type":"类型","wd.d.cal.type.v":"健身房 - 上肢","wd.d.cal.duration":"时长","wd.d.cal.duration.v":"58 分钟","wd.d.cal.burned":"消耗热量","wd.d.cal.avghr":"平均心率","wd.d.cal.maxhr":"最高心率","wd.d.cal.peak":"峰值强度","wd.d.cal.peak.v":"4 区（无氧阈）","wd.d.cal.dist":"距离","wd.d.zone":"区间","wd.d.sleep.total":"总时长","wd.d.sleep.fell":"入睡","wd.d.sleep.wake":"醒来","wd.d.sleep.quality":"质量","wd.d.sleep.quality.v":"良好 (76/100)","wd.d.sleep.hrv":"夜间 HRV","wd.d.sleep.deep":"深睡","wd.d.sleep.light":"浅睡","wd.d.sleep.awake":"清醒","wd.d.sleep.deepph":"深睡阶段","wd.d.sleep.deepph.v":"18% - 正常范围 (15-25%)","wd.d.sleep.rem.v":"22% - 有利于认知恢复","wd.d.sleep.consist":"作息一致性","wd.d.sleep.consist.v":"高 - 7 晚中 6 晚相同","wd.d.sleep.rec":"建议","wd.d.sleep.rec.v":"保持作息。22:00 后减少屏幕","wd.d.hrv.current":"当前 HRV","wd.d.hrv.baseline":"个人基线","wd.d.hrv.recovery":"恢复指数","wd.d.hrv.recovery.v":"良好 - 高于基线 6%","wd.d.hrv.stress":"生理压力","wd.d.hrv.stress.v":"低","wd.d.hrv.readiness":"准备度","wd.d.hrv.readiness.v":"78/100 - 可进行高强度训练","wd.d.hrv.today.v":"建议高强度训练","wd.d.hrv.note.v":"HRV < 40 ms -> 恢复日",
     "partner.modal.title":"关联伙伴档案","partner.modal.sub":"购物清单按两个真实计划计算","partner.mycode.label":"你的 DUBI 代码","partner.mycode.copy":"复制","partner.mycode.note":"把这个代码分享给伙伴。对方需在同一设备打开 DUBI、完成资料，然后在这里输入你的代码。","partner.code.input.label":"伙伴代码","partner.code.placeholder":"例 DK7MXP","partner.code.search":"搜索","partner.notfound.msg":"未找到代码。伙伴需要完成 onboarding 并生成 DUBI 代码。","partner.same.msg":"这是你自己的代码。请输入伙伴代码。","partner.idle.msg":"DUBI 代码会在 onboarding 完成后自动生成。每个档案都有唯一代码。","partner.found.label":"找到档案","partner.found.code":"代码：{code}","partner.found.goal":"目标","partner.found.kcal":"千卡/天","partner.found.protein":"蛋白/天","partner.found.note":"购物清单会合并两个档案的真实需求。","partner.save.btn":"关联此档案",
     "askdubi.suggestions.label":"常见情况","askdubi.support":"顾问 - 计划 - 支持","askdubi.info":"你可以描述真实情况或继续提问；DUBI 会记住上下文，并可<strong style=\"color:#7A9E73\">更新今天的计划</strong>。","askdubi.response.label":"DUBI 回复","askdubi.fonte":"来源：","askdubi.offer.label":"我可以加入计划","askdubi.offer.q":"要把“{item}”加入今天的计划吗？","askdubi.apply":"是，更新计划","askdubi.adapt.label":"计划调整","askdubi.updated":"计划已更新","askdubi.updated.sub":"关闭面板查看变化。","askdubi.input.ph":"描述你的情况或提问...","askdubi.input.ph.followup":"回复或继续提问...","askdubi.send":"发送","askdubi.sugg.1":"我起晚了，跳过早餐","askdubi.sugg.2":"今天没法吃午餐","askdubi.sugg.3":"鸡肉可以换成鱼吗？","askdubi.sugg.4":"晚上饿怎么办？","askdubi.sugg.5":"今晚在外面吃晚餐","askdubi.sugg.6":"我该喝多少水？",
-    "ingr.in.plan":"计划中的食材","ingr.macros":"营养数值","ingr.benefits.label":"关键益处","ingr.tip.label":"DUBI 建议","ingr.source":"来源：","ingr.why":"为什么在你的计划中","ingr.why.text":"用于完善这餐的营养结构，并支持当天热量与宏量目标。","ingr.tip.generic":"每个食材都按营养密度和与整餐的配合来选择。","shop.butcher.title":"质量建议","shop.butcher.text":"肉类、鸡肉和鸡蛋建议从可信供应商购买。红肉尽量选择 grass-fed：Omega-3 和 CLA 通常高于集约养殖。","src.philosophy.label":"DUBI 理念","src.fonti.gara":"备赛来源","trend.card.weight":"体重","trend.card.recovery":"恢复","trend.card.adherence":"依从性","trend.card.energy":"能量","trend.back":"返回摘要"
+    "ingr.in.plan":"计划中的食材","ingr.macros":"营养数值","ingr.benefits.label":"关键益处","ingr.tip.label":"DUBI 建议","ingr.source":"来源：","ingr.why":"为什么在你的计划中","ingr.why.text":"用于完善这餐的营养结构，并支持当天热量与宏量目标。","ingr.tip.generic":"每个食材都按营养密度和与整餐的配合来选择。","shop.butcher.title":"质量建议","shop.butcher.text":"肉类、鸡肉和鸡蛋建议从可信供应商购买。红肉尽量选择 grass-fed：Omega-3 和 CLA 通常高于集约养殖。","src.philosophy.label":"DUBI 理念","trend.card.weight":"体重","trend.card.recovery":"恢复","trend.card.adherence":"依从性","trend.card.energy":"能量","trend.back":"返回摘要"
   },
   ja: {
-    "partner.modal.title":"パートナープロフィールを連携","partner.modal.sub":"買い物リストは両方の実際のプランから計算されます","partner.mycode.label":"あなたの DUBI コード","partner.mycode.copy":"コピー","partner.code.input.label":"パートナーのコード","partner.code.placeholder":"例 DK7MXP","partner.code.search":"検索","askdubi.suggestions.label":"よくある状況","askdubi.support":"アドバイザー - プラン - サポート","askdubi.info":"実際の状況を説明したり追加質問できます。DUBI は文脈を記憶し、<strong style=\"color:#7A9E73\">今日のプランを更新</strong>できます。","askdubi.send":"送信","askdubi.input.ph":"状況を説明するか質問してください...","askdubi.sugg.1":"起きるのが遅く、朝食を抜きます","askdubi.sugg.2":"今日は昼食を取れません","askdubi.sugg.3":"鶏肉を魚に替えられますか？","askdubi.sugg.4":"夜の空腹はどう管理しますか？","askdubi.sugg.5":"今夜は外食します","askdubi.sugg.6":"水はどれくらい飲むべき？","ingr.in.plan":"プラン内の食材","ingr.macros":"栄養値","ingr.benefits.label":"主な利点","ingr.tip.label":"DUBI のヒント","ingr.source":"出典：","shop.butcher.title":"品質のヒント","shop.butcher.text":"肉、鶏肉、卵は信頼できる店で買うのがおすすめです。赤身肉は可能なら grass-fed を選ぶと、Omega-3 と CLA が多い傾向があります。","src.philosophy.label":"DUBI の哲学","src.fonti.gara":"競技準備の出典","wd.d.hrv.readiness":"準備度"
+    "partner.modal.title":"パートナープロフィールを連携","partner.modal.sub":"買い物リストは両方の実際のプランから計算されます","partner.mycode.label":"あなたの DUBI コード","partner.mycode.copy":"コピー","partner.code.input.label":"パートナーのコード","partner.code.placeholder":"例 DK7MXP","partner.code.search":"検索","askdubi.suggestions.label":"よくある状況","askdubi.support":"アドバイザー - プラン - サポート","askdubi.info":"実際の状況を説明したり追加質問できます。DUBI は文脈を記憶し、<strong style=\"color:#7A9E73\">今日のプランを更新</strong>できます。","askdubi.send":"送信","askdubi.input.ph":"状況を説明するか質問してください...","askdubi.sugg.1":"起きるのが遅く、朝食を抜きます","askdubi.sugg.2":"今日は昼食を取れません","askdubi.sugg.3":"鶏肉を魚に替えられますか？","askdubi.sugg.4":"夜の空腹はどう管理しますか？","askdubi.sugg.5":"今夜は外食します","askdubi.sugg.6":"水はどれくらい飲むべき？","ingr.in.plan":"プラン内の食材","ingr.macros":"栄養値","ingr.benefits.label":"主な利点","ingr.tip.label":"DUBI のヒント","ingr.source":"出典：","shop.butcher.title":"品質のヒント","shop.butcher.text":"肉、鶏肉、卵は信頼できる店で買うのがおすすめです。赤身肉は可能なら grass-fed を選ぶと、Omega-3 と CLA が多い傾向があります。","src.philosophy.label":"DUBI の哲学","wd.d.hrv.readiness":"準備度"
   },
   ru: {
-    "partner.modal.title":"Связать профиль партнера","partner.modal.sub":"Список покупок считается по двум реальным планам","partner.mycode.label":"ТВОЙ КОД DUBI","partner.mycode.copy":"Копировать","partner.code.input.label":"КОД ПАРТНЕРА","partner.code.placeholder":"Напр. DK7MXP","partner.code.search":"Найти","askdubi.suggestions.label":"ЧАСТЫЕ СИТУАЦИИ","askdubi.support":"Советник - План - Поддержка","askdubi.info":"Можно описать реальную ситуацию или задать уточняющий вопрос - DUBI помнит контекст и может <strong style=\"color:#7A9E73\">обновить план на сегодня</strong>.","askdubi.send":"Отправить","askdubi.input.ph":"Опиши ситуацию или задай вопрос...","askdubi.sugg.1":"Я поздно проснулся, пропускаю завтрак","askdubi.sugg.2":"Сегодня не могу пообедать","askdubi.sugg.3":"Можно заменить курицу рыбой?","askdubi.sugg.4":"Как справиться с вечерним голодом?","askdubi.sugg.5":"Сегодня ужинаю вне дома","askdubi.sugg.6":"Сколько воды пить?","ingr.in.plan":"ИНГРЕДИЕНТ В ТВОЕМ ПЛАНЕ","ingr.macros":"ПИЩЕВАЯ ЦЕННОСТЬ","ingr.benefits.label":"КЛЮЧЕВЫЕ ПРЕИМУЩЕСТВА","ingr.tip.label":"СОВЕТ DUBI","ingr.source":"Источник:","shop.butcher.title":"Совет по качеству","shop.butcher.text":"Мясо, курицу и яйца лучше покупать у надежного поставщика. Для красного мяса по возможности выбирай grass-fed: больше Omega-3 и CLA, чем при интенсивном выращивании.","src.philosophy.label":"ФИЛОСОФИЯ DUBI","src.fonti.gara":"ИСТОЧНИКИ ДЛЯ ПОДГОТОВКИ","wd.d.hrv.readiness":"Готовность"
+    "partner.modal.title":"Связать профиль партнера","partner.modal.sub":"Список покупок считается по двум реальным планам","partner.mycode.label":"ТВОЙ КОД DUBI","partner.mycode.copy":"Копировать","partner.code.input.label":"КОД ПАРТНЕРА","partner.code.placeholder":"Напр. DK7MXP","partner.code.search":"Найти","askdubi.suggestions.label":"ЧАСТЫЕ СИТУАЦИИ","askdubi.support":"Советник - План - Поддержка","askdubi.info":"Можно описать реальную ситуацию или задать уточняющий вопрос - DUBI помнит контекст и может <strong style=\"color:#7A9E73\">обновить план на сегодня</strong>.","askdubi.send":"Отправить","askdubi.input.ph":"Опиши ситуацию или задай вопрос...","askdubi.sugg.1":"Я поздно проснулся, пропускаю завтрак","askdubi.sugg.2":"Сегодня не могу пообедать","askdubi.sugg.3":"Можно заменить курицу рыбой?","askdubi.sugg.4":"Как справиться с вечерним голодом?","askdubi.sugg.5":"Сегодня ужинаю вне дома","askdubi.sugg.6":"Сколько воды пить?","ingr.in.plan":"ИНГРЕДИЕНТ В ТВОЕМ ПЛАНЕ","ingr.macros":"ПИЩЕВАЯ ЦЕННОСТЬ","ingr.benefits.label":"КЛЮЧЕВЫЕ ПРЕИМУЩЕСТВА","ingr.tip.label":"СОВЕТ DUBI","ingr.source":"Источник:","shop.butcher.title":"Совет по качеству","shop.butcher.text":"Мясо, курицу и яйца лучше покупать у надежного поставщика. Для красного мяса по возможности выбирай grass-fed: больше Omega-3 и CLA, чем при интенсивном выращивании.","src.philosophy.label":"ФИЛОСОФИЯ DUBI","wd.d.hrv.readiness":"Готовность"
   }
 };
 Object.keys(I18N_DEEP_COMPLETION).forEach(code => {
@@ -7411,21 +7395,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "Football · Basket-ball · Volley-ball · Hockey",
     "comp.sport.combat.t": "Sports de combat",
     "comp.sport.combat.d": "Boxe · MMA · Judo · Lutte · Karaté",
-    "goal.step.sport.header": "CHOISISSEZ VOTRE SPORT DE COMPÉTITION",
-    "goal.step.race.header": "DATE DE COMPÉTITION / COURSE",
-    "goal.step.race.nodate": "Saisissez la date pour recevoir un plan périodisé au jour le jour",
-    "race.phase.past": "Course réussie",
-    "race.phase.past.note": "Fixez une date future pour le plan.",
-    "race.phase.base": "Phase de base",
-    "race.phase.base.note": "{weeks} semaines avant la course. Renforcement aérobie/force avec léger surplus.",
-    "race.phase.develop": "Phase de développement",
-    "race.phase.develop.note": "{weeks} sem. Volume élevé, glucides élevés, haute teneur en protéines.",
-    "race.phase.peak": "Phase de pointe",
-    "race.phase.peak.note": "{weeks} sem. Réduction progressive, affinement de la composition.",
-    "race.phase.taper": "Effilé",
-    "race.phase.taper.note": "{weeks} sem. Réduction du volume, chargement en glucides avant la course.",
-    "race.phase.raceweek": "Semaine de course",
-    "race.phase.raceweek.note": "Semaine de course. Chargement en glucides, hydratation maximale.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "safety.badge.hard": "NON COMPATIBLE",
     "safety.badge.soft": "SUGGESTIONS",
     "safety.badge.confirm": "CONFIRMER",
@@ -7445,7 +7429,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "Définition",
     "goal.labels.gain": "Masse musculaire",
     "goal.labels.maintain": "Entretien",
-    "goal.labels.competition": "Concurrence",
+
     "load.preparing": "Préparer votre plan",
     "wrap.cover.label": "2026 · Bilan mensuel",
     "wrap.cover.title": "Votre emballage",
@@ -7537,21 +7521,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "Fútbol · Baloncesto · Voleibol · Hockey",
     "comp.sport.combat.t": "Deportes de combate",
     "comp.sport.combat.d": "Boxeo · MMA · Judo · Lucha Libre · Karate",
-    "goal.step.sport.header": "SELECCIONA TU DEPORTE DE COMPETENCIA",
-    "goal.step.race.header": "COMPETICIÓN / FECHA DE CARRERA",
-    "goal.step.race.nodate": "Ingrese la fecha para recibir un plan periodizado día a día",
-    "race.phase.past": "Carrera pasada",
-    "race.phase.past.note": "Establezca una fecha futura para el plan.",
-    "race.phase.base": "Fase básica",
-    "race.phase.base.note": "{weeks} semanas para competir. Aeróbico/desarrollo de fuerza con ligero excedente.",
-    "race.phase.develop": "Fase de desarrollo",
-    "race.phase.develop.note": "{weeks} semanas. Alto volumen, carbohidratos elevados, alto contenido de proteínas.",
-    "race.phase.peak": "Fase de pico",
-    "race.phase.peak.note": "{weeks} semanas. Reducción gradual, refinamiento de la composición.",
-    "race.phase.taper": "Disminución",
-    "race.phase.taper.note": "{weeks} semanas. Reducción de volumen, carga de carbohidratos antes de la carrera.",
-    "race.phase.raceweek": "Semana de carrera",
-    "race.phase.raceweek.note": "Semana de carreras. Carga de carbohidratos, máxima hidratación.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "safety.badge.hard": "NO COMPATIBLES",
     "safety.badge.soft": "SUGERENCIA",
     "safety.badge.confirm": "CONFIRMAR",
@@ -7571,7 +7555,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "Definición",
     "goal.labels.gain": "masa muscular",
     "goal.labels.maintain": "Mantenimiento",
-    "goal.labels.competition": "Competencia",
+
     "load.preparing": "Preparando tu plan",
     "wrap.cover.label": "2026 · Revisión mensual",
     "wrap.cover.title": "Tu envoltura",
@@ -7663,21 +7647,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "Fußball · Basketball · Volleyball · Hockey",
     "comp.sport.combat.t": "Kampfsport",
     "comp.sport.combat.d": "Boxen · MMA · Judo · Wrestling · Karate",
-    "goal.step.sport.header": "WÄHLEN SIE IHREN WETTKAMPF-SPORT",
-    "goal.step.race.header": "WETTBEWERBS-/RENNDATUM",
-    "goal.step.race.nodate": "Geben Sie das Datum ein, um einen tagesaktuellen, periodisierten Plan zu erhalten",
-    "race.phase.past": "Rennen bestanden",
-    "race.phase.past.note": "Legen Sie ein zukünftiges Datum für den Plan fest.",
-    "race.phase.base": "Basisphase",
-    "race.phase.base.note": "{weeks} Wochen bis zum Rennen. Aerobic/Kraftaufbau mit leichtem Überschuss.",
-    "race.phase.develop": "Entwicklungsphase",
-    "race.phase.develop.note": "{weeks} Wo. Hohes Volumen, hohe Kohlenhydrate, hoher Proteingehalt.",
-    "race.phase.peak": "Höhepunktphase",
-    "race.phase.peak.note": "{weeks} Wo. Allmähliche Reduzierung, Verfeinerung der Komposition.",
-    "race.phase.taper": "Verjüngung",
-    "race.phase.taper.note": "{weeks} Wo. Volumenreduzierung, Kohlenhydratbeladung vor dem Rennen.",
-    "race.phase.raceweek": "Rennwoche",
-    "race.phase.raceweek.note": "Rennwoche. Kohlenhydratladung, maximale Flüssigkeitszufuhr.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "safety.badge.hard": "NICHT KOMPATIBEL",
     "safety.badge.soft": "VORSCHLAG",
     "safety.badge.confirm": "BESTÄTIGEN",
@@ -7697,7 +7681,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "Definition",
     "goal.labels.gain": "Muskelmasse",
     "goal.labels.maintain": "Wartung",
-    "goal.labels.competition": "Wettbewerb",
+
     "load.preparing": "Bereiten Sie Ihren Plan vor",
     "wrap.cover.label": "2026 · Monatsrückblick",
     "wrap.cover.title": "Dein Wrap",
@@ -7792,21 +7776,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "كرة القدم · كرة السلة · الكرة الطائرة · الهوكي",
     "comp.sport.combat.t": "الرياضات القتالية",
     "comp.sport.combat.d": "الملاكمة · الفنون القتالية المختلطة · الجودو · المصارعة · الكاراتيه",
-    "goal.step.sport.header": "اختر الرياضة المنافسة لك",
-    "goal.step.race.header": "تاريخ المنافسة/السباق",
-    "goal.step.race.nodate": "أدخل التاريخ لتلقي خطة دورية يومًا بعد يوم",
-    "race.phase.past": "مر السباق",
-    "race.phase.past.note": "حدد تاريخًا مستقبليًا للخطة.",
-    "race.phase.base": "المرحلة الأساسية",
-    "race.phase.base.note": "{weeks} أسابيع للسباق. الهوائية / بناء القوة مع فائض طفيف.",
-    "race.phase.develop": "مرحلة التطوير",
-    "race.phase.develop.note": "{weeks} أسابيع. حجم كبير، كربوهيدرات مرتفعة، نسبة عالية من البروتين.",
-    "race.phase.peak": "مرحلة الذروة",
-    "race.phase.peak.note": "{weeks} أسابيع. التخفيض التدريجي، وصقل التكوين.",
-    "race.phase.taper": "التناقص",
-    "race.phase.taper.note": "{weeks} أسابيع. تقليل الحجم، تحميل الكربوهيدرات قبل السباق.",
-    "race.phase.raceweek": "أسبوع السباق",
-    "race.phase.raceweek.note": "أسبوع السباق. تحميل الكربوهيدرات، أقصى قدر من الترطيب.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "safety.badge.hard": "غير متوافق",
     "safety.badge.soft": "اقتراح",
     "safety.badge.confirm": "تأكيد",
@@ -7826,7 +7810,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "التعريف",
     "goal.labels.gain": "كتلة العضلات",
     "goal.labels.maintain": "الصيانة",
-    "goal.labels.competition": "المنافسة",
+
     "load.preparing": "إعداد خطتك",
     "wrap.cover.label": "2026 · المراجعة الشهرية",
     "wrap.cover.title": "التفاف الخاص بك",
@@ -7872,8 +7856,8 @@ const PROMPT14_TRANSLATIONS = {
     "shop.plan.solo": "خطتي فقط",
     "shop.plan.both": "خطط لكليهما",
     "set.field.gender": "الجنس",
-    "set.field.dailySteps": "متوسط الخطوات",
-    "set.field.sedentaryDays": "الأيام المستقرة",
+
+
     "trend.summary.kicker": "اتجاه الجسم",
     "trend.summary.title": "جسمك يستجيب",
     "trend.summary.body": "يقرأ DUBI بيانات الوزن والالتزام والتعافي والنوم والبيانات القابلة للارتداء لفهم ما إذا كانت الخطة تناسب جسمك.",
@@ -7933,21 +7917,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "Futebol · Basquetebol · Voleibol · Hóquei",
     "comp.sport.combat.t": "Esportes de Combate",
     "comp.sport.combat.d": "Boxe · MMA · Judô · Luta livre · Karatê",
-    "goal.step.sport.header": "SELECIONE SEU ESPORTE DE COMPETIÇÃO",
-    "goal.step.race.header": "COMPETIÇÃO / DATA DA CORRIDA",
-    "goal.step.race.nodate": "Insira a data para receber um plano periodizado dia a dia",
-    "race.phase.past": "Corrida passada",
-    "race.phase.past.note": "Defina uma data futura para o plano.",
-    "race.phase.base": "Fase Básica",
-    "race.phase.base.note": "{weeks} semanas para a corrida. Construção aeróbica/de força com ligeiro excedente.",
-    "race.phase.develop": "Fase de Desenvolvimento",
-    "race.phase.develop.note": "{weeks} semanas. Alto volume, carboidratos elevados, alto teor de proteínas.",
-    "race.phase.peak": "Fase de Pico",
-    "race.phase.peak.note": "{weeks} semanas. Redução gradual, refinamento da composição.",
-    "race.phase.taper": "Afinando",
-    "race.phase.taper.note": "{weeks} semanas. Redução de volume, carregamento de carboidratos pré-corrida.",
-    "race.phase.raceweek": "Semana da Corrida",
-    "race.phase.raceweek.note": "Semana de corrida. Carregamento de carboidratos, hidratação máxima.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "safety.badge.hard": "NÃO COMPATÍVEL",
     "safety.badge.soft": "SUGESTÃO",
     "safety.badge.confirm": "CONFIRMAR",
@@ -7967,7 +7951,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "Definição",
     "goal.labels.gain": "Massa Muscular",
     "goal.labels.maintain": "Manutenção",
-    "goal.labels.competition": "Competição",
+
     "load.preparing": "Preparando seu plano",
     "wrap.cover.label": "2026 · Revisão mensal",
     "wrap.cover.title": "Seu embrulho",
@@ -8062,21 +8046,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "足球·篮球·排球·曲棍球",
     "comp.sport.combat.t": "格斗运动",
     "comp.sport.combat.d": "拳击·综合格斗·柔道·摔跤·空手道",
-    "goal.step.sport.header": "选择您的竞技运动",
-    "goal.step.race.header": "比赛/比赛日期",
-    "goal.step.race.nodate": "输入接收每日定期计划的日期",
-    "race.phase.past": "比赛通过",
-    "race.phase.past.note": "为计划设定一个未来日期。",
-    "race.phase.base": "基础阶段",
-    "race.phase.base.note": "距离比赛还有 {weeks} 周。有氧运动/力量训练，略有剩余。",
-    "race.phase.develop": "开发阶段",
-    "race.phase.develop.note": "{weeks} 周。高容量、高碳水化合物、高蛋白质。",
-    "race.phase.peak": "峰值阶段",
-    "race.phase.peak.note": "{weeks} 周。逐步减少，成分细化。",
-    "race.phase.taper": "逐渐变细",
-    "race.phase.taper.note": "{weeks} 周。减少体积，赛前碳水化合物装载。",
-    "race.phase.raceweek": "比赛周",
-    "race.phase.raceweek.note": "比赛周。碳水化合物负荷，最大限度的水合作用。",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "safety.badge.hard": "不兼容",
     "safety.badge.soft": "建议",
     "safety.badge.confirm": "确认",
@@ -8096,7 +8080,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "定义",
     "goal.labels.gain": "肌肉质量",
     "goal.labels.maintain": "维护保养",
-    "goal.labels.competition": "竞争",
+
     "load.preparing": "准备你的计划",
     "wrap.cover.label": "2026·月度回顾",
     "wrap.cover.title": "你的裹身布",
@@ -8142,8 +8126,8 @@ const PROMPT14_TRANSLATIONS = {
     "shop.plan.solo": "仅我的计划",
     "shop.plan.both": "为两者制定计划",
     "set.field.gender": "性别",
-    "set.field.dailySteps": "平均步数",
-    "set.field.sedentaryDays": "久坐的日子",
+
+
     "trend.summary.kicker": "身体趋势",
     "trend.summary.title": "你的身体正在做出反应",
     "trend.summary.body": "DUBI 读取体重、坚持、恢复、睡眠和可穿戴数据，以了解该计划是否适合您的身体。",
@@ -8251,21 +8235,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "サッカー・バスケットボール・バレーボール・ホッケー",
     "comp.sport.combat.t": "格闘技",
     "comp.sport.combat.d": "ボクシング・MMA・柔道・レスリング・空手",
-    "goal.step.sport.header": "競技スポーツを選択してください",
-    "goal.step.race.header": "競技会/レース日",
-    "goal.step.race.nodate": "日付を入力すると、その日ごとの定期的なプランが表示されます",
-    "race.phase.past": "レースはパスしました",
-    "race.phase.past.note": "計画の将来の日付を設定します。",
-    "race.phase.base": "ベースフェーズ",
-    "race.phase.base.note": "レースまであと{weeks}週間。エアロビック/ストレングスビルディングでわずかに余剰があります。",
-    "race.phase.develop": "開発段階",
-    "race.phase.develop.note": "{weeks} 週間。大容量、高炭水化物、高タンパク質。",
-    "race.phase.peak": "ピーキングフェーズ",
-    "race.phase.peak.note": "{weeks} 週間。徐々に削減し、構成を洗練させます。",
-    "race.phase.taper": "テーパリング",
-    "race.phase.taper.note": "{weeks} 週間。体積の削減、レース前のカーボローディング。",
-    "race.phase.raceweek": "レースウィーク",
-    "race.phase.raceweek.note": "レースウィーク。カーボローディング、最大限の水分補給。",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "partner.mycode.note": "このコードをパートナーと共有してください。同じデバイスで DUBI を開き、プロフィールを完成させ、ここにコードを入力する必要があります。",
     "partner.notfound.msg": "コードが見つかりません。パートナーはこのデバイスでのオンボーディングを完了し、DUBI コードを生成している必要があります。",
     "partner.same.msg": "これはあなた自身のコードです。パートナーのコードを入力してください。",
@@ -8305,7 +8289,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "定義",
     "goal.labels.gain": "筋肉量",
     "goal.labels.maintain": "メンテナンス",
-    "goal.labels.competition": "競争",
+
     "load.preparing": "計画の準備",
     "ingr.why": "それがあなたの計画に含まれる理由",
     "ingr.why.text": "食事の栄養プロファイルを完成させるために選択され、毎日のカロリーとマクロ目標に貢献します。",
@@ -8354,8 +8338,8 @@ const PROMPT14_TRANSLATIONS = {
     "shop.plan.solo": "私の計画だけ",
     "shop.plan.both": "両方を計画する",
     "set.field.gender": "性別",
-    "set.field.dailySteps": "平均歩数",
-    "set.field.sedentaryDays": "座りっぱなしの日",
+
+
     "trend.summary.kicker": "ボディトレンド",
     "trend.summary.title": "あなたの体は反応しています",
     "trend.summary.body": "DUBI は体重、服薬遵守、回復、睡眠、ウェアラブルのデータを読み取り、プランがあなたの体に合っているかどうかを理解します。",
@@ -8468,21 +8452,21 @@ const PROMPT14_TRANSLATIONS = {
     "comp.sport.team.d": "Футбол · Баскетбол · Волейбол · Хоккей",
     "comp.sport.combat.t": "Боевые виды спорта",
     "comp.sport.combat.d": "Бокс · ММА · Дзюдо · Борьба · Каратэ",
-    "goal.step.sport.header": "ВЫБЕРИТЕ СОРЕВНОВАНИЕ ВИДА СПОРТА",
-    "goal.step.race.header": "ДАТА СОРЕВНОВАНИЯ/ГОНКИ",
-    "goal.step.race.nodate": "Введите дату, чтобы получить ежедневный периодический план",
-    "race.phase.past": "Гонка пройдена",
-    "race.phase.past.note": "Установите будущую дату для плана.",
-    "race.phase.base": "Базовая фаза",
-    "race.phase.base.note": "{weeks} недель до гонки. Аэробно-силовой комплекс с небольшим избытком.",
-    "race.phase.develop": "Этап разработки",
-    "race.phase.develop.note": "{weeks} нед. Большой объем, повышенное содержание углеводов, высокое содержание белка.",
-    "race.phase.peak": "Пиковая фаза",
-    "race.phase.peak.note": "{weeks} нед. Постепенное сокращение, уточнение состава.",
-    "race.phase.taper": "Сужение",
-    "race.phase.taper.note": "{weeks} нед. Уменьшение объема, загрузка углеводов перед гонкой.",
-    "race.phase.raceweek": "Гоночная неделя",
-    "race.phase.raceweek.note": "Неделя гонок. Углеводная загрузка, максимальное увлажнение.",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     "partner.mycode.note": "Поделитесь этим кодом со своим партнером. Им необходимо открыть DUBI на том же устройстве, заполнить свой профиль, а затем ввести здесь свой код.",
     "partner.notfound.msg": "Код не найден. Ваш партнер должен пройти регистрацию на этом устройстве и сгенерировать свой код DUBI.",
     "partner.same.msg": "Это ваш собственный код. Пожалуйста, введите код вашего партнера.",
@@ -8522,7 +8506,7 @@ const PROMPT14_TRANSLATIONS = {
     "goal.labels.definition": "Определение",
     "goal.labels.gain": "Мышечная масса",
     "goal.labels.maintain": "Техническое обслуживание",
-    "goal.labels.competition": "Конкуренция",
+
     "load.preparing": "Подготовка вашего плана",
     "ingr.why": "ПОЧЕМУ ЭТО В ВАШЕМ ПЛАНЕ",
     "ingr.why.text": "Выбран для завершения питательного профиля еды, внося вклад в ежедневную норму калорий и макроэлементов.",
@@ -8571,8 +8555,8 @@ const PROMPT14_TRANSLATIONS = {
     "shop.plan.solo": "Только мой план",
     "shop.plan.both": "Планируйте оба",
     "set.field.gender": "Пол",
-    "set.field.dailySteps": "Средние шаги",
-    "set.field.sedentaryDays": "Сидячие дни",
+
+
     "trend.summary.kicker": "ТЕЛО-ТРЕНД",
     "trend.summary.title": "Ваше тело реагирует",
     "trend.summary.body": "DUBI считывает данные о весе, соблюдении режима приема, восстановлении, сне и данных носимых устройств, чтобы понять, подходит ли план вашему организму.",
@@ -8656,7 +8640,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Senza wearable, DUBI usa i tuoi check-in per stimare meglio il dispendio energetico.",
     "trend.manual.weightPlaceholder":"Peso di oggi (kg)",
     "trend.manual.tdee":"STIMA TDEE SENZA WEARABLE",
-    "trend.manual.stepsUnknown":"Passi: non so",
+
     "trend.manual.workouts":"{n} allenamenti",
     "trend.wearable.noData":"Non ci sono ancora dati biometrici. DUBI continua a personalizzare il piano usando profilo e check-in. Collega un wearable per aggiungere trend automatici.",
     "trend.wearable.partial":"{provider} invia dati parziali. DUBI usa soltanto le metriche realmente disponibili.",
@@ -8709,7 +8693,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Without a wearable, DUBI uses your check-ins to estimate energy expenditure more accurately.",
     "trend.manual.weightPlaceholder":"Today’s weight (kg)",
     "trend.manual.tdee":"TDEE ESTIMATE WITHOUT A WEARABLE",
-    "trend.manual.stepsUnknown":"Steps: unsure",
+
     "trend.manual.workouts":"{n} workouts",
     "trend.wearable.noData":"There is no biometric data yet. DUBI keeps personalizing your plan using your profile and check-ins. Connect a wearable to add automatic trends.",
     "trend.wearable.partial":"{provider} sends partial data. DUBI only uses metrics that are actually available.",
@@ -8761,7 +8745,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Sans portable, DUBI utilise vos enregistrements pour estimer plus précisément la dépense énergétique.",
     "trend.manual.weightPlaceholder":"Poids du jour (kg)",
     "trend.manual.tdee":"ESTIMATION TDEE SANS PORTABLE",
-    "trend.manual.stepsUnknown":"Étapes : je ne suis pas sûr",
+
     "trend.manual.workouts":"{n} entraînements",
     "trend.wearable.noData":"Il n'y a pas encore de données biométriques. DUBI continue de personnaliser votre plan en utilisant votre profil et vos enregistrements. Connectez un portable pour ajouter des tendances automatiques.",
     "trend.wearable.partial":"{provider} envoie des données partielles. DUBI utilise uniquement les métriques réellement disponibles.",
@@ -8813,7 +8797,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Sin un dispositivo portátil, DUBI utiliza sus registros para estimar el gasto energético con mayor precisión.",
     "trend.manual.weightPlaceholder":"Peso actual (kg)",
     "trend.manual.tdee":"ESTIMACIÓN DE TDEE SIN UN DISPOSITIVO",
-    "trend.manual.stepsUnknown":"Pasos: inseguro",
+
     "trend.manual.workouts":"{n} entrenamientos",
     "trend.wearable.noData":"Aún no hay datos biométricos. DUBI sigue personalizando tu plan usando tu perfil y check-ins. Conecte un dispositivo portátil para agregar tendencias automáticas.",
     "trend.wearable.partial":"{provider} envía datos parciales. DUBI sólo utiliza métricas que realmente están disponibles.",
@@ -8865,7 +8849,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Ohne ein Wearable nutzt DUBI Ihre Check-ins, um den Energieverbrauch genauer einzuschätzen.",
     "trend.manual.weightPlaceholder":"Heutiges Gewicht (kg)",
     "trend.manual.tdee":"TDEE-SCHÄTZUNG OHNE WEARABLE",
-    "trend.manual.stepsUnknown":"Schritte: unsicher",
+
     "trend.manual.workouts":"{n} Trainingseinheiten",
     "trend.wearable.noData":"Es liegen noch keine biometrischen Daten vor. DUBI personalisiert Ihren Plan weiterhin mithilfe Ihres Profils und Ihrer Check-ins. Schließen Sie ein Wearable an, um automatische Trends hinzuzufügen.",
     "trend.wearable.partial":"{provider} sendet Teildaten. DUBI verwendet nur tatsächlich verfügbare Kennzahlen.",
@@ -8917,7 +8901,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"بدون جهاز يمكن ارتداؤه، يستخدم DUBI عمليات تسجيل الوصول الخاصة بك لتقدير إنفاق الطاقة بشكل أكثر دقة.",
     "trend.manual.weightPlaceholder":"الوزن اليوم (كجم)",
     "trend.manual.tdee":"تقدير TDEE دون ارتداء أي شيء",
-    "trend.manual.stepsUnknown":"الخطوات: غير متأكد",
+
     "trend.manual.workouts":"{n} التدريبات",
     "trend.wearable.noData":"لا توجد بيانات بيومترية حتى الآن. تستمر DUBI في تخصيص خطتك باستخدام ملفك الشخصي وتسجيلات الوصول. قم بتوصيل جهاز يمكن ارتداؤه لإضافة الاتجاهات التلقائية.",
     "trend.wearable.partial":"{provider} يرسل بيانات جزئية. تستخدم DUBI فقط المقاييس المتوفرة بالفعل.",
@@ -8969,7 +8953,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Sem wearable, o DUBI usa seus check-ins para estimar o gasto de energia com mais precisão.",
     "trend.manual.weightPlaceholder":"Peso de hoje (kg)",
     "trend.manual.tdee":"ESTIMATIVA DE TDEE SEM WEARABLE",
-    "trend.manual.stepsUnknown":"Passos: não tenho certeza",
+
     "trend.manual.workouts":"{n} treinos",
     "trend.wearable.noData":"Ainda não há dados biométricos. DUBI continua personalizando seu plano usando seu perfil e check-ins. Conecte um wearable para adicionar tendências automáticas.",
     "trend.wearable.partial":"{provider} envia dados parciais. O DUBI usa apenas métricas que estão realmente disponíveis.",
@@ -9021,7 +9005,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"如果没有可穿戴设备，DUBI 可以通过您的签到来更准确地估算能源消耗。",
     "trend.manual.weightPlaceholder":"今日体重（公斤）",
     "trend.manual.tdee":"没有可穿戴设备时的 TDEE 估算",
-    "trend.manual.stepsUnknown":"步骤：不确定",
+
     "trend.manual.workouts":"{n} 锻炼",
     "trend.wearable.noData":"目前还没有生物识别数据。 DUBI 不断使用您的个人资料和签到来个性化您的计划。连接可穿戴设备以添加自动趋势。",
     "trend.wearable.partial":"{provider} 发送部分数据。 DUBI 仅使用实际可用的指标。",
@@ -9073,7 +9057,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"ウェアラブルがない場合、DUBI はチェックインを使用してエネルギー消費量をより正確に推定します。",
     "trend.manual.weightPlaceholder":"今日の体重(kg)",
     "trend.manual.tdee":"ウェアラブルを使用しない場合の TDEE の推定値",
-    "trend.manual.stepsUnknown":"手順: 不明",
+
     "trend.manual.workouts":"{n} ワークアウト",
     "trend.wearable.noData":"生体認証データはまだありません。 DUBI は、プロフィールとチェックインを使用してプランをパーソナライズし続けます。ウェアラブルを接続して自動トレンドを追加します。",
     "trend.wearable.partial":"{provider} は部分的なデータを送信します。 DUBI は、実際に利用可能なメトリクスのみを使用します。",
@@ -9125,7 +9109,7 @@ const PROMPT14_UI_TRANSLATIONS = {
     "trend.manual.noWearable":"Без носимого устройства DUBI использует ваши проверки для более точной оценки расхода энергии.",
     "trend.manual.weightPlaceholder":"Сегодняшний вес (кг)",
     "trend.manual.tdee":"ОЦЕНКА TDEE БЕЗ НОСИМОГО УСТРОЙСТВА",
-    "trend.manual.stepsUnknown":"Шаги: не уверен",
+
     "trend.manual.workouts":"{n} тренировки",
     "trend.wearable.noData":"Биометрических данных пока нет. DUBI продолжает персонализировать ваш план, используя ваш профиль и проверки. Подключите носимое устройство, чтобы автоматически добавлять тенденции.",
     "trend.wearable.partial":"{provider} отправляет частичные данные. DUBI использует только те показатели, которые действительно доступны.",
@@ -9987,7 +9971,7 @@ Object.entries(TREND_SCREEN_TRANSLATIONS).forEach(([code, additions]) => {
 const TREND_CHECKIN_TRANSLATIONS = {
   it: {
     "trend.checkin.title":"Check-in attività giornaliera", "trend.checkin.subtitle":"Aiuta DUBI a stimare le calorie bruciate. Ci vogliono 10 secondi.",
-    "trend.checkin.steps":"Quanti passi fai in una giornata tipica?", "trend.checkin.stepsHint":"Controlla l'app Salute del tuo telefono per la media giornaliera.",
+
     "trend.checkin.workouts":"Quante volte a settimana ti alleni?", "trend.checkin.effort":"Quanto sono intensi i tuoi allenamenti?",
     "trend.checkin.effortLow":"Camminata, yoga, stretching leggero", "trend.checkin.effortModerate":"Ciclismo, nuoto, circuit training",
     "trend.checkin.effortHigh":"Corsa, HIIT, pesi pesanti", "trend.checkin.submit":"Aggiorna il mio target calorico",
@@ -9996,7 +9980,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   en: {
     "trend.checkin.title":"Daily activity check-in", "trend.checkin.subtitle":"Help DUBI estimate how many calories you burn. Takes 10 seconds.",
-    "trend.checkin.steps":"How many steps do you walk on a typical day?", "trend.checkin.stepsHint":"Check your phone's Health app for your daily average.",
+
     "trend.checkin.workouts":"How many times per week do you train?", "trend.checkin.effort":"How intense are your workouts?",
     "trend.checkin.effortLow":"Walking, yoga, light stretching", "trend.checkin.effortModerate":"Cycling, swimming, gym circuits",
     "trend.checkin.effortHigh":"Running, HIIT, heavy lifting", "trend.checkin.submit":"Update my calorie target",
@@ -10005,7 +9989,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   fr: {
     "trend.checkin.title":"Bilan d'activité quotidienne", "trend.checkin.subtitle":"Aidez DUBI à estimer les calories dépensées. Cela prend 10 secondes.",
-    "trend.checkin.steps":"Combien de pas faites-vous lors d'une journée type ?", "trend.checkin.stepsHint":"Consultez l'app Santé de votre téléphone pour votre moyenne quotidienne.",
+
     "trend.checkin.workouts":"Combien de fois vous entraînez-vous par semaine ?", "trend.checkin.effort":"Quelle est l'intensité de vos entraînements ?",
     "trend.checkin.effortLow":"Marche, yoga, étirements légers", "trend.checkin.effortModerate":"Vélo, natation, circuits en salle",
     "trend.checkin.effortHigh":"Course, HIIT, charges lourdes", "trend.checkin.submit":"Mettre à jour mon objectif calorique",
@@ -10014,7 +9998,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   es: {
     "trend.checkin.title":"Registro de actividad diaria", "trend.checkin.subtitle":"Ayuda a DUBI a estimar las calorías que quemas. Solo tarda 10 segundos.",
-    "trend.checkin.steps":"¿Cuántos pasos das en un día normal?", "trend.checkin.stepsHint":"Consulta la app Salud de tu teléfono para ver tu media diaria.",
+
     "trend.checkin.workouts":"¿Cuántas veces entrenas por semana?", "trend.checkin.effort":"¿Qué intensidad tienen tus entrenamientos?",
     "trend.checkin.effortLow":"Caminar, yoga, estiramientos suaves", "trend.checkin.effortModerate":"Ciclismo, natación, circuitos de gimnasio",
     "trend.checkin.effortHigh":"Correr, HIIT, levantamiento pesado", "trend.checkin.submit":"Actualizar mi objetivo calórico",
@@ -10023,7 +10007,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   de: {
     "trend.checkin.title":"Täglicher Aktivitäts-Check-in", "trend.checkin.subtitle":"Hilf DUBI, deinen Kalorienverbrauch zu schätzen. Dauert 10 Sekunden.",
-    "trend.checkin.steps":"Wie viele Schritte gehst du an einem typischen Tag?", "trend.checkin.stepsHint":"Den Tagesdurchschnitt findest du in der Gesundheits-App deines Telefons.",
+
     "trend.checkin.workouts":"Wie oft trainierst du pro Woche?", "trend.checkin.effort":"Wie intensiv sind deine Trainingseinheiten?",
     "trend.checkin.effortLow":"Gehen, Yoga, leichtes Dehnen", "trend.checkin.effortModerate":"Radfahren, Schwimmen, Zirkeltraining",
     "trend.checkin.effortHigh":"Laufen, HIIT, schweres Krafttraining", "trend.checkin.submit":"Kalorienziel aktualisieren",
@@ -10032,7 +10016,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   ar: {
     "trend.checkin.title":"تسجيل النشاط اليومي", "trend.checkin.subtitle":"ساعد DUBI على تقدير السعرات التي تحرقها. يستغرق ذلك 10 ثوانٍ.",
-    "trend.checkin.steps":"كم خطوة تمشي في يوم عادي؟", "trend.checkin.stepsHint":"تحقق من تطبيق الصحة في هاتفك لمعرفة متوسطك اليومي.",
+
     "trend.checkin.workouts":"كم مرة تتمرن في الأسبوع؟", "trend.checkin.effort":"ما مدى شدة تمارينك؟",
     "trend.checkin.effortLow":"المشي، اليوغا، تمارين الإطالة الخفيفة", "trend.checkin.effortModerate":"ركوب الدراجة، السباحة، التمارين الدائرية",
     "trend.checkin.effortHigh":"الجري، تمارين HIIT، رفع الأوزان الثقيلة", "trend.checkin.submit":"تحديث هدفي من السعرات",
@@ -10041,7 +10025,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   pt: {
     "trend.checkin.title":"Registo diário de atividade", "trend.checkin.subtitle":"Ajude o DUBI a estimar as calorias gastas. Demora 10 segundos.",
-    "trend.checkin.steps":"Quantos passos dá num dia normal?", "trend.checkin.stepsHint":"Consulte a app Saúde do telemóvel para ver a média diária.",
+
     "trend.checkin.workouts":"Quantas vezes treina por semana?", "trend.checkin.effort":"Qual é a intensidade dos seus treinos?",
     "trend.checkin.effortLow":"Caminhada, ioga, alongamentos leves", "trend.checkin.effortModerate":"Ciclismo, natação, circuitos de ginásio",
     "trend.checkin.effortHigh":"Corrida, HIIT, levantamento pesado", "trend.checkin.submit":"Atualizar o meu objetivo calórico",
@@ -10050,7 +10034,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   zh: {
     "trend.checkin.title":"每日活动记录", "trend.checkin.subtitle":"帮助 DUBI 估算你的热量消耗，只需 10 秒。",
-    "trend.checkin.steps":"你通常每天走多少步？", "trend.checkin.stepsHint":"请在手机的健康应用中查看每日平均步数。",
+
     "trend.checkin.workouts":"你每周训练几次？", "trend.checkin.effort":"你的训练强度如何？",
     "trend.checkin.effortLow":"步行、瑜伽、轻度拉伸", "trend.checkin.effortModerate":"骑行、游泳、循环训练",
     "trend.checkin.effortHigh":"跑步、HIIT、大重量训练", "trend.checkin.submit":"更新我的热量目标",
@@ -10059,7 +10043,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   ja: {
     "trend.checkin.title":"毎日のアクティビティチェック", "trend.checkin.subtitle":"消費カロリーの推定にご協力ください。10秒で完了します。",
-    "trend.checkin.steps":"普段は1日に何歩歩きますか？", "trend.checkin.stepsHint":"スマートフォンのヘルスケアアプリで1日の平均を確認できます。",
+
     "trend.checkin.workouts":"週に何回トレーニングしますか？", "trend.checkin.effort":"トレーニングの強度はどの程度ですか？",
     "trend.checkin.effortLow":"ウォーキング、ヨガ、軽いストレッチ", "trend.checkin.effortModerate":"サイクリング、水泳、サーキットトレーニング",
     "trend.checkin.effortHigh":"ランニング、HIIT、高重量トレーニング", "trend.checkin.submit":"カロリー目標を更新",
@@ -10068,7 +10052,7 @@ const TREND_CHECKIN_TRANSLATIONS = {
   },
   ru: {
     "trend.checkin.title":"Ежедневная проверка активности", "trend.checkin.subtitle":"Помогите DUBI оценить расход калорий. Это займёт 10 секунд.",
-    "trend.checkin.steps":"Сколько шагов вы проходите в обычный день?", "trend.checkin.stepsHint":"Посмотрите среднее значение за день в приложении здоровья телефона.",
+
     "trend.checkin.workouts":"Сколько раз в неделю вы тренируетесь?", "trend.checkin.effort":"Насколько интенсивны ваши тренировки?",
     "trend.checkin.effortLow":"Ходьба, йога, лёгкая растяжка", "trend.checkin.effortModerate":"Велосипед, плавание, круговые тренировки",
     "trend.checkin.effortHigh":"Бег, HIIT, тяжёлая силовая тренировка", "trend.checkin.submit":"Обновить мою цель по калориям",
@@ -10312,9 +10296,9 @@ function localizeSourceNote(item, lang){
       "Carbohydrate quality and glycemic response":"Qualite des glucides et reponse glycemique",
       "Low-carb vs balanced diets":"Low-carb vs regimes equilibres",
       "Official position of AND, Dietitians of Canada and ACSM on nutrition and athletic performance. Macro targets, timing, hydration for competitive athletes.":"Position officielle de l'AND, Dietitians of Canada et ACSM sur nutrition et performance. Cibles macro, timing et hydratation pour athletes.",
-      "IOC consensus statement on dietary supplements and elite athletes. Periodised nutrition protocols for competition.":"Consensus du CIO sur complements alimentaires et athletes d'elite. Protocoles de nutrition periodisee pour la competition.",
+      "IOC consensus statement on dietary supplements and elite athletes. Periodised nutrition protocols.":"Consensus du CIO sur complements alimentaires et athletes d'elite. Protocoles de nutrition periodisee.",
       "Updated ISSN Position Stand on creatine, protein and supplementation for strength and power athletes. Dose: 3-5g/day of creatine monohydrate.":"Position ISSN actualisee sur creatine, proteines et supplementation pour force et puissance. Dose: 3-5 g/j de creatine monohydrate.",
-      "Evidence-based recommendations for natural bodybuilding competition preparation: caloric deficit, protein 2.3-3.1g/kg, meal frequency.":"Recommandations evidence-based pour le bodybuilding naturel: deficit calorique, proteines 2.3-3.1 g/kg, frequence des repas.",
+      "Evidence-based recommendations for natural bodybuilding nutrition: caloric deficit, protein 2.3-3.1g/kg, meal frequency.":"Recommandations evidence-based pour le bodybuilding naturel: deficit calorique, proteines 2.3-3.1 g/kg, frequence des repas.",
       "Acute weight reduction strategies for combat sports (boxing, wrestling, MMA). Weight category management while maintaining performance.":"Strategies de reduction aigue du poids pour sports de combat. Gestion de categorie avec maintien de la performance."
     },
     es: {
@@ -10671,22 +10655,9 @@ const LanguageSelector = ({ position="absolute" }) => {
 // ═══════════════════════════════════════════════
 // NUTRITION LOGIC
 // ═══════════════════════════════════════════════
-function calcTDEE({ gender, age, height, weight, occupation, workoutDays, workoutDuration, workoutIntensity, dailySteps }) {
-  const bmr = gender === "M"
-    ? 10*weight + 6.25*height - 5*age + 5
-    : 10*weight + 6.25*height - 5*age - 161;
-  const occMult = { sedentary:1.2, mixed:1.3, walking:1.4, active:1.55, heavy:1.7 }[occupation] || 1.3;
-  const freqScore  = { "0":0, "1-2":1.5, "3-4":3.5, "5-6":5.5, "7":7 }[workoutDays] || 0;
-  const durScore   = { "<30":0.5, "30-45":0.75, "45-60":1.0, "60-90":1.25, ">90":1.5 }[workoutDuration] || 0.75;
-  // Coefficienti calibrati su PAL standard FAO/WHO/UNU 2004 (Tabella 5.1).
-  // Approccio additivo: occMult = baseline giornaliero, intScore × freq × dur = contributo allenamento strutturato.
-  // Valori ridotti rispetto alla versione precedente per evitare sovrastima nei profili ad alta attività.
-  // Validato vs. Harris-Benedict + PAL lookup per 12 profili tipo (errore medio ±5%).
-  const intScore = { leggera:0.025, moderata:0.035, alta:0.05 }[workoutIntensity] || 0.03;
-  const stepsAdd = { "<3000":-0.03, "3000-6000":0, "6000-8000":0.02, "8000-10000":0.04, "10000+":0.07, unknown:0.02 }[dailySteps] || 0;
-  const rawPal = occMult + freqScore*durScore*intScore + stepsAdd;
-  const pal = Math.min(1.9, Math.max(1.15, rawPal));
-  return Math.round(bmr * pal);
+function calcTDEE({ gender, age, height, weight, workoutDays, workoutIntensity }) {
+  // Mirrors routes/plan.js calculateActivityKcal until the approved MET model replaces it.
+  return fallbackTdee({ gender, age, height, weight, workoutDays, workoutIntensity });
 }
 
 function calcMealCount({ goal, workoutIntensity, workoutDays, dayStart = "07:00", dayEnd = "22:00" }) {
@@ -10703,7 +10674,7 @@ function calcMealCount({ goal, workoutIntensity, workoutDays, dayStart = "07:00"
   const start = toHour(dayStart, 7);
   const end = toHour(dayEnd, 22);
 
-  let base = { gain: 5, definition: 5, fatLoss: 4, maintain: 4, competition: 6 }[goal] || 4;
+  let base = { gain: 5, definition: 5, fatLoss: 4, maintain: 4 }[goal] || 4;
 
   if (workoutIntensity === "alta" && workoutDays !== "0") base = Math.min(base + 1, 6);
   if ((end - start) < 13) base = Math.min(base, 4);
@@ -10852,11 +10823,6 @@ function getAiMealListForDay(plan, dayIdx, slots, times) {
 function carbNote(sport, goal) {
   const isEndurance = /corsa|ciclismo|nuoto|triathlon|maratona|running|bici/i.test(sport||"");
   const isStrength  = /palestra|crossfit|pesi|powerlifting/i.test(sport||"");
-  if (goal === "competition") {
-    if (isEndurance) return "Agonismo Endurance: carb loading 3 giorni pre-gara (8-12g/kg/die). In gara: 30-60g carb/ora. Fonte: Burke et al., J Sports Sci 2011 · IOC 2018.";
-    if (isStrength)  return "Agonismo Forza: carboidrati nella finestra anabolica (±1h dall'allenamento). Fase peaking: ±10% manipolazione idrica. Fonte: ISSN Position Stand 2021.";
-    return "Agonismo: periodizzazione carboidrati in base al ciclo di allenamento (alto nei giorni intensi, basso nei giorni di recupero). Fonte: Thomas et al., J Acad Nutr Diet 2016.";
-  }
   if (isEndurance) return "carb.endurance";
   if (isStrength)  return "carb.strength";
   if (goal==="fatLoss") return "carb.fatLoss";
@@ -11201,32 +11167,16 @@ function applySafetyOverrides(data, findings) {
 }
 
 function calcPlan(data) {
+  const goal = normalizeLegacyGoal(data.goal) || "maintain";
   const tdee = calcTDEE(data);
 
   // ── Aggiustamento calorico per obiettivo ──
-  // Competition: basato su sport specifico (IOC 2018, ISSN 2021, Burke et al. 2011)
-  let compAdj = 0;
-  if (data.goal === "competition") {
-    const cs = data.competitionSport || "endurance";
-    compAdj = { endurance:0.12, strength:0.08, aesthetic:-0.10, team:0.06, combat:-0.08 }[cs] || 0.08;
-    // Applica la variazione di fase (periodizzazione) se disponibile la data gara
-    if (data.competitionDate) {
-      const rp = calcRacePhase(data.competitionDate);
-      if (rp && rp.adj !== undefined) compAdj += rp.adj;
-    }
-  }
   // ── Deficit per obiettivo ──
   // fatLoss:   -20%  → ~300–500 kcal/die per la maggior parte degli utenti (ACSM Guidelines 2021)
   // definition: -15% → deficit moderato ~250–350 kcal/die per recomposizione (Barakat et al., S&C 2020)
   // gain:      +15%  → surplus minimo per lean bulk (ISSN 2021)
-  const intensity = data.dietIntensity || data.diet_intensity || "balanced";
-  const goalAdjByIntensity = {
-    gentle:   { fatLoss:-0.12, maintain:0, gain:0.10, definition:-0.10 },
-    balanced: { fatLoss:-0.18, maintain:0, gain:0.14, definition:-0.14 },
-    focused:  { fatLoss:-0.20, maintain:0, gain:0.15, definition:-0.15 },
-  };
-  const adj = data.goal === "competition" ? compAdj
-    : (goalAdjByIntensity[intensity] || goalAdjByIntensity.balanced)[data.goal] || 0;
+  const goalAdj = { fatLoss:-0.18, maintain:0, gain:0.14, definition:-0.14 };
+  const adj = goalAdj[goal] || 0;
   let kcal = Math.round(tdee*(1+adj));
 
   // ── Pavimento calorico: max(BMR×1.1, ACSM minimum) ──
@@ -11241,32 +11191,17 @@ function calcPlan(data) {
   if (kcal < minCal) { kcal = minCal; calorieFloor = true; }
 
   // ── Macro ratios per obiettivo ──
-  // Competition: ratios specifici per sport (Thomas et al., J Acad Nutr Diet 2016)
-  const compRatios = data.goal === "competition" ? ({
-    endurance:  {p:0.18, f:0.20, c:0.62}, // Alto carb — Burke et al., J Sports Sci 2011
-    strength:   {p:0.32, f:0.26, c:0.42}, // Alto protein — ISSN Position Stand 2021
-    aesthetic:  {p:0.35, f:0.20, c:0.45}, // Definizione spinta — Helms et al., IJSNEM 2014
-    team:       {p:0.25, f:0.25, c:0.50}, // Bilanciato — IOC Consensus 2018
-    combat:     {p:0.33, f:0.25, c:0.42}, // Controllo peso + massa — Reale et al., IJSNEM 2017
-  }[data.competitionSport || "endurance"] || {p:0.25, f:0.25, c:0.50}) : null;
-
   // ── Fat ratio per obiettivo (% calorie) ──
-  const fatRatio = compRatios ? compRatios.f : ({
+  const fatRatio = ({
     fatLoss:0.25, maintain:0.30, gain:0.28, definition:0.25,
-  }[data.goal] ?? 0.28);
+  }[goal] ?? 0.28);
 
   // ── Proteina: g/kg peso corporeo (ISSN Position Stand 2017; Morton et al., BJSM 2018) ──
   // Standard evidence-based: 1.6–2.2g/kg per persone attive.
   // Valori superiori (>2.2g/kg) non apportano ulteriori benefici per la maggior parte degli utenti.
   let protein, fat, carbs;
-  if (data.goal === "competition") {
-    // Agonismo: usa i ratio specifici per sport (calorie-based come prima)
-    protein = Math.round(kcal * compRatios.p / 4);
-    fat     = Math.round(kcal * compRatios.f / 9);
-    carbs   = Math.round((kcal - protein*4 - fat*9) / 4);
-  } else {
-    // Utente normale: proteina in g/kg bodyweight, grassi come % calorie, carbo a riempire
-    const protPerKg = { fatLoss:2.0, maintain:1.6, gain:2.0, definition:1.8 }[data.goal] ?? 1.8;
+  {
+    const protPerKg = { fatLoss:2.0, maintain:1.6, gain:2.0, definition:1.8 }[goal] ?? 1.8;
     protein = Math.round((data.weight || 70) * protPerKg);
     fat     = Math.round(kcal * fatRatio / 9);
     // Assicura che proteine + grassi non superino le calorie totali
@@ -11279,7 +11214,7 @@ function calcPlan(data) {
     carbs = Math.max(0, Math.round((kcal - protein*4 - fat*9) / 4));
   }
 
-  const mealCount = calcMealCount({...data, dayStart:data.dayStart||7, dayEnd:data.dayEnd||22});
+  const mealCount = calcMealCount({...data, goal, dayStart:data.dayStart||7, dayEnd:data.dayEnd||22});
   const mealTimes = calcMealTimes({dayStart:data.dayStart||7, dayEnd:data.dayEnd||22, mealCount});
 
   const bmi = calcBMI(data);
@@ -11296,13 +11231,10 @@ function calcPlan(data) {
     protein, fat, carbs,
     weeklyLossKg,
     mealCount, mealTimes,
-    carbNote: carbNote(data.sport, data.goal),
+    carbNote: carbNote(data.sport, goal),
     bmi, bf, bfCat: bfCategory(bf, data.gender),
     calorieFloor, minCal,
-    goal: data.goal,
-    competitionSport: data.competitionSport || null,
-    competitionDate: data.competitionDate || null,
-    racePhase: (data.goal === "competition" && data.competitionDate) ? calcRacePhase(data.competitionDate) : null,
+    goal,
     safetyFlag: data._safetyFlag || null,
   };
 }
@@ -11732,7 +11664,7 @@ const SRC_STUDI = [
   {org:"Barakat CI et al. — 2020",sub:"Strength & Conditioning Journal",note:"Ricomposizione corporea (recomp): deficit moderato 200–350 kcal + alto apporto proteico 1.6–2.4g/kg per perdere grasso e mantenere/guadagnare massa magra simultaneamente.",noteEN:"Body recomposition: moderate deficit 200–350 kcal + high protein 1.6–2.4g/kg to lose fat and maintain/gain lean mass simultaneously.",badge:"NEW"},
   // ── Fonti performance atletica ──
   {org:"Thomas DT, Erdman KA, Burke LM — 2016",sub:"Journal of the Academy of Nutrition and Dietetics",note:"Posizione ufficiale di AND, Dietitians of Canada e ACSM su nutrizione e performance atletica. Macro target, timing, idratazione per atleti.",noteEN:"Official position of AND, Dietitians of Canada and ACSM on nutrition and athletic performance. Macro targets, timing, hydration for athletes.",badge:"NEW"},
-  {org:"Maughan RJ et al. — 2018",sub:"British Journal of Sports Medicine · IOC Consensus Statement",note:"Consensus CIO su nutrizione da competizione e integratori: uso solo se evidence-based, sicuro e coerente con sport e obiettivo.",noteEN:"IOC consensus on competition nutrition and supplements: use only when evidence-based, safe and coherent with sport and goal.",badge:"NEW"},
+  {org:"Maughan RJ et al. — 2018",sub:"British Journal of Sports Medicine · IOC Consensus Statement",note:"Consensus CIO su nutrizione sportiva e integratori: uso solo se evidence-based, sicuro e coerente con sport e obiettivo.",noteEN:"IOC consensus on sports nutrition and supplements: use only when evidence-based, safe and coherent with sport and goal.",badge:"NEW"},
   {org:"Antonio J et al. — 2021",sub:"Journal of the International Society of Sports Nutrition",note:"ISSN Position Stand su creatina, proteine e supplementazione per atleti di forza e potenza. Dose: 3-5g/die di creatina monoidrato.",noteEN:"ISSN Position Stand on creatine, protein and supplementation for strength and power athletes. Dose: 3-5g/day of creatine monohydrate.",badge:"NEW"},
   {org:"Helms ER, Aragon AA, Fitschen PJ — 2014",sub:"Journal of the International Society of Sports Nutrition",note:"Raccomandazioni evidence-based per atleti: deficit calorico moderato, proteine 2.3-3.1g/kg, frequenza dei pasti per ottimizzare la composizione corporea.",noteEN:"Evidence-based recommendations for athletes: moderate caloric deficit, protein 2.3-3.1g/kg, meal frequency for optimal body composition.",badge:"NEW"},
   {org:"Reale R, Slater G, Burke LM — 2017",sub:"International Journal of Sports Physiology and Performance",note:"Strategie di gestione del peso per sport da combattimento: riduzione acuta del peso con mantenimento della performance.",noteEN:"Weight management strategies for combat sports: acute weight reduction while maintaining performance.",badge:"NEW"},
@@ -14893,21 +14825,6 @@ const PhysicalStep = ({d, u, onAutoNext, page}) => {
   );
 };
 
-// ── Calcola la fase nutrizionale in base alle settimane alla gara ──
-function calcRacePhase(competitionDate) {
-  if (!competitionDate) return null;
-  const today = new Date();
-  const race  = new Date(competitionDate);
-  const days  = Math.round((race - today) / (1000 * 60 * 60 * 24));
-  const weeks = Math.round(days / 7);
-  if (days < 0) return { labelKey:"race.phase.past",    color:"#C47B7B", adj:0,     noteKey:"race.phase.past.note",    icon:"info",    weeks:0 };
-  if (weeks > 16) return { labelKey:"race.phase.base",   weeks, color:T.accentD,  adj:+0.08, noteKey:"race.phase.base.note",   icon:"leaf2" };
-  if (weeks > 10) return { labelKey:"race.phase.develop",weeks, color:"#0F0F0F",  adj:+0.04, noteKey:"race.phase.develop.note",icon:"zap" };
-  if (weeks > 5)  return { labelKey:"race.phase.peak",   weeks, color:"#C9A87C",  adj:-0.05, noteKey:"race.phase.peak.note",   icon:"flame" };
-  if (weeks > 1)  return { labelKey:"race.phase.taper",  weeks, color:"#9A8FBF",  adj:-0.10, noteKey:"race.phase.taper.note",  icon:"refresh" };
-  return             { labelKey:"race.phase.raceweek", weeks:1, color:"#C47B7B", adj:0,     noteKey:"race.phase.raceweek.note",icon:"medal" };
-}
-
 const GOALS = [
   {id:"fatLoss",ic:"flame",tk:"goal.fatLoss.t",dk:"goal.fatLoss.d"},
   {id:"definition",ic:"scissors",tk:"goal.definition.t",dk:"goal.definition.d"},
@@ -14993,7 +14910,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
 
       </>) : (<>
 
-      {/* ── Target peso / BF — per fatLoss, gain, definition, competition ── */}
+      {/* ── Target peso / BF ── */}
       {["fatLoss","gain","definition"].includes(d.goal) && (
         <div style={{marginBottom:10,padding:"16px",background:T.sel,borderRadius:16,border:`1px solid ${T.border}`}}>
           <p style={{fontSize:11,color:T.muted,fontWeight:700,letterSpacing:0.5,marginBottom:14}}>
@@ -15031,7 +14948,7 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
                 <p style={{fontSize:11,color:"#B8893A",margin:0,lineHeight:1.5}}>{twWarn}</p>
               </div>
             )}
-            
+
             {/* Weight loss/gain rate selector and time estimate */}
 
           </div>
@@ -15045,9 +14962,6 @@ const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margin
           </div>
         </div>
       )}
-
-      {/* Sezione agonismo inclusa nella beta gratuita */}
-
 
       {d.goal === "maintain" && (
         <div style={{padding:"24px 20px",background:T.sel,borderRadius:16,border:`1px solid ${T.border}`,textAlign:"center"}}>
@@ -15077,15 +14991,7 @@ const ActivityStep = ({d, u, page}) => {
     <p style={{fontSize:13,color:T.muted,lineHeight:1.6,marginBottom:20,fontWeight:300,fontStyle:"italic"}}>
       {t("act.intro")}
     </p>
-    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("act.q1")}</p>
-    <OptBtn value={d.occupation} onChange={v=>u("occupation",v)} small options={[
-      {id:"sedentary",label:t("act.occ.sedentary"),note:t("act.occ.sedentary.note")},
-      {id:"mixed",label:t("act.occ.mixed")},
-      {id:"walking",label:t("act.occ.walking")},
-      {id:"active",label:t("act.occ.active")},
-      {id:"heavy",label:t("act.occ.heavy")},
-    ]} />
-    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q2")}</p>
+    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("act.q2")}</p>
     <div style={{display:"flex",gap:6}}>
       {["0","1-2","3-4","5-6","7"].map(v=>(
         <button key={v} onClick={()=>u("workoutDays",v)}
@@ -15106,19 +15012,6 @@ const ActivityStep = ({d, u, page}) => {
       {id:"moderata",label:t("act.int.moderate"),note:t("act.int.moderate.note")},
       {id:"alta",label:t("act.int.high"),note:t("act.int.high.note")},
     ]} />
-    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q5")}</p>
-    <OptBtn value={d.dailySteps} onChange={v=>u("dailySteps",v)} small options={[
-      {id:"<3000",label:"< 3.000"},{id:"3000-6000",label:"3.000 – 6.000"},{id:"6000-8000",label:"6.000 – 8.000"},{id:"8000-10000",label:"8.000 – 10.000"},{id:"10000+",label:"10.000+"},{id:"unknown",label:t("act.steps.unknown")},
-    ]} />
-    <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q6")}</p>
-    <div style={{display:"flex",gap:6}}>
-      {["0-1","2-3","4-5","6-7"].map(v=>(
-        <button key={v} onClick={()=>u("sedentaryDays",v)}
-          style={{flex:1,padding:"12px 4px",borderRadius:12,border:`1.5px solid ${d.sedentaryDays===v?T.accent:T.border}`,background:d.sedentaryDays===v?T.sel:T.card,fontSize:14,fontWeight:d.sedentaryDays===v?600:400,color:T.text,cursor:"pointer",textAlign:"center"}}>
-          {v}
-        </button>
-      ))}
-    </div>
     </>)}
   </div>
 );};
@@ -15999,16 +15892,10 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   weight:null,
   goal:"fatLoss",
   targetWeight:"",
-  targetBodyFat:"",
-
-  occupation:"sedentary",
   workoutDays:"3-4",
   workoutDuration:"45-60",
   workoutIntensity:"moderata",
-  dailySteps:"",
-  sedentaryDays:"",
   diet:"omnivore",
-  dietIntensity:"balanced",
   allergies:"",
   sport:"",
   sports:[],
@@ -16069,16 +15956,10 @@ const normalizeInitialOnboardingData = (source) => {
     weight: source.weight || defaultOnboardingData.weight,
     goal: toAppGoal(source.goal || defaultOnboardingData.goal),
     targetWeight: source.target_weight || source.targetWeight || "",
-    targetBodyFat: source.target_body_fat || source.targetBodyFat || "",
-
-    occupation: source.occupation || defaultOnboardingData.occupation,
     workoutDays: source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
     workoutDuration: source.workout_duration || source.workoutDuration || defaultOnboardingData.workoutDuration,
     workoutIntensity: toAppIntensity(source.workout_intensity || source.workoutIntensity || defaultOnboardingData.workoutIntensity),
-    dailySteps: source.daily_steps || source.dailySteps || "",
-    sedentaryDays: source.sedentary_days || source.sedentaryDays || "",
     diet: toCanonicalDiet(source.diet || defaultOnboardingData.diet),
-    dietIntensity: source.diet_intensity || source.dietIntensity || defaultOnboardingData.dietIntensity,
     allergies: serializeCanonicalList(source.allergies || ""),
     sports: normalizeSports(source.sports, source.sport),
     sport: normalizeSports(source.sports, source.sport)[0] || "",
@@ -16149,7 +16030,7 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   );
   const canContinueStep = !healthConsentRequired && !wearableConsentRequired && !physicalIncomplete && !workoutScheduleIncomplete;
 
-  
+
   return (
     <>
     {isEditing && (
@@ -17705,7 +17586,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
         <h1 style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:28,fontWeight:700,color:T.text,margin:0,letterSpacing:-0.5}}>
           {t(greeting.prefixKey)}{greeting.name ? `, ${greeting.name}` : ""}
         </h1>
-        
+
       </div>
 
 
@@ -19418,7 +19299,6 @@ const TrendScreen = ({userData, plan, onOpenWrap, onAiPlanRefresh, onManualActiv
   const [progressHistory, setProgressHistory] = useState([]);
   const [editingProgressId, setEditingProgressId] = useState(null);
   const [editingWeight, setEditingWeight] = useState("");
-  const [manualDailySteps, setManualDailySteps] = useState(userData?.dailySteps || "unknown");
   const [manualWorkoutDays, setManualWorkoutDays] = useState(userData?.workoutDays || "3-4");
   const [manualWorkoutIntensity, setManualWorkoutIntensity] = useState(userData?.workoutIntensity || "moderata");
   const [manualTdeeMessage, setManualTdeeMessage] = useState("");
@@ -19688,7 +19568,6 @@ const handleManualTdeeUpdate = async () => {
   const updatedData = {
     ...userData,
     weight: Number(newWeight || currentWeight || userData?.weight),
-    dailySteps: manualDailySteps,
     workoutDays: manualWorkoutDays,
     workoutIntensity: manualWorkoutIntensity,
   };
@@ -19983,18 +19862,6 @@ const handleManualTdeeUpdate = async () => {
 
         {(!wearableConnectionActive || manualCheckinOpen) && (
           <div>
-            <label style={{display:"block",fontSize:12,fontWeight:850,color:T.text,marginBottom:7}}>{t("trend.checkin.steps")}</label>
-            <select value={manualDailySteps} onChange={e=>setManualDailySteps(e.target.value)}
-              style={{width:"100%",padding:"11px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12}}>
-              <option value="unknown">{t("trend.manual.stepsUnknown")}</option>
-              <option value="<3000">&lt; 3.000</option>
-              <option value="3000-6000">3.000 - 6.000</option>
-              <option value="6000-8000">6.000 - 8.000</option>
-              <option value="8000-10000">8.000 - 10.000</option>
-              <option value="10000+">10.000+</option>
-            </select>
-            <p style={{fontSize:10,color:T.muted,lineHeight:1.4,margin:"6px 0 16px"}}>{t("trend.checkin.stepsHint")}</p>
-
             <label style={{display:"block",fontSize:12,fontWeight:850,color:T.text,marginBottom:7}}>{t("trend.checkin.workouts")}</label>
             <select value={manualWorkoutDays} onChange={e=>setManualWorkoutDays(e.target.value)}
               style={{width:"100%",padding:"11px 12px",borderRadius:12,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontFamily:"inherit",fontSize:12,marginBottom:16}}>
@@ -20127,7 +19994,7 @@ const handleManualTdeeUpdate = async () => {
             </button>
           </div>
           <button
-  
+
       onClick={handleSaveProgress}
   disabled={savingProgress}
   style={{
@@ -20275,7 +20142,7 @@ const handleManualTdeeUpdate = async () => {
   )}
 </div>
         </div>
-      
+
       )}
 
       {/* ── RESOCONTO SETTIMANALE COLLAPSIBLE ── */}
@@ -21068,10 +20935,6 @@ const handleConfirmHealthRevocation = async () => {
     workoutDuration:null,
     workout_intensity:null,
     workoutIntensity:null,
-    daily_steps:null,
-    dailySteps:null,
-    sedentary_days:null,
-    sedentaryDays:null,
     training_time:null,
     trainingTime:null
   };
@@ -21099,14 +20962,9 @@ const [profileForm, setProfileForm] = useState({
   goal: toAppGoal(userData?.goal || ""),
   target_weight: userData?.target_weight || userData?.targetWeight || "",
   target_body_fat: userData?.target_body_fat || userData?.targetBf || "",
-  competition_sport: userData?.competition_sport || "",
-  competition_date: userData?.competition_date || "",
-  occupation: userData?.occupation || "",
   workout_days: userData?.workout_days || userData?.workoutDays || "",
   workout_duration: userData?.workout_duration || userData?.workoutDuration || "",
   workout_intensity: toAppIntensity(userData?.workout_intensity || userData?.workoutIntensity || ""),
-  daily_steps: userData?.daily_steps || userData?.dailySteps || "",
-  sedentary_days: userData?.sedentary_days || userData?.sedentaryDays || "",
   diet: toCanonicalDiet(userData?.diet || ""),
   allergies: serializeCanonicalList(userData?.allergies || ""),
   sports: normalizeSports(userData?.sports, userData?.sport),
@@ -21152,8 +21010,6 @@ const currentProfileValue = (key) => ({
   workout_days: userData?.workout_days ?? userData?.workoutDays,
   workout_duration: userData?.workout_duration ?? userData?.workoutDuration,
   workout_intensity: userData?.workout_intensity ?? userData?.workoutIntensity,
-  daily_steps: userData?.daily_steps ?? userData?.dailySteps,
-  sedentary_days: userData?.sedentary_days ?? userData?.sedentaryDays,
   sports: normalizeSports(userData?.sports, userData?.sport),
   training_time: userData?.training_time ?? userData?.trainingTime,
   breakfast_pref: userData?.breakfast_pref ?? userData?.breakfastPref,
@@ -21215,14 +21071,9 @@ const handleSaveProfile = async () => {
     goal: toAppGoal(pick("goal", userData?.goal || "maintain")),
     targetWeight: pick("target_weight", userData?.targetWeight || null) ? Number(pick("target_weight", userData?.targetWeight || null)) : null,
     targetBf: pick("target_body_fat", userData?.targetBf || null) ? Number(pick("target_body_fat", userData?.targetBf || null)) : null,
-    competitionSport: pick("competition_sport", userData?.competitionSport || null),
-    competitionDate: pick("competition_date", userData?.competitionDate || null),
-    occupation: pick("occupation", userData?.occupation || "sedentary"),
     workoutDays: String(pick("workout_days", userData?.workoutDays || "0")),
     workoutDuration: pick("workout_duration", userData?.workoutDuration || "45-60"),
     workoutIntensity: toAppIntensity(pick("workout_intensity", userData?.workoutIntensity || "moderata")),
-    dailySteps: pick("daily_steps", userData?.dailySteps || "unknown"),
-    sedentaryDays: Number(pick("sedentary_days", userData?.sedentaryDays || 0)),
     diet: toCanonicalDiet(pick("diet", userData?.diet || "omnivore")),
     allergies: serializeCanonicalList(pick("allergies", userData?.allergies || "")),
     sports: selectedSports,
@@ -23141,7 +22992,7 @@ const handleDeleteAccount = async (otp) => {
   };
 
   const handleComplete = data => {
-    
+
     // Safety engine: rileva regole HARD/SOFT/COERENZA
     const sc = runSafetyChecks(data);
     if (sc.findings.length > 0) {
@@ -23153,7 +23004,7 @@ const handleDeleteAccount = async (otp) => {
   };
 
   const finalizeData = async data => {
-    
+
     // Genera codice DUBI univoco se non esiste già
     if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
     // Salva profilo in localStorage per il collegamento con altri profili
@@ -23361,7 +23212,7 @@ setPhase("app");
   />
 )}
             </div>
-    
+
             <BottomNav active={activeTab} onChange={setActiveTab} />
             {showWrap && <WrapScreen userData={userData} plan={plan} onClose={()=>setShowWrap(false)} />}
           </>

@@ -15,8 +15,9 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC = join(ROOT, 'src');
 
 function files(dir) {
@@ -71,4 +72,3 @@ if (!/NO_SAFE_MATCH|RECIPE_ENGINE_V1_CONTROLLED_FAILURE/.test(all)) {
 
 console.log(JSON.stringify({ test: 'no-name-substitution', failures_total: failures.length, failures: failures.slice(0, 60) }, null, 2));
 process.exit(failures.length ? 1 : 0);
-
