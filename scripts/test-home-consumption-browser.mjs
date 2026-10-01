@@ -118,6 +118,14 @@ try {
       savedOnboarding = JSON.parse(request.postData() || "{}");
       return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({success:true})});
     }
+    if (url.endsWith("/plan/ingredient-plan/training-state/preview")) {
+      return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
+        date:firstDate,
+        calorie_delta:JSON.parse(request.postData() || "{}").state === "rest" ? -600 : 600,
+        targets:{current:{calories:2600},proposed:{calories:2000}},
+        past_meals:[],
+      })});
+    }
     if (url.endsWith("/plan/ingredient-plan/training-state")) {
       trainingStatePayload = JSON.parse(request.postData() || "{}");
       return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
@@ -150,7 +158,8 @@ try {
   await workoutPage.getByTestId("today-workout-card").waitFor();
   await workoutPage.getByTestId("today-training-question").waitFor();
   await workoutPage.getByTestId("today-training-no").click();
-  await workoutPage.getByText("Oggi non ti alleni").waitFor();
+  await workoutPage.getByTestId("today-workout-title").waitFor();
+  assert.match(await workoutPage.getByTestId("today-workout-title").textContent(), /Oggi non ti alleni|No training today/);
   await workoutPage.getByText(/rest day/).waitFor();
   assert.equal(trainingStatePayload?.state,"rest","NO must persist an explicit rest-day override");
   assert.equal(generationPayload?.daily_training_override?.state,"rest");

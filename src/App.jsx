@@ -10,6 +10,7 @@ import { effectiveCompletedIngredientKeys, getIngredientMacroContribution, macro
 import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoading, getExplicitWorkoutLabel, getMealDisplayModel, getWeeklyPlanFetchDate, selectWeeklyPlanForDate, shouldFetchWeeklyPlanForDate } from "./planDisplayModel.mjs";
 import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
 import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
+import { allPastMealsAnswered, confirmationFromSelection, trainingChangeMessage } from "./trainingChangeConfirmation.mjs";
 import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 
@@ -1671,7 +1672,20 @@ async function replaceIngredientPlanMeal(date, mealId) {
   return normalizeIngredientPlanPayload(payload);
 }
 
-async function saveTodayTrainingState({ date, state, sessions = [] }) {
+async function previewTodayTrainingState({ date, state, sessions = [] }) {
+  const token = getAuthToken();
+  if (!token) throw new Error("missing_token");
+  const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/training-state/preview`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ date, state, sessions, timezone: getDeviceTimezone() }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "training_state_preview_failed");
+  return payload;
+}
+
+async function saveTodayTrainingState({ date, state, sessions = [], confirmations = [] }) {
   const token = getAuthToken();
   if (!token) throw new Error("missing_token");
   const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/training-state`, {
@@ -1680,7 +1694,7 @@ async function saveTodayTrainingState({ date, state, sessions = [] }) {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ date, state, sessions }),
+    body: JSON.stringify({ date, state, sessions, confirmations, timezone: getDeviceTimezone() }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -15353,6 +15367,11 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [routineMode,setRoutineMode] = useState("today");
+  const [changeReview,setChangeReview] = useState(null);
+  const [pendingOverride,setPendingOverride] = useState(null);
+  const [mealAnswers,setMealAnswers] = useState({});
+  const [partialMealType,setPartialMealType] = useState(null);
+  const [partialIngredientIds,setPartialIngredientIds] = useState(new Set());
   const defaultSessions = () => {
     const source = dailyOverride?.state === "training"
       ? dailyOverride.sessions
@@ -15387,6 +15406,71 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
     ...nextTodaySessions,
   ]);
 
+  const applyState = async (nextOverride, confirmations = []) => {
+    setSaving(true);
+    setMessage("");
+    try {
+      const normalizedOverride = {
+        date:todayIso,
+        state:nextOverride.state,
+        sessions:nextOverride.state === "training" ? normalizeTrainingSessions(nextOverride.sessions) : [],
+      };
+      const savedState = await saveTodayTrainingState({...normalizedOverride,confirmations});
+      const persistedOverride = savedState.daily_training_override || normalizedOverride;
+      setDailyOverride(persistedOverride);
+      try { localStorage.setItem(overrideStorageKey,JSON.stringify(persistedOverride)); } catch (_) {}
+      setPlan?.(current=>({
+        ...current,
+        ingredientPlan:{...(current?.ingredientPlan || {}),daily_training_override:persistedOverride,nutrition_context_stale:true},
+      }));
+
+      let updatedData = userData;
+      if (routineMode === "routine") {
+        const nextRoutineSessions = replaceRoutineDay(persistedOverride.sessions);
+        const workoutDayCount = new Set(nextRoutineSessions.map(session=>session.day_of_week)).size;
+        const hasDoubleSessions = [...new Set(nextRoutineSessions.map(session=>session.day_of_week))]
+          .some(day=>nextRoutineSessions.filter(session=>session.day_of_week===day).length > 1);
+        updatedData = {...userData,trainingSessions:nextRoutineSessions,training_sessions:nextRoutineSessions,workoutDays:String(workoutDayCount),workout_days:workoutDayCount,doubleSessions:hasDoubleSessions,double_sessions:hasDoubleSessions};
+        const saved = await saveOnboardingToBackend(updatedData);
+        if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
+        setUserData?.(updatedData);
+        saveDubiProfile(updatedData);
+      }
+
+      const {plan:updatedPlan} = await generateAiPlanFromBackend(updatedData, {
+        date: todayIso, force: true, reason: "today_training_state_updated",
+        dailyTrainingOverride:persistedOverride, throwOnFailure:true,
+      });
+      migrateTodayStatus(plan, updatedPlan, updatedData);
+      setPlan?.(updatedPlan);
+      const unallocated = Number(updatedPlan?.ingredientPlan?.remaining_energy_unallocated_kcal || updatedPlan?.remaining_energy_unallocated_kcal || 0);
+      const session = persistedOverride.sessions?.[0];
+      const minutesToSession = session ? (() => { const [h,m]=session.start_time.split(":").map(Number); const now=new Date(); return h*60+m-(now.getHours()*60+now.getMinutes()); })() : null;
+      const resultingMeals = updatedPlan?.ingredientPlan?.meals || updatedPlan?.meals || [];
+      const hasApprovedPreMeal = resultingMeals.some(meal=>meal.workout_relation === "PRE");
+      setMessage(unallocated > 0
+        ? trainingChangeMessage({warning:"unallocated_energy"})
+        : (minutesToSession !== null && minutesToSession >= 0 && minutesToSession < 30 && !hasApprovedPreMeal
+          ? trainingChangeMessage({warning:"late_session"})
+          : (persistedOverride.state === "rest"
+            ? (lang === "it" ? "Oggi è impostato come giorno di riposo. I pasti già fatti sono rimasti invariati." : "Today is set as a rest day. Completed meals were preserved.")
+            : (lang === "it" ? "Piano aggiornato. I pasti già fatti sono rimasti invariati." : "Plan updated. Completed meals were preserved."))));
+      setEditing(false);
+      setChangeReview(null);
+      setPendingOverride(null);
+      setMealAnswers({});
+      setPartialMealType(null);
+    } catch (error) {
+      console.error("Today workout update failed:", error);
+      setEditing(false);
+      setMessage(error?.code === "RECIPE_ENGINE_V1_DOUBLE_SESSION_RULE_NOT_IMPLEMENTED"
+        ? (lang === "it" ? "Sessioni salvate. Il piano nutrizionale per doppia sessione è in attesa di regole professionali approvate." : "Sessions saved. Double-session nutrition rules are still awaiting professional approval.")
+        : (lang === "it" ? "Non riesco ad aggiornare l'allenamento." : "Could not update the workout."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const persistState = async (nextOverride) => {
     if (nextOverride.state === "training") {
       if (!nextOverride.sessions.length || nextOverride.sessions.some(session=>!isTrainingSessionComplete(session))) {
@@ -15398,77 +15482,33 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
         return;
       }
     }
-    if (hasStoredConsumptionForDate(userData, todayIso)) {
-      const accepted = window.confirm(lang === "it"
-        ? "Hai già segnato alimenti consumati oggi. Rigenerare il piano preservando lo stato registrato?"
-        : "You already logged food today. Regenerate while preserving recorded completion state?");
-      if (!accepted) return;
-    }
-
     setSaving(true);
-    setMessage("");
     try {
-      const normalizedOverride = {
-        date:todayIso,
-        state:nextOverride.state,
-        sessions:nextOverride.state === "training" ? normalizeTrainingSessions(nextOverride.sessions) : [],
-      };
-      const savedState = await saveTodayTrainingState(normalizedOverride);
-      const persistedOverride = savedState.daily_training_override || normalizedOverride;
-      setDailyOverride(persistedOverride);
-      try { localStorage.setItem(overrideStorageKey,JSON.stringify(persistedOverride)); } catch (_) {}
-      setPlan?.(current=>({
-        ...current,
-        ingredientPlan:{
-          ...(current?.ingredientPlan || {}),
-          daily_training_override:persistedOverride,
-          nutrition_context_stale:true,
-        },
-      }));
-
-      let updatedData = userData;
-      if (routineMode === "routine") {
-        const nextRoutineSessions = replaceRoutineDay(persistedOverride.sessions);
-        const workoutDayCount = new Set(nextRoutineSessions.map(session=>session.day_of_week)).size;
-        const hasDoubleSessions = [...new Set(nextRoutineSessions.map(session=>session.day_of_week))]
-          .some(day=>nextRoutineSessions.filter(session=>session.day_of_week===day).length > 1);
-        updatedData = {
-          ...userData,
-          trainingSessions:nextRoutineSessions,
-          training_sessions:nextRoutineSessions,
-          workoutDays:String(workoutDayCount),
-          workout_days:workoutDayCount,
-          doubleSessions:hasDoubleSessions,
-          double_sessions:hasDoubleSessions,
-        };
-        const saved = await saveOnboardingToBackend(updatedData);
-        if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
-        setUserData?.(updatedData);
-        saveDubiProfile(updatedData);
+      const normalized = {date:todayIso,state:nextOverride.state,sessions:nextOverride.state === "training" ? normalizeTrainingSessions(nextOverride.sessions) : []};
+      const preview = await previewTodayTrainingState(normalized);
+      if ((preview.past_meals || []).length > 0) {
+        setPendingOverride(normalized);
+        setChangeReview(preview);
+        setMealAnswers({});
+        setPartialMealType(null);
+        return;
       }
-
-      const {plan:updatedPlan} = await generateAiPlanFromBackend(updatedData, {
-        date: todayIso,
-        force: true,
-        reason: "today_training_state_updated",
-        dailyTrainingOverride:persistedOverride,
-        throwOnFailure:true,
-      });
-      migrateTodayStatus(plan, updatedPlan, updatedData);
-      setPlan?.(updatedPlan);
-      setEditing(false);
-      setMessage(persistedOverride.state === "rest"
-        ? (lang === "it" ? "Oggi è impostato come giorno di riposo." : "Today is set as a rest day.")
-        : (lang === "it" ? "Piano aggiornato attorno all'allenamento." : "Plan updated around the workout."));
+      await applyState(normalized, []);
     } catch (error) {
-      console.error("Today workout update failed:", error);
-      setEditing(false);
-      setMessage(error?.code === "RECIPE_ENGINE_V1_DOUBLE_SESSION_RULE_NOT_IMPLEMENTED"
-        ? (lang === "it" ? "Sessioni salvate. Il piano nutrizionale per doppia sessione è in attesa di regole professionali approvate." : "Sessions saved. Double-session nutrition rules are still awaiting professional approval.")
-        : (lang === "it" ? "Non riesco ad aggiornare l'allenamento." : "Could not update the workout."));
+      console.error("Training change preview failed:",error);
+      setMessage(lang === "it" ? "Non riesco a preparare l'aggiornamento dell'allenamento." : "Could not prepare the training update.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const finishTrainingChange = () => {
+    if (!changeReview || !pendingOverride || !allPastMealsAnswered(changeReview.past_meals,mealAnswers)) return;
+    const confirmations = (changeReview.past_meals || []).filter(meal=>meal.status !== "logged").map(meal=>({
+      meal_type:meal.meal_type,
+      ingredients_consumed:mealAnswers[meal.meal_type],
+    }));
+    void applyState(pendingOverride,confirmations);
   };
 
   const beginTrainingEdit = () => {
@@ -15529,6 +15569,32 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
           Modifica
         </button>}
       </div>
+      {changeReview && pendingOverride && <div data-testid="training-change-review" style={{marginTop:14,padding:12,borderRadius:12,border:`1px solid ${T.border}`,background:T.bg}}>
+        <p style={{fontSize:12,fontWeight:800,color:T.text,margin:"0 0 10px"}}>{trainingChangeMessage({state:pendingOverride.state,calorieDelta:changeReview.calorie_delta})}</p>
+        <p style={{fontSize:11,color:T.muted,margin:"0 0 10px"}}>Mi confermi cosa hai mangiato finora, così ricalcolo bene il resto della giornata?</p>
+        {(changeReview.past_meals || []).map(meal=>{
+          if (meal.status === "logged") return <div key={meal.meal_type} data-testid={`past-meal-logged-${meal.meal_type}`} style={{padding:"8px 0",fontSize:11,color:T.text}}>{meal.meal_type} · {meal.scheduled_time} · Acquisito</div>;
+          const answered = Object.prototype.hasOwnProperty.call(mealAnswers,meal.meal_type);
+          const isPartial = partialMealType === meal.meal_type;
+          return <div key={meal.meal_type} data-testid={`past-meal-confirm-${meal.meal_type}`} style={{padding:"9px 0",borderTop:`1px solid ${T.border}`}}>
+            <p style={{fontSize:11,fontWeight:900,color:T.text,margin:"0 0 7px"}}>{meal.meal_type} · {meal.scheduled_time}</p>
+            {!isPartial ? <div style={{display:"flex",gap:7}}>
+              <button type="button" onClick={()=>{const all=new Set((meal.ingredients||[]).map(item=>String(item.ingredient_id??item.id??"")));setMealAnswers(current=>({...current,[meal.meal_type]:(meal.ingredients||[]).map(item=>({ingredient_id:item.ingredient_id??item.id,name:item.name||item.ingredient_name,portion_g:item.selected_quantity_g??item.portion_g??item.portionG??0,calories:item.calories??0,protein:item.protein??0,carbs:item.carbs??0,fat:item.fat??0}))}));setPartialMealType(null);void all;}}
+                style={{flex:1,padding:8,borderRadius:9,border:`1px solid ${T.border}`,background:answered?T.sel:T.card,color:T.text,fontSize:10,fontWeight:800}}>L'ho mangiato tutto</button>
+              <button type="button" onClick={()=>{setPartialMealType(meal.meal_type);setPartialIngredientIds(new Set((meal.ingredients||[]).map(item=>String(item.ingredient_id??item.id??""))));setMealAnswers(current=>{const next={...current};delete next[meal.meal_type];return next;});}}
+                style={{flex:1,padding:8,borderRadius:9,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:10,fontWeight:800}}>Ho saltato qualcosa</button>
+            </div> : <div>
+              {(meal.ingredients||[]).map((ingredient,index)=>{const id=String(ingredient.ingredient_id??ingredient.id??index);return <label key={`${meal.meal_type}-${id}`} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",fontSize:10.5,color:T.text}}><input type="checkbox" checked={partialIngredientIds.has(id)} onChange={()=>setPartialIngredientIds(current=>{const next=new Set(current);next.has(id)?next.delete(id):next.add(id);return next;})}/>{ingredient.name||ingredient.ingredient_name} · {ingredient.selected_quantity_g??ingredient.portion_g??ingredient.portionG??0}g</label>;})}
+              <div style={{display:"flex",gap:7,marginTop:7}}><button type="button" onClick={()=>{const picked=confirmationFromSelection(meal,partialIngredientIds);setMealAnswers(current=>({...current,[meal.meal_type]:picked.ingredients_consumed}));setPartialMealType(null);}} style={{flex:1,padding:8,border:0,borderRadius:9,background:T.accentD,color:"#E8E4DC",fontSize:10,fontWeight:900}}>Conferma ingredienti</button><button type="button" onClick={()=>setPartialMealType(null)} style={{padding:8,border:`1px solid ${T.border}`,borderRadius:9,background:T.card,color:T.text,fontSize:10}}>Annulla</button></div>
+            </div>}
+            {answered && !isPartial && <small style={{display:"block",marginTop:5,color:T.accentD}}>Risposta registrata</small>}
+          </div>;
+        })}
+        <div style={{display:"flex",gap:7,marginTop:10}}>
+          <button type="button" onClick={()=>{setChangeReview(null);setPendingOverride(null);setMealAnswers({});setPartialMealType(null);}} disabled={saving} style={{flex:1,padding:9,borderRadius:9,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:10,fontWeight:800}}>Annulla</button>
+          <button data-testid="confirm-training-change" type="button" onClick={finishTrainingChange} disabled={saving||!allPastMealsAnswered(changeReview.past_meals,mealAnswers)||Boolean(partialMealType)} style={{flex:1.3,padding:9,border:0,borderRadius:9,background:T.accentD,color:"#E8E4DC",fontSize:10,fontWeight:900,opacity:saving||!allPastMealsAnswered(changeReview.past_meals,mealAnswers)||Boolean(partialMealType)?.55:1}}>Aggiorna piano</button>
+        </div>
+      </div>}
       {!editing && model.showRoutineConfirmationActions && <div style={{display:"flex",gap:8,marginTop:12}}>
         <button data-testid="today-training-yes" type="button" onClick={confirmScheduledTraining} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:"none",background:T.accentD,color:"#E8E4DC",fontWeight:900,cursor:"pointer"}}>{lang === "it" ? "Sì, mi alleno" : "Yes, I am training"}</button>
         <button data-testid="today-training-no" type="button" onClick={()=>persistState({state:"rest",sessions:[]})} disabled={saving} style={{flex:1,padding:10,borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,color:T.text,fontWeight:900,cursor:"pointer"}}>{lang === "it" ? "Oggi no" : "Not today"}</button>
