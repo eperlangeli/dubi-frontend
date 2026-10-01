@@ -81,7 +81,7 @@ const DUBI_BETA_COPY = {
     sportSourcesText:"Quando selezioni gli sport, DUBI usa linee guida su proteine, carboidrati, timing, recupero e nutrizione sportiva.",
     cta:"Entra nel mio piano gratuito", note:"Nessuna carta richiesta. Nessun abbonamento. Tutte le funzionalita della beta sono incluse.",
     settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Tutto incluso", settingsNote:"Piano completo gratuito per i primi utenti beta.",
-    features:["Piano nutrizionale personalizzato","Adattamenti automatici sui tuoi dati","Lista della spesa e alternative","Progressi, trend e wearable"]
+    features:["Piano nutrizionale personalizzato","Adattamenti automatici sui tuoi dati","Lista della spesa e sostituzione dei pasti","Progressi, trend e wearable"]
   },
   en: {
     badge:"FREE BETA", title:"Your DUBI plan is ready.",
@@ -93,7 +93,7 @@ const DUBI_BETA_COPY = {
     sportSourcesText:"When you select sports, DUBI uses guidance on protein, carbohydrates, timing, recovery and sports nutrition guidance.",
     cta:"Open my free plan", note:"No card required. No subscription. All beta features are included.",
     settingsTitle:"FREE BETA", settingsPlan:"DUBI Beta · Everything included", settingsNote:"Full plan free for early beta users.",
-    features:["Personalized nutrition plan","Automatic adaptations from your data","Shopping list and alternatives","Progress, trends and wearables"]
+    features:["Personalized nutrition plan","Automatic adaptations from your data","Shopping list and complete meal replacements","Progress, trends and wearables"]
   },
   fr: {
     badge:"BETA GRATUITE", included:"TOUT INCLUS", title:"Ton plan DUBI est pret.",
@@ -102,7 +102,7 @@ const DUBI_BETA_COPY = {
     subtitle:"C'est pourquoi le service et ton plan personnalise sont offerts gratuitement : adaptations, liste de courses, progres et wearables inclus.",
     cta:"Ouvrir mon plan gratuit", note:"Aucune carte requise. Aucun abonnement. Toutes les fonctions beta sont incluses.",
     settingsTitle:"BETA GRATUITE", settingsPlan:"DUBI Beta · Tout inclus", settingsNote:"Plan complet gratuit pour les premiers utilisateurs beta.",
-    features:["Plan nutritionnel personnalise","Adaptations automatiques","Liste de courses et alternatives","Progres, tendances et wearables"]
+    features:["Plan nutritionnel personnalise","Adaptations automatiques","Liste de courses et remplacement de repas complets","Progres, tendances et wearables"]
   },
   es: {
     badge:"BETA GRATUITA", included:"TODO INCLUIDO", title:"Tu plan DUBI esta listo.",
@@ -111,7 +111,7 @@ const DUBI_BETA_COPY = {
     subtitle:"Por eso el servicio y tu plan personalizado se ofrecen gratis: adaptaciones, lista de compra, progreso y wearables incluidos.",
     cta:"Abrir mi plan gratuito", note:"Sin tarjeta. Sin suscripcion. Todas las funciones beta estan incluidas.",
     settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Todo incluido", settingsNote:"Plan completo gratuito para los primeros usuarios beta.",
-    features:["Plan nutricional personalizado","Adaptaciones automaticas","Lista de compra y alternativas","Progreso, tendencias y wearables"]
+    features:["Plan nutricional personalizado","Adaptaciones automaticas","Lista de compra y sustitucion de comidas completas","Progreso, tendencias y wearables"]
   },
   de: {
     badge:"KOSTENLOSE BETA", included:"ALLES INKLUSIVE", title:"Dein DUBI Plan ist bereit.",
@@ -120,7 +120,7 @@ const DUBI_BETA_COPY = {
     subtitle:"Darum sind der Service und dein personalisierter Plan kostenlos: Anpassungen, Einkaufsliste, Fortschritt und Wearables inklusive.",
     cta:"Meinen kostenlosen Plan offnen", note:"Keine Karte. Kein Abo. Alle Beta-Funktionen sind enthalten.",
     settingsTitle:"KOSTENLOSE BETA", settingsPlan:"DUBI Beta · Alles inklusive", settingsNote:"Kompletter Plan kostenlos fur fruhe Beta-Nutzer.",
-    features:["Personalisierter Ernahrungsplan","Automatische Anpassungen","Einkaufsliste und Alternativen","Fortschritt, Trends und Wearables"]
+    features:["Personalisierter Ernahrungsplan","Automatische Anpassungen","Einkaufsliste und Austausch ganzer Mahlzeiten","Fortschritt, Trends und Wearables"]
   },
   ar: {
     badge:"نسخة تجريبية مجانية", included:"كل شيء مشمول", title:"خطة DUBI جاهزة.",
@@ -129,7 +129,7 @@ const DUBI_BETA_COPY = {
     subtitle:"لهذا السبب نقدم الخدمة والخطة الشخصية مجانا: التعديلات، قائمة التسوق، التقدم والأجهزة مشمولة.",
     cta:"افتح خطتي المجانية", note:"لا بطاقة. لا اشتراك. كل ميزات النسخة التجريبية مشمولة.",
     settingsTitle:"نسخة مجانية", settingsPlan:"DUBI Beta · كل شيء مشمول", settingsNote:"خطة كاملة مجانية للمستخدمين الأوائل.",
-    features:["خطة غذائية شخصية","تعديلات تلقائية","قائمة تسوق وبدائل","تقدم واتجاهات وأجهزة"]
+    features:["خطة غذائية شخصية","تعديلات تلقائية","قائمة تسوق واستبدال الوجبات الكاملة","تقدم واتجاهات وأجهزة"]
   },
   pt: {
     badge:"BETA GRATUITA", included:"TUDO INCLUIDO", title:"O teu plano DUBI esta pronto.",
@@ -138,7 +138,7 @@ const DUBI_BETA_COPY = {
     subtitle:"Por isso o servico e o teu plano personalizado sao gratuitos: adaptacoes, lista de compras, progresso e wearables incluidos.",
     cta:"Abrir o meu plano gratuito", note:"Sem cartao. Sem subscricao. Todas as funcionalidades beta estao incluidas.",
     settingsTitle:"BETA GRATUITA", settingsPlan:"DUBI Beta · Tudo incluido", settingsNote:"Plano completo gratuito para os primeiros utilizadores beta.",
-    features:["Plano nutricional personalizado","Adaptacoes automaticas","Lista de compras e alternativas","Progresso, tendencias e wearables"]
+    features:["Plano nutricional personalizado","Adaptacoes automaticas","Lista de compras e substituicao de refeicoes completas","Progresso, tendencias e wearables"]
   },
   zh: {
     badge:"免费测试版", included:"全部包含", title:"你的 DUBI 计划已准备好。",
@@ -147,7 +147,7 @@ const DUBI_BETA_COPY = {
     subtitle:"因此，服务和个性化计划免费提供：调整、购物清单、进展和 wearable 都包含在内。",
     cta:"打开我的免费计划", note:"无需银行卡。无需订阅。测试版全部功能已包含。",
     settingsTitle:"免费测试版", settingsPlan:"DUBI Beta · 全部包含", settingsNote:"为早期测试用户提供完整免费计划。",
-    features:["个性化营养计划","自动数据调整","购物清单和替代方案","进展、趋势和 wearables"]
+    features:["个性化营养计划","自动数据调整","购物清单和完整餐食替换","进展、趋势和 wearables"]
   },
   ja: {
     badge:"無料ベータ", included:"すべて込み", title:"DUBI プランの準備ができました。",
@@ -156,7 +156,7 @@ const DUBI_BETA_COPY = {
     subtitle:"そのため、サービスと個別プランは無料です。調整、買い物リスト、進捗、wearable が含まれます。",
     cta:"無料プランを開く", note:"カード不要。サブスクなし。ベータ機能はすべて含まれます。",
     settingsTitle:"無料ベータ", settingsPlan:"DUBI Beta · すべて込み", settingsNote:"初期ベータユーザー向けの完全無料プラン。",
-    features:["個別栄養プラン","データによる自動調整","買い物リストと代替案","進捗、トレンド、wearables"]
+    features:["個別栄養プラン","データによる自動調整","買い物リストと食事全体の置き換え","進捗、トレンド、wearables"]
   },
   ru: {
     badge:"БЕСПЛАТНАЯ БЕТА", included:"ВСЕ ВКЛЮЧЕНО", title:"Ваш план DUBI готов.",
@@ -165,7 +165,7 @@ const DUBI_BETA_COPY = {
     subtitle:"Поэтому сервис и персональный план бесплатны: адаптации, список покупок, прогресс и wearables включены.",
     cta:"Открыть мой бесплатный план", note:"Без карты. Без подписки. Все функции беты включены.",
     settingsTitle:"БЕСПЛАТНАЯ БЕТА", settingsPlan:"DUBI Beta · Все включено", settingsNote:"Полный бесплатный план для первых бета-пользователей.",
-    features:["Персональный план питания","Автоматические адаптации","Список покупок и замены","Прогресс, тренды и wearables"]
+    features:["Персональный план питания","Автоматические адаптации","Список покупок и замена целого приема пищи","Прогресс, тренды и wearables"]
   }
 };
 const getDubiBetaCopy = (lang) => DUBI_BETA_COPY[lang] || DUBI_BETA_COPY.en;
@@ -1807,50 +1807,6 @@ const fetchCurrentAiPlanFromBackend = async (userData) => {
   }
 };
 
-const fetchIngredientSwapsFromBackend = async () => {
-  const token = getAuthToken();
-  if (!token) return {};
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/swaps`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-
-    if (!response.ok) return {};
-
-    const data = await response.json();
-    return (data.swaps || []).reduce((acc, row) => {
-      if (row.swap_key && row.replacement_ingredient) acc[row.swap_key] = row.replacement_ingredient;
-      return acc;
-    }, {});
-  } catch (error) {
-    console.error("Ingredient swaps load failed:", error);
-    return {};
-  }
-};
-
-const saveIngredientSwapToBackend = async (payload) => {
-  const token = getAuthToken();
-  if (!token) return null;
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/swaps`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) return null;
-    return await response.json();
-  } catch (error) {
-    console.error("Ingredient swap save failed:", error);
-    return null;
-  }
-};
 const saveProgressToBackend = async (progressData) => {
   const token = getAuthToken();
 
@@ -3478,7 +3434,6 @@ const TRANSLATIONS = {
     // Weekly screen
     "weekly.title": "Piano Settimanale",
     "weekly.target": "Target: {kcal} kcal · {p}g prot · {n} pasti",
-    "weekly.alts": "Alternative disponibili:",
     "days.short.0": "Lun",
     "days.short.1": "Mar",
     "days.short.2": "Mer",
@@ -3700,7 +3655,7 @@ const TRANSLATIONS = {
     "askdubi.adapt.label":"ADATTAMENTO PIANO","askdubi.updated":"Piano aggiornato ✓","askdubi.updated.sub":"Chiudi il pannello per vedere le modifiche.",
     "askdubi.input.ph":"Descrivi la tua situazione o fai una domanda…","askdubi.input.ph.followup":"Rispondi o fai un'altra domanda…","askdubi.send":"Invia",
     "askdubi.sugg.1":"Mi sono svegliato tardi, salto la colazione","askdubi.sugg.2":"Non riesco a fare pranzo oggi",
-    "askdubi.sugg.3":"Posso sostituire il pollo con il pesce?","askdubi.sugg.4":"Come gestisco la fame serale?",
+    "askdubi.sugg.3":"Posso cambiare questo pasto con un'altra ricetta completa?","askdubi.sugg.4":"Come gestisco la fame serale?",
     "askdubi.sugg.5":"Sono fuori casa a cena stasera","askdubi.sugg.6":"Quanta acqua devo bere?",
     "safety.badge.hard":"NON COMPATIBILE","safety.badge.soft":"SUGGERIMENTO","safety.badge.confirm":"CONFERMA",
     "safety.header.label":"DUBI · ANALISI PROFILO",
@@ -3833,7 +3788,7 @@ TRANSLATIONS.en = {
   "today.adapt.t":"Auto-adaptation active","today.adapt.d":"DUBI updates calories, macros and portions based on your real 7-day data.",
   "today.macro.short.p":"Prot","today.macro.short.c":"Carb","today.macro.short.f":"Fat",
   "meal.colazione":"Breakfast","meal.pranzo":"Lunch","meal.cena":"Dinner","meal.snack":"Snack","meal.snack_m":"Morning snack","meal.snack_n":"Pre-bedtime","meal.snack_pm":"Afternoon snack",
-  "weekly.title":"Weekly Plan","weekly.target":"Target: {kcal} kcal · {p}g prot · {n} meals","weekly.alts":"Available alternatives:",
+  "weekly.title":"Weekly Plan","weekly.target":"Target: {kcal} kcal · {p}g prot · {n} meals",
   "days.short.0":"Mon","days.short.1":"Tue","days.short.2":"Wed","days.short.3":"Thu","days.short.4":"Fri","days.short.5":"Sat","days.short.6":"Sun",
   "shop.title":"Shopping List","shop.progress":"{done} / {total} purchased",
   "shop.cat.proteins":"Proteins","shop.cat.grains":"Grains & Legumes","shop.cat.veg":"Fresh vegetables","shop.cat.fruit":"Fruit","shop.cat.fats":"Fats & Seeds",
@@ -3988,7 +3943,7 @@ TRANSLATIONS.en = {
   "askdubi.adapt.label":"PLAN ADAPTATION","askdubi.updated":"Plan updated ✓","askdubi.updated.sub":"Close the panel to see the changes.",
   "askdubi.input.ph":"Describe your situation or ask a question…","askdubi.input.ph.followup":"Reply or ask another question…","askdubi.send":"Send",
   "askdubi.sugg.1":"I woke up late, skipping breakfast","askdubi.sugg.2":"Can\'t have lunch today",
-  "askdubi.sugg.3":"Can I swap chicken for fish?","askdubi.sugg.4":"How do I handle evening hunger?",
+  "askdubi.sugg.3":"Can I replace this meal with another complete recipe?","askdubi.sugg.4":"How do I handle evening hunger?",
   "askdubi.sugg.5":"I\'m eating out tonight","askdubi.sugg.6":"How much water should I drink?",
   "safety.badge.hard":"NOT COMPATIBLE","safety.badge.soft":"SUGGESTION","safety.badge.confirm":"CONFIRM",
   "safety.header.label":"DUBI · PROFILE ANALYSIS",
@@ -4116,7 +4071,7 @@ TRANSLATIONS.fr = {
   "today.adapt.t":"Adaptation automatique active","today.adapt.d":"DUBI met à jour calories, macros et portions selon tes données réelles sur 7 jours.",
   "today.macro.short.p":"Prot","today.macro.short.c":"Glu","today.macro.short.f":"Lip",
   "meal.colazione":"Petit-déjeuner","meal.pranzo":"Déjeuner","meal.cena":"Dîner","meal.snack":"Collation","meal.snack_m":"Collation matin","meal.snack_n":"Avant le coucher","meal.snack_pm":"Collation après-midi",
-  "weekly.title":"Plan Hebdomadaire","weekly.target":"Objectif : {kcal} kcal · {p}g prot · {n} repas","weekly.alts":"Alternatives disponibles :",
+  "weekly.title":"Plan Hebdomadaire","weekly.target":"Objectif : {kcal} kcal · {p}g prot · {n} repas",
   "days.short.0":"Lun","days.short.1":"Mar","days.short.2":"Mer","days.short.3":"Jeu","days.short.4":"Ven","days.short.5":"Sam","days.short.6":"Dim",
   "shop.title":"Liste de Courses","shop.progress":"{done} / {total} achetés",
   "shop.cat.proteins":"Protéines","shop.cat.grains":"Céréales & Légumineuses","shop.cat.veg":"Légumes frais","shop.cat.fruit":"Fruits","shop.cat.fats":"Graisses & Graines",
@@ -4338,7 +4293,7 @@ TRANSLATIONS.fr = {
   "askdubi.send":"Envoyer",
   "askdubi.sugg.1":"Je me suis reveille tard, je saute le petit-dejeuner",
   "askdubi.sugg.2":"Je ne peux pas dejeuner aujourd'hui",
-  "askdubi.sugg.3":"Puis-je remplacer le poulet par du poisson ?",
+  "askdubi.sugg.3":"Puis-je remplacer ce repas par une autre recette complète ?",
   "askdubi.sugg.4":"Comment gerer la faim du soir ?",
   "askdubi.sugg.5":"Je dine dehors ce soir",
   "askdubi.sugg.6":"Quelle quantite d'eau dois-je boire ?",
@@ -4471,7 +4426,7 @@ TRANSLATIONS.es = {
   "today.adapt.t":"Adaptación automática activa","today.adapt.d":"DUBI actualiza calorías, macros y porciones según tus datos reales de los últimos 7 días.",
   "today.macro.short.p":"Prot","today.macro.short.c":"Carb","today.macro.short.f":"Gras",
   "meal.colazione":"Desayuno","meal.pranzo":"Almuerzo","meal.cena":"Cena","meal.snack":"Tentempié","meal.snack_m":"Tentempié mañana","meal.snack_n":"Antes de dormir","meal.snack_pm":"Tentempié tarde",
-  "weekly.title":"Plan Semanal","weekly.target":"Objetivo: {kcal} kcal · {p}g prot · {n} comidas","weekly.alts":"Alternativas disponibles:",
+  "weekly.title":"Plan Semanal","weekly.target":"Objetivo: {kcal} kcal · {p}g prot · {n} comidas",
   "days.short.0":"Lun","days.short.1":"Mar","days.short.2":"Mié","days.short.3":"Jue","days.short.4":"Vie","days.short.5":"Sáb","days.short.6":"Dom",
   "shop.title":"Lista de la Compra","shop.progress":"{done} / {total} comprados",
   "shop.cat.proteins":"Proteínas","shop.cat.grains":"Cereales y Legumbres","shop.cat.veg":"Verduras frescas","shop.cat.fruit":"Fruta","shop.cat.fats":"Grasas y Semillas",
@@ -4693,7 +4648,7 @@ TRANSLATIONS.es = {
   "askdubi.send":"Enviar",
   "askdubi.sugg.1":"Me desperte tarde, salto el desayuno",
   "askdubi.sugg.2":"No puedo almorzar hoy",
-  "askdubi.sugg.3":"Puedo cambiar pollo por pescado?",
+  "askdubi.sugg.3":"Puedo sustituir esta comida por otra receta completa?",
   "askdubi.sugg.4":"Como gestiono el hambre nocturna?",
   "askdubi.sugg.5":"Ceno fuera esta noche",
   "askdubi.sugg.6":"Cuanta agua debo beber?",
@@ -4826,7 +4781,7 @@ TRANSLATIONS.de = {
   "today.adapt.t":"Automatische Anpassung aktiv","today.adapt.d":"DUBI aktualisiert Kalorien, Makros und Portionen anhand deiner echten 7-Tage-Daten.",
   "today.macro.short.p":"Prot","today.macro.short.c":"KH","today.macro.short.f":"Fett",
   "meal.colazione":"Frühstück","meal.pranzo":"Mittagessen","meal.cena":"Abendessen","meal.snack":"Snack","meal.snack_m":"Vormittagssnack","meal.snack_n":"Vor dem Schlafen","meal.snack_pm":"Nachmittagssnack",
-  "weekly.title":"Wochenplan","weekly.target":"Ziel: {kcal} kcal · {p}g Prot · {n} Mahlzeiten","weekly.alts":"Verfügbare Alternativen:",
+  "weekly.title":"Wochenplan","weekly.target":"Ziel: {kcal} kcal · {p}g Prot · {n} Mahlzeiten",
   "days.short.0":"Mo","days.short.1":"Di","days.short.2":"Mi","days.short.3":"Do","days.short.4":"Fr","days.short.5":"Sa","days.short.6":"So",
   "shop.title":"Einkaufsliste","shop.progress":"{done} / {total} gekauft",
   "shop.cat.proteins":"Proteine","shop.cat.grains":"Getreide & Hülsenfrüchte","shop.cat.veg":"Frisches Gemüse","shop.cat.fruit":"Obst","shop.cat.fats":"Fette & Samen",
@@ -5048,7 +5003,7 @@ TRANSLATIONS.de = {
   "askdubi.send":"Senden",
   "askdubi.sugg.1":"Ich bin spat aufgewacht und lasse das Fruhstuck aus",
   "askdubi.sugg.2":"Ich kann heute nicht zu Mittag essen",
-  "askdubi.sugg.3":"Kann ich Huhn durch Fisch ersetzen?",
+  "askdubi.sugg.3":"Kann ich diese Mahlzeit durch ein anderes vollständiges Rezept ersetzen?",
   "askdubi.sugg.4":"Wie gehe ich mit Hunger am Abend um?",
   "askdubi.sugg.5":"Ich esse heute Abend auswarts",
   "askdubi.sugg.6":"Wie viel Wasser soll ich trinken?",
@@ -5181,7 +5136,7 @@ TRANSLATIONS.ar = {
   "today.adapt.t":"التكيّف التلقائي مفعَّل","today.adapt.d":"تحدِّث DUBI السعرات والماكروز والحصص بناءً على بياناتك الحقيقية لآخر 7 أيام.",
   "today.macro.short.p":"برو","today.macro.short.c":"كرب","today.macro.short.f":"دهن",
   "meal.colazione":"الإفطار","meal.pranzo":"الغداء","meal.cena":"العشاء","meal.snack":"وجبة خفيفة","meal.snack_m":"وجبة الصباح","meal.snack_n":"قبل النوم","meal.snack_pm":"وجبة بعد الظهر",
-  "weekly.title":"الخطة الأسبوعية","weekly.target":"الهدف: {kcal} سعرة · {p}غ بروتين · {n} وجبات","weekly.alts":"البدائل المتاحة:",
+  "weekly.title":"الخطة الأسبوعية","weekly.target":"الهدف: {kcal} سعرة · {p}غ بروتين · {n} وجبات",
   "days.short.0":"إثن","days.short.1":"ثلا","days.short.2":"أرب","days.short.3":"خمي","days.short.4":"جمع","days.short.5":"سبت","days.short.6":"أحد",
   "shop.title":"قائمة التسوق","shop.progress":"{done} / {total} تم شراؤها",
   "shop.cat.proteins":"البروتينات","shop.cat.grains":"الحبوب والبقوليات","shop.cat.veg":"خضراوات طازجة","shop.cat.fruit":"الفواكه","shop.cat.fats":"الدهون والبذور",
@@ -5403,7 +5358,7 @@ TRANSLATIONS.ar = {
   "askdubi.send":"إرسال",
   "askdubi.sugg.1":"استيقظت متأخرا، سأتخطى الفطور",
   "askdubi.sugg.2":"لا أستطيع تناول الغداء اليوم",
-  "askdubi.sugg.3":"هل أستطيع استبدال الدجاج بالسمك؟",
+  "askdubi.sugg.3":"هل يمكنني استبدال هذه الوجبة بوصفة كاملة أخرى؟",
   "askdubi.sugg.4":"كيف أتعامل مع الجوع مساء؟",
   "askdubi.sugg.5":"سأتناول العشاء خارج المنزل الليلة",
   "askdubi.sugg.6":"كم يجب أن أشرب من الماء؟",
@@ -5536,7 +5491,7 @@ TRANSLATIONS.pt = {
   "today.adapt.t":"Adaptação automática ativa","today.adapt.d":"A DUBI atualiza calorias, macros e porções com base nos teus dados reais dos últimos 7 dias.",
   "today.macro.short.p":"Prot","today.macro.short.c":"Hidr","today.macro.short.f":"Gord",
   "meal.colazione":"Pequeno-almoço","meal.pranzo":"Almoço","meal.cena":"Jantar","meal.snack":"Lanche","meal.snack_m":"Lanche manhã","meal.snack_n":"Antes de dormir","meal.snack_pm":"Lanche tarde",
-  "weekly.title":"Plano Semanal","weekly.target":"Objetivo: {kcal} kcal · {p}g prot · {n} refeições","weekly.alts":"Alternativas disponíveis:",
+  "weekly.title":"Plano Semanal","weekly.target":"Objetivo: {kcal} kcal · {p}g prot · {n} refeições",
   "days.short.0":"Seg","days.short.1":"Ter","days.short.2":"Qua","days.short.3":"Qui","days.short.4":"Sex","days.short.5":"Sáb","days.short.6":"Dom",
   "shop.title":"Lista de Compras","shop.progress":"{done} / {total} comprados",
   "shop.cat.proteins":"Proteínas","shop.cat.grains":"Cereais e Leguminosas","shop.cat.veg":"Vegetais frescos","shop.cat.fruit":"Fruta","shop.cat.fats":"Gorduras e Sementes",
@@ -5758,7 +5713,7 @@ TRANSLATIONS.pt = {
   "askdubi.send":"Enviar",
   "askdubi.sugg.1":"Acordei tarde, salto o pequeno-almoco",
   "askdubi.sugg.2":"Nao consigo almocar hoje",
-  "askdubi.sugg.3":"Posso trocar frango por peixe?",
+  "askdubi.sugg.3":"Posso substituir esta refeição por outra receita completa?",
   "askdubi.sugg.4":"Como gerir a fome ao fim do dia?",
   "askdubi.sugg.5":"Vou jantar fora hoje",
   "askdubi.sugg.6":"Quanta agua devo beber?",
@@ -5891,7 +5846,7 @@ TRANSLATIONS.zh = {
   "today.adapt.t":"自动适配已开启","today.adapt.d":"DUBI 根据你最近 7 天的真实数据更新卡路里、宏量与分量。",
   "today.macro.short.p":"蛋","today.macro.short.c":"碳","today.macro.short.f":"脂",
   "meal.colazione":"早餐","meal.pranzo":"午餐","meal.cena":"晚餐","meal.snack":"加餐","meal.snack_m":"上午加餐","meal.snack_n":"睡前加餐","meal.snack_pm":"下午加餐",
-  "weekly.title":"每周计划","weekly.target":"目标：{kcal} 千卡 · {p}克蛋白 · {n} 餐","weekly.alts":"可选替代品：",
+  "weekly.title":"每周计划","weekly.target":"目标：{kcal} 千卡 · {p}克蛋白 · {n} 餐",
   "days.short.0":"一","days.short.1":"二","days.short.2":"三","days.short.3":"四","days.short.4":"五","days.short.5":"六","days.short.6":"日",
   "shop.title":"购物清单","shop.progress":"{done} / {total} 已购买",
   "shop.cat.proteins":"蛋白质","shop.cat.grains":"谷物与豆类","shop.cat.veg":"新鲜蔬菜","shop.cat.fruit":"水果","shop.cat.fats":"脂类与种子",
@@ -6113,7 +6068,7 @@ TRANSLATIONS.zh = {
   "askdubi.send":"发送",
   "askdubi.sugg.1":"我起晚了，跳过早餐",
   "askdubi.sugg.2":"今天没法吃午餐",
-  "askdubi.sugg.3":"鸡肉可以换成鱼吗？",
+  "askdubi.sugg.3":"我可以用另一道完整食谱替换这顿饭吗？",
   "askdubi.sugg.4":"晚上饿怎么办？",
   "askdubi.sugg.5":"今晚在外面吃晚餐",
   "askdubi.sugg.6":"我该喝多少水？",
@@ -6246,7 +6201,7 @@ TRANSLATIONS.ja = {
   "today.adapt.t":"自動適応 オン","today.adapt.d":"DUBIは過去7日の実データに基づきカロリー・マクロ・量を更新します。",
   "today.macro.short.p":"P","today.macro.short.c":"C","today.macro.short.f":"F",
   "meal.colazione":"朝食","meal.pranzo":"昼食","meal.cena":"夕食","meal.snack":"間食","meal.snack_m":"午前間食","meal.snack_n":"就寝前","meal.snack_pm":"午後間食",
-  "weekly.title":"週間プラン","weekly.target":"目標：{kcal} kcal · {p}gタンパク · {n} 食","weekly.alts":"利用可能な代替：",
+  "weekly.title":"週間プラン","weekly.target":"目標：{kcal} kcal · {p}gタンパク · {n} 食",
   "days.short.0":"月","days.short.1":"火","days.short.2":"水","days.short.3":"木","days.short.4":"金","days.short.5":"土","days.short.6":"日",
   "shop.title":"買い物リスト","shop.progress":"{done} / {total} 購入済",
   "shop.cat.proteins":"タンパク質","shop.cat.grains":"穀物と豆類","shop.cat.veg":"新鮮野菜","shop.cat.fruit":"果物","shop.cat.fats":"脂質と種子",
@@ -6468,7 +6423,7 @@ TRANSLATIONS.ja = {
   "askdubi.send":"送信",
   "askdubi.sugg.1":"起きるのが遅く、朝食を抜きます",
   "askdubi.sugg.2":"今日は昼食を取れません",
-  "askdubi.sugg.3":"鶏肉を魚に替えられますか？",
+  "askdubi.sugg.3":"この食事を別の完全なレシピに置き換えられますか？",
   "askdubi.sugg.4":"夜の空腹はどう管理しますか？",
   "askdubi.sugg.5":"今夜は外食します",
   "askdubi.sugg.6":"水はどれくらい飲むべき？",
@@ -6601,7 +6556,7 @@ TRANSLATIONS.ru = {
   "today.adapt.t":"Авто-адаптация включена","today.adapt.d":"DUBI обновляет калории, макросы и порции по реальным данным за 7 дней.",
   "today.macro.short.p":"Б","today.macro.short.c":"У","today.macro.short.f":"Ж",
   "meal.colazione":"Завтрак","meal.pranzo":"Обед","meal.cena":"Ужин","meal.snack":"Перекус","meal.snack_m":"Утренний перекус","meal.snack_n":"Перед сном","meal.snack_pm":"Дневной перекус",
-  "weekly.title":"Недельный план","weekly.target":"Цель: {kcal} ккал · {p}г белка · {n} приёмов","weekly.alts":"Доступные альтернативы:",
+  "weekly.title":"Недельный план","weekly.target":"Цель: {kcal} ккал · {p}г белка · {n} приёмов",
   "days.short.0":"Пн","days.short.1":"Вт","days.short.2":"Ср","days.short.3":"Чт","days.short.4":"Пт","days.short.5":"Сб","days.short.6":"Вс",
   "shop.title":"Список покупок","shop.progress":"{done} / {total} куплено",
   "shop.cat.proteins":"Белки","shop.cat.grains":"Крупы и бобовые","shop.cat.veg":"Свежие овощи","shop.cat.fruit":"Фрукты","shop.cat.fats":"Жиры и семена",
@@ -6823,7 +6778,7 @@ TRANSLATIONS.ru = {
   "askdubi.send":"Отправить",
   "askdubi.sugg.1":"Я поздно проснулся, пропускаю завтрак",
   "askdubi.sugg.2":"Сегодня не могу пообедать",
-  "askdubi.sugg.3":"Можно заменить курицу рыбой?",
+  "askdubi.sugg.3":"Можно заменить этот прием пищи другим полноценным рецептом?",
   "askdubi.sugg.4":"Как справиться с вечерним голодом?",
   "askdubi.sugg.5":"Сегодня ужинаю вне дома",
   "askdubi.sugg.6":"Сколько воды пить?",
@@ -7066,7 +7021,7 @@ const I18N_COMPLETION = {
     "wd.d.sleep.total":"Duree totale","wd.d.sleep.fell":"Endormissement","wd.d.sleep.wake":"Reveil","wd.d.sleep.quality":"Qualite","wd.d.sleep.quality.v":"Bonne (76/100)","wd.d.sleep.hrv":"VFC nocturne","wd.d.sleep.deep":"Profond","wd.d.sleep.light":"Leger","wd.d.sleep.awake":"Eveil","wd.d.sleep.deepph":"Sommeil profond","wd.d.sleep.deepph.v":"18% - dans la norme (15-25%)","wd.d.sleep.rem.v":"22% - optimal pour la recuperation cognitive","wd.d.sleep.consist":"Regularite horaire","wd.d.sleep.consist.v":"Elevee - meme horaire 6 nuits sur 7","wd.d.sleep.rec":"Recommandation","wd.d.sleep.rec.v":"Garde cet horaire. Evite les ecrans apres 22h00",
     "wd.d.hrv.current":"VFC actuelle","wd.d.hrv.baseline":"Reference personnelle","wd.d.hrv.recovery":"Indice de recuperation","wd.d.hrv.recovery.v":"Bon - +6% au-dessus de la reference","wd.d.hrv.stress":"Stress physiologique","wd.d.hrv.stress.v":"Bas","wd.d.hrv.readiness":"Disponibilite","wd.d.hrv.readiness.v":"78/100 - pret pour un entrainement intense","wd.d.hrv.today.v":"Entrainement a haute intensite conseille","wd.d.hrv.note.v":"VFC < 40 ms -> jour de recuperation",
     "partner.modal.title":"Lier le profil partenaire","partner.modal.sub":"La liste de courses se calcule sur les deux plans reels","partner.mycode.label":"TON CODE DUBI","partner.mycode.copy":"Copier","partner.mycode.note":"Partage ce code avec ton/ta partenaire. Il/elle devra ouvrir DUBI sur le meme appareil, completer son profil, puis saisir ici ton code.","partner.code.input.label":"CODE DE TON PARTENAIRE","partner.code.placeholder":"Ex. DK7MXP","partner.code.search":"Rechercher","partner.notfound.msg":"Code introuvable. Le partenaire doit avoir termine l'onboarding sur cet appareil et genere son code DUBI.","partner.same.msg":"C'est ton propre code. Saisis le code de ton/ta partenaire.","partner.idle.msg":"Le code DUBI est genere automatiquement a la fin de l'onboarding. Chaque profil a un code unique.","partner.found.label":"Profil trouve","partner.found.code":"Code : {code}","partner.found.goal":"Objectif","partner.found.kcal":"Kcal/jour","partner.found.protein":"Proteines/j","partner.found.note":"La liste de courses sera generee en additionnant les besoins reels des deux profils.","partner.save.btn":"Lier ce profil",
-    "askdubi.suggestions.label":"SITUATIONS FREQUENTES","askdubi.support":"Conseiller - Plan - Support","askdubi.info":"Tu peux decrire des situations reelles ou poser des questions de suivi - DUBI garde le contexte et peut <strong style=\"color:#7A9E73\">mettre a jour le plan du jour</strong>.","askdubi.response.label":"REPONSE DUBI","askdubi.fonte":"Source :","askdubi.offer.label":"JE PEUX L'AJOUTER AU PLAN","askdubi.offer.q":"Veux-tu que j'ajoute \"{item}\" au plan d'aujourd'hui ?","askdubi.apply":"Oui, mettre a jour le plan","askdubi.adapt.label":"ADAPTATION DU PLAN","askdubi.updated":"Plan mis a jour","askdubi.updated.sub":"Ferme le panneau pour voir les changements.","askdubi.input.ph":"Decris ta situation ou pose une question...","askdubi.input.ph.followup":"Reponds ou pose une autre question...","askdubi.send":"Envoyer","askdubi.sugg.1":"Je me suis reveille tard, je saute le petit-dejeuner","askdubi.sugg.2":"Je ne peux pas dejeuner aujourd'hui","askdubi.sugg.3":"Puis-je remplacer le poulet par du poisson ?","askdubi.sugg.4":"Comment gerer la faim du soir ?","askdubi.sugg.5":"Je dine dehors ce soir","askdubi.sugg.6":"Quelle quantite d'eau dois-je boire ?",
+    "askdubi.suggestions.label":"SITUATIONS FREQUENTES","askdubi.support":"Conseiller - Plan - Support","askdubi.info":"Tu peux decrire des situations reelles ou poser des questions de suivi - DUBI garde le contexte et peut <strong style=\"color:#7A9E73\">mettre a jour le plan du jour</strong>.","askdubi.response.label":"REPONSE DUBI","askdubi.fonte":"Source :","askdubi.offer.label":"JE PEUX L'AJOUTER AU PLAN","askdubi.offer.q":"Veux-tu que j'ajoute \"{item}\" au plan d'aujourd'hui ?","askdubi.apply":"Oui, mettre a jour le plan","askdubi.adapt.label":"ADAPTATION DU PLAN","askdubi.updated":"Plan mis a jour","askdubi.updated.sub":"Ferme le panneau pour voir les changements.","askdubi.input.ph":"Decris ta situation ou pose une question...","askdubi.input.ph.followup":"Reponds ou pose une autre question...","askdubi.send":"Envoyer","askdubi.sugg.1":"Je me suis reveille tard, je saute le petit-dejeuner","askdubi.sugg.2":"Je ne peux pas dejeuner aujourd'hui","askdubi.sugg.3":"Puis-je remplacer ce repas par une autre recette complete ?","askdubi.sugg.4":"Comment gerer la faim du soir ?","askdubi.sugg.5":"Je dine dehors ce soir","askdubi.sugg.6":"Quelle quantite d'eau dois-je boire ?",
     "ingr.in.plan":"INGREDIENT DANS TON PLAN","ingr.macros":"VALEURS NUTRITIONNELLES","ingr.benefits.label":"BENEFICES CLES","ingr.tip.label":"CONSEIL DUBI","ingr.source":"Source :","ingr.why":"POURQUOI DANS TON PLAN","ingr.why.text":"Selectionne pour completer le profil nutritionnel du repas et soutenir l'objectif calorique et macro de la journee.","ingr.tip.generic":"Chaque ingredient est choisi pour sa densite nutritionnelle et sa coherence avec le reste du repas.","meal.source.linked":"Source scientifique reliee :","meal.reason.localized":"DUBI a choisi ce repas selon ton creneau, ton objectif calorique et la qualite nutritionnelle : satiete, densite en nutriments, indice glycemique et soutien de la recuperation. Niveau de preuve : eleve.",
     "shop.butcher.title":"Conseil qualite","shop.butcher.text":"Viande, poulet et oeufs sont idealement achetes chez un boucher de confiance. Pour la viande rouge, choisis si possible du grass-fed : plus d'Omega-3 et de CLA que l'elevage intensif.",
     "src.philosophy.label":"PHILOSOPHIE DUBI","src.badge.new":"NOUVEAU","src.badge.present":"DEJA PRESENT"
@@ -7077,7 +7032,7 @@ const I18N_COMPLETION = {
     "wd.d.sleep.total":"Duracion total","wd.d.sleep.fell":"Inicio del sueno","wd.d.sleep.wake":"Despertar","wd.d.sleep.quality":"Calidad","wd.d.sleep.quality.v":"Buena (76/100)","wd.d.sleep.hrv":"HRV nocturna","wd.d.sleep.deep":"Profundo","wd.d.sleep.light":"Ligero","wd.d.sleep.awake":"Despierto","wd.d.sleep.deepph":"Fase profunda","wd.d.sleep.deepph.v":"18% - dentro del rango (15-25%)","wd.d.sleep.rem.v":"22% - optimo para recuperacion cognitiva","wd.d.sleep.consist":"Regularidad horaria","wd.d.sleep.consist.v":"Alta - mismo horario 6/7 noches","wd.d.sleep.rec":"Recomendacion","wd.d.sleep.rec.v":"Mantén el horario. Evita pantallas despues de las 22:00",
     "wd.d.hrv.current":"HRV actual","wd.d.hrv.baseline":"Linea base personal","wd.d.hrv.recovery":"Indice de recuperacion","wd.d.hrv.recovery.v":"Bueno - +6% sobre la linea base","wd.d.hrv.stress":"Estres fisiologico","wd.d.hrv.stress.v":"Bajo","wd.d.hrv.readiness":"Preparacion","wd.d.hrv.readiness.v":"78/100 - listo para entrenamiento intenso","wd.d.hrv.today.v":"Entrenamiento de alta intensidad recomendado","wd.d.hrv.note.v":"HRV < 40 ms -> dia de recuperacion",
     "partner.modal.title":"Vincular perfil de pareja","partner.modal.sub":"La compra se calcula con ambos planes reales","partner.mycode.label":"TU CODIGO DUBI","partner.mycode.copy":"Copiar","partner.mycode.note":"Comparte este codigo con tu pareja. Debe abrir DUBI en el mismo dispositivo, completar su perfil e introducir aqui tu codigo.","partner.code.input.label":"CODIGO DE TU PAREJA","partner.code.placeholder":"Ej. DK7MXP","partner.code.search":"Buscar","partner.notfound.msg":"Codigo no encontrado. La pareja debe haber completado el onboarding y generado su codigo DUBI.","partner.same.msg":"Este es tu propio codigo. Introduce el codigo de tu pareja.","partner.idle.msg":"El codigo DUBI se genera automaticamente al finalizar el onboarding. Cada perfil tiene un codigo unico.","partner.found.label":"Perfil encontrado","partner.found.code":"Codigo: {code}","partner.found.goal":"Objetivo","partner.found.kcal":"Kcal/dia","partner.found.protein":"Proteinas/dia","partner.found.note":"La lista de la compra sumara las necesidades reales de ambos perfiles.","partner.save.btn":"Vincular este perfil",
-    "askdubi.suggestions.label":"SITUACIONES FRECUENTES","askdubi.support":"Asesor - Plan - Soporte","askdubi.info":"Puedes describir situaciones reales o hacer preguntas de seguimiento; DUBI recuerda el contexto y puede <strong style=\"color:#7A9E73\">actualizar el plan de hoy</strong>.","askdubi.response.label":"RESPUESTA DUBI","askdubi.fonte":"Fuente:","askdubi.offer.label":"PUEDO ANADIRLO AL PLAN","askdubi.offer.q":"Quieres que anada \"{item}\" al plan de hoy?","askdubi.apply":"Si, actualizar el plan","askdubi.adapt.label":"ADAPTACION DEL PLAN","askdubi.updated":"Plan actualizado","askdubi.updated.sub":"Cierra el panel para ver los cambios.","askdubi.input.ph":"Describe tu situacion o haz una pregunta...","askdubi.input.ph.followup":"Responde o haz otra pregunta...","askdubi.send":"Enviar","askdubi.sugg.1":"Me desperte tarde, salto el desayuno","askdubi.sugg.2":"No puedo almorzar hoy","askdubi.sugg.3":"Puedo cambiar pollo por pescado?","askdubi.sugg.4":"Como gestiono el hambre nocturna?","askdubi.sugg.5":"Ceno fuera esta noche","askdubi.sugg.6":"Cuanta agua debo beber?",
+    "askdubi.suggestions.label":"SITUACIONES FRECUENTES","askdubi.support":"Asesor - Plan - Soporte","askdubi.info":"Puedes describir situaciones reales o hacer preguntas de seguimiento; DUBI recuerda el contexto y puede <strong style=\"color:#7A9E73\">actualizar el plan de hoy</strong>.","askdubi.response.label":"RESPUESTA DUBI","askdubi.fonte":"Fuente:","askdubi.offer.label":"PUEDO ANADIRLO AL PLAN","askdubi.offer.q":"Quieres que anada \"{item}\" al plan de hoy?","askdubi.apply":"Si, actualizar el plan","askdubi.adapt.label":"ADAPTACION DEL PLAN","askdubi.updated":"Plan actualizado","askdubi.updated.sub":"Cierra el panel para ver los cambios.","askdubi.input.ph":"Describe tu situacion o haz una pregunta...","askdubi.input.ph.followup":"Responde o haz otra pregunta...","askdubi.send":"Enviar","askdubi.sugg.1":"Me desperte tarde, salto el desayuno","askdubi.sugg.2":"No puedo almorzar hoy","askdubi.sugg.3":"Puedo sustituir esta comida por otra receta completa?","askdubi.sugg.4":"Como gestiono el hambre nocturna?","askdubi.sugg.5":"Ceno fuera esta noche","askdubi.sugg.6":"Cuanta agua debo beber?",
     "ingr.in.plan":"INGREDIENTE EN TU PLAN","ingr.macros":"VALORES NUTRICIONALES","ingr.benefits.label":"BENEFICIOS CLAVE","ingr.tip.label":"CONSEJO DUBI","ingr.source":"Fuente:","ingr.why":"POR QUE ESTA EN TU PLAN","ingr.why.text":"Elegido para completar el perfil nutricional de la comida y apoyar el objetivo diario de calorias y macros.","ingr.tip.generic":"Cada ingrediente se elige por densidad nutricional y coherencia con el resto de la comida.","meal.source.linked":"Fuente cientifica vinculada:","meal.reason.localized":"DUBI eligio esta comida segun tu ventana horaria, objetivo calorico y calidad nutricional: saciedad, densidad de nutrientes, indice glucemico y recuperacion. Evidencia: alta.",
     "shop.butcher.title":"Consejo de calidad","shop.butcher.text":"Carne, pollo y huevos se recomiendan de un proveedor de confianza. Para carne roja, elige grass-fed cuando sea posible: mas Omega-3 y CLA que la cria intensiva.",
     "src.philosophy.label":"FILOSOFIA DUBI","src.badge.new":"NUEVO","src.badge.present":"YA PRESENTE"
@@ -7088,7 +7043,7 @@ const I18N_COMPLETION = {
     "wd.d.sleep.total":"Gesamtdauer","wd.d.sleep.fell":"Einschlafen","wd.d.sleep.wake":"Aufwachen","wd.d.sleep.quality":"Qualitat","wd.d.sleep.quality.v":"Gut (76/100)","wd.d.sleep.hrv":"Nachts-HRV","wd.d.sleep.deep":"Tief","wd.d.sleep.light":"Leicht","wd.d.sleep.awake":"Wach","wd.d.sleep.deepph":"Tiefschlafphase","wd.d.sleep.deepph.v":"18% - im Normbereich (15-25%)","wd.d.sleep.rem.v":"22% - optimal fur kognitive Erholung","wd.d.sleep.consist":"Zeitliche Konstanz","wd.d.sleep.consist.v":"Hoch - gleiche Zeit 6/7 Nachte","wd.d.sleep.rec":"Empfehlung","wd.d.sleep.rec.v":"Rhythmus halten. Bildschirme nach 22:00 vermeiden",
     "wd.d.hrv.current":"Aktuelle HRV","wd.d.hrv.baseline":"Personliche Baseline","wd.d.hrv.recovery":"Erholungsindex","wd.d.hrv.recovery.v":"Gut - +6% uber Baseline","wd.d.hrv.stress":"Physiologischer Stress","wd.d.hrv.stress.v":"Niedrig","wd.d.hrv.readiness":"Bereitschaft","wd.d.hrv.readiness.v":"78/100 - bereit fur intensives Training","wd.d.hrv.today.v":"Hochintensives Training empfohlen","wd.d.hrv.note.v":"HRV < 40 ms -> Erholungstag",
     "partner.modal.title":"Partnerprofil verknupfen","partner.modal.sub":"Die Einkaufsliste wird aus beiden echten Planen berechnet","partner.mycode.label":"DEIN DUBI-CODE","partner.mycode.copy":"Kopieren","partner.mycode.note":"Teile diesen Code mit deinem Partner. Er/sie offnet DUBI auf demselben Gerat, erstellt das Profil und gibt hier deinen Code ein.","partner.code.input.label":"CODE DEINES PARTNERS","partner.code.placeholder":"Z. B. DK7MXP","partner.code.search":"Suchen","partner.notfound.msg":"Code nicht gefunden. Der Partner muss das Onboarding beendet und den DUBI-Code erzeugt haben.","partner.same.msg":"Das ist dein eigener Code. Gib den Partnercode ein.","partner.idle.msg":"Der DUBI-Code wird nach dem Onboarding automatisch erstellt. Jedes Profil hat einen eigenen Code.","partner.found.label":"Profil gefunden","partner.found.code":"Code: {code}","partner.found.goal":"Ziel","partner.found.kcal":"Kcal/Tag","partner.found.protein":"Protein/Tag","partner.found.note":"Die Einkaufsliste addiert die realen Bedarfe beider Profile.","partner.save.btn":"Dieses Profil verknupfen",
-    "askdubi.suggestions.label":"HAUFIGE SITUATIONEN","askdubi.support":"Berater - Plan - Support","askdubi.info":"Du kannst reale Situationen beschreiben oder Nachfragen stellen - DUBI merkt sich den Kontext und kann <strong style=\"color:#7A9E73\">den heutigen Plan aktualisieren</strong>.","askdubi.response.label":"DUBI-ANTWORT","askdubi.fonte":"Quelle:","askdubi.offer.label":"ICH KANN ES ZUM PLAN HINZUFUGEN","askdubi.offer.q":"Soll ich \"{item}\" zum heutigen Plan hinzufugen?","askdubi.apply":"Ja, Plan aktualisieren","askdubi.adapt.label":"PLANANPASSUNG","askdubi.updated":"Plan aktualisiert","askdubi.updated.sub":"Schliesse das Panel, um die Anderungen zu sehen.","askdubi.input.ph":"Beschreibe deine Situation oder stelle eine Frage...","askdubi.input.ph.followup":"Antworte oder stelle eine weitere Frage...","askdubi.send":"Senden","askdubi.sugg.1":"Ich bin spat aufgewacht und lasse das Fruhstuck aus","askdubi.sugg.2":"Ich kann heute nicht zu Mittag essen","askdubi.sugg.3":"Kann ich Huhn durch Fisch ersetzen?","askdubi.sugg.4":"Wie gehe ich mit Hunger am Abend um?","askdubi.sugg.5":"Ich esse heute Abend auswarts","askdubi.sugg.6":"Wie viel Wasser soll ich trinken?",
+    "askdubi.suggestions.label":"HAUFIGE SITUATIONEN","askdubi.support":"Berater - Plan - Support","askdubi.info":"Du kannst reale Situationen beschreiben oder Nachfragen stellen - DUBI merkt sich den Kontext und kann <strong style=\"color:#7A9E73\">den heutigen Plan aktualisieren</strong>.","askdubi.response.label":"DUBI-ANTWORT","askdubi.fonte":"Quelle:","askdubi.offer.label":"ICH KANN ES ZUM PLAN HINZUFUGEN","askdubi.offer.q":"Soll ich \"{item}\" zum heutigen Plan hinzufugen?","askdubi.apply":"Ja, Plan aktualisieren","askdubi.adapt.label":"PLANANPASSUNG","askdubi.updated":"Plan aktualisiert","askdubi.updated.sub":"Schliesse das Panel, um die Anderungen zu sehen.","askdubi.input.ph":"Beschreibe deine Situation oder stelle eine Frage...","askdubi.input.ph.followup":"Antworte oder stelle eine weitere Frage...","askdubi.send":"Senden","askdubi.sugg.1":"Ich bin spat aufgewacht und lasse das Fruhstuck aus","askdubi.sugg.2":"Ich kann heute nicht zu Mittag essen","askdubi.sugg.3":"Kann ich diese Mahlzeit durch ein anderes vollständiges Rezept ersetzen?","askdubi.sugg.4":"Wie gehe ich mit Hunger am Abend um?","askdubi.sugg.5":"Ich esse heute Abend auswarts","askdubi.sugg.6":"Wie viel Wasser soll ich trinken?",
     "ingr.in.plan":"ZUTAT IN DEINEM PLAN","ingr.macros":"NAHRWERTE","ingr.benefits.label":"WICHTIGE VORTEILE","ingr.tip.label":"DUBI-TIPP","ingr.source":"Quelle:","ingr.why":"WARUM IM PLAN","ingr.why.text":"Ausgewahlt, um das Nahrwertprofil der Mahlzeit zu vervollstandigen und dein Tagesziel zu unterstutzen.","ingr.tip.generic":"Jede Zutat wird nach Nahrstoffdichte und Zusammenspiel mit der Mahlzeit ausgewahlt.","meal.source.linked":"Verknupfte wissenschaftliche Quelle:","meal.reason.localized":"DUBI hat diese Mahlzeit nach Zeitfenster, Kalorienziel und Ernahrungsqualitat gewahlt: Sattigung, Nahrstoffdichte, glykämischer Index und Erholung. Evidenz: hoch.",
     "shop.butcher.title":"Qualitatstipp","shop.butcher.text":"Fleisch, Huhn und Eier kaufst du am besten bei einem vertrauenswurdigen Anbieter. Bei rotem Fleisch moglichst grass-fed wahlen: mehr Omega-3 und CLA als Intensivhaltung.",
     "src.philosophy.label":"DUBI-PHILOSOPHIE","src.badge.new":"NEU","src.badge.present":"BEREITS VORHANDEN"
@@ -7099,7 +7054,7 @@ const I18N_COMPLETION = {
     "wd.d.sleep.total":"Duracao total","wd.d.sleep.fell":"Adormeceu","wd.d.sleep.wake":"Despertar","wd.d.sleep.quality":"Qualidade","wd.d.sleep.quality.v":"Boa (76/100)","wd.d.sleep.hrv":"HRV noturna","wd.d.sleep.deep":"Profundo","wd.d.sleep.light":"Leve","wd.d.sleep.awake":"Acordado","wd.d.sleep.deepph":"Fase profunda","wd.d.sleep.deepph.v":"18% - dentro do normal (15-25%)","wd.d.sleep.rem.v":"22% - otimo para recuperacao cognitiva","wd.d.sleep.consist":"Consistencia de horario","wd.d.sleep.consist.v":"Alta - mesmo horario 6/7 noites","wd.d.sleep.rec":"Recomendacao","wd.d.sleep.rec.v":"Mantem o horario. Evita ecras apos as 22:00",
     "wd.d.hrv.current":"HRV atual","wd.d.hrv.baseline":"Baseline pessoal","wd.d.hrv.recovery":"Indice de recuperacao","wd.d.hrv.recovery.v":"Bom - +6% acima da baseline","wd.d.hrv.stress":"Stress fisiologico","wd.d.hrv.stress.v":"Baixo","wd.d.hrv.readiness":"Prontidao","wd.d.hrv.readiness.v":"78/100 - pronto para treino intenso","wd.d.hrv.today.v":"Treino de alta intensidade recomendado","wd.d.hrv.note.v":"HRV < 40 ms -> dia de recuperacao",
     "partner.modal.title":"Ligar perfil parceiro","partner.modal.sub":"A lista de compras e calculada a partir dos dois planos reais","partner.mycode.label":"O TEU CODIGO DUBI","partner.mycode.copy":"Copiar","partner.mycode.note":"Partilha este codigo com o teu parceiro. Ele/ela devera abrir o DUBI no mesmo dispositivo, completar o perfil e inserir aqui o teu codigo.","partner.code.input.label":"CODIGO DO TEU PARCEIRO","partner.code.placeholder":"Ex. DK7MXP","partner.code.search":"Procurar","partner.notfound.msg":"Codigo nao encontrado. O parceiro deve ter concluido o onboarding e gerado o codigo DUBI.","partner.same.msg":"Este e o teu proprio codigo. Insere o codigo do parceiro.","partner.idle.msg":"O codigo DUBI e gerado automaticamente no fim do onboarding. Cada perfil tem um codigo unico.","partner.found.label":"Perfil encontrado","partner.found.code":"Codigo: {code}","partner.found.goal":"Objetivo","partner.found.kcal":"Kcal/dia","partner.found.protein":"Proteina/dia","partner.found.note":"A lista de compras somara as necessidades reais dos dois perfis.","partner.save.btn":"Ligar este perfil",
-    "askdubi.suggestions.label":"SITUACOES FREQUENTES","askdubi.support":"Consultor - Plano - Suporte","askdubi.info":"Podes descrever situacoes reais ou fazer perguntas de seguimento - o DUBI guarda o contexto e pode <strong style=\"color:#7A9E73\">atualizar o plano de hoje</strong>.","askdubi.response.label":"RESPOSTA DUBI","askdubi.fonte":"Fonte:","askdubi.offer.label":"POSSO ADICIONAR AO PLANO","askdubi.offer.q":"Queres que adicione \"{item}\" ao plano de hoje?","askdubi.apply":"Sim, atualizar plano","askdubi.adapt.label":"ADAPTACAO DO PLANO","askdubi.updated":"Plano atualizado","askdubi.updated.sub":"Fecha o painel para ver as alteracoes.","askdubi.input.ph":"Descreve a tua situacao ou faz uma pergunta...","askdubi.input.ph.followup":"Responde ou faz outra pergunta...","askdubi.send":"Enviar","askdubi.sugg.1":"Acordei tarde, salto o pequeno-almoco","askdubi.sugg.2":"Nao consigo almocar hoje","askdubi.sugg.3":"Posso trocar frango por peixe?","askdubi.sugg.4":"Como gerir a fome ao fim do dia?","askdubi.sugg.5":"Vou jantar fora hoje","askdubi.sugg.6":"Quanta agua devo beber?",
+    "askdubi.suggestions.label":"SITUACOES FREQUENTES","askdubi.support":"Consultor - Plano - Suporte","askdubi.info":"Podes descrever situacoes reais ou fazer perguntas de seguimento - o DUBI guarda o contexto e pode <strong style=\"color:#7A9E73\">atualizar o plano de hoje</strong>.","askdubi.response.label":"RESPOSTA DUBI","askdubi.fonte":"Fonte:","askdubi.offer.label":"POSSO ADICIONAR AO PLANO","askdubi.offer.q":"Queres que adicione \"{item}\" ao plano de hoje?","askdubi.apply":"Sim, atualizar plano","askdubi.adapt.label":"ADAPTACAO DO PLANO","askdubi.updated":"Plano atualizado","askdubi.updated.sub":"Fecha o painel para ver as alteracoes.","askdubi.input.ph":"Descreve a tua situacao ou faz uma pergunta...","askdubi.input.ph.followup":"Responde ou faz outra pergunta...","askdubi.send":"Enviar","askdubi.sugg.1":"Acordei tarde, salto o pequeno-almoco","askdubi.sugg.2":"Nao consigo almocar hoje","askdubi.sugg.3":"Posso substituir esta refeição por outra receita completa?","askdubi.sugg.4":"Como gerir a fome ao fim do dia?","askdubi.sugg.5":"Vou jantar fora hoje","askdubi.sugg.6":"Quanta agua devo beber?",
     "ingr.in.plan":"INGREDIENTE NO TEU PLANO","ingr.macros":"VALORES NUTRICIONAIS","ingr.benefits.label":"BENEFICIOS CHAVE","ingr.tip.label":"DICA DUBI","ingr.source":"Fonte:","ingr.why":"PORQUE ESTA NO PLANO","ingr.why.text":"Selecionado para completar o perfil nutricional da refeicao e apoiar o objetivo diario de calorias e macros.","ingr.tip.generic":"Cada ingrediente e escolhido pela densidade nutricional e coerencia com a refeicao.","meal.source.linked":"Fonte cientifica associada:","meal.reason.localized":"O DUBI escolheu esta refeicao segundo o teu horario, objetivo calorico e qualidade nutricional: saciedade, densidade de nutrientes, indice glicemico e recuperacao. Evidencia: alta.",
     "shop.butcher.title":"Dica de qualidade","shop.butcher.text":"Carne, frango e ovos devem idealmente vir de um fornecedor de confianca. Para carne vermelha, escolhe grass-fed quando possivel: mais Omega-3 e CLA que criacao intensiva.",
     "src.philosophy.label":"FILOSOFIA DUBI","src.badge.new":"NOVO","src.badge.present":"JA PRESENTE"
@@ -7144,20 +7099,20 @@ const I18N_DEEP_COMPLETION = {
   ar: {
     "wd.d.steps.total":"إجمالي الخطوات","wd.d.steps.dist":"المسافة","wd.d.steps.goal":"الهدف","wd.d.steps.streak":"السلسلة النشطة","wd.d.steps.streak.v":"5 أيام متتالية","wd.d.steps.unit":" خطوة","wd.d.steps.walkcal":"سعرات المشي","wd.d.steps.active":"دقائق نشطة","wd.d.steps.met":"مكافئ MET","wd.d.cal.type":"النوع","wd.d.cal.type.v":"النادي - الجزء العلوي","wd.d.cal.duration":"المدة","wd.d.cal.duration.v":"58 دقيقة","wd.d.cal.burned":"السعرات المحروقة","wd.d.cal.avghr":"متوسط النبض","wd.d.cal.maxhr":"أقصى نبض","wd.d.cal.peak":"ذروة الشدة","wd.d.cal.peak.v":"المنطقة 4 (العتبة اللاهوائية)","wd.d.cal.dist":"المسافة","wd.d.zone":"المنطقة","wd.d.sleep.total":"المدة الإجمالية","wd.d.sleep.fell":"وقت النوم","wd.d.sleep.wake":"الاستيقاظ","wd.d.sleep.quality":"الجودة","wd.d.sleep.quality.v":"جيدة (76/100)","wd.d.sleep.hrv":"HRV ليلي","wd.d.sleep.deep":"عميق","wd.d.sleep.light":"خفيف","wd.d.sleep.awake":"يقظة","wd.d.sleep.deepph":"مرحلة النوم العميق","wd.d.sleep.deepph.v":"18% - ضمن الطبيعي (15-25%)","wd.d.sleep.rem.v":"22% - ممتاز للتعافي الذهني","wd.d.sleep.consist":"انتظام الوقت","wd.d.sleep.consist.v":"عال - نفس الوقت 6 من 7 ليال","wd.d.sleep.rec":"توصية","wd.d.sleep.rec.v":"حافظ على الوقت وتجنب الشاشات بعد 22:00","wd.d.hrv.current":"HRV الحالي","wd.d.hrv.baseline":"خطك الأساسي","wd.d.hrv.recovery":"مؤشر التعافي","wd.d.hrv.recovery.v":"جيد - +6% فوق الخط الأساسي","wd.d.hrv.stress":"إجهاد فسيولوجي","wd.d.hrv.stress.v":"منخفض","wd.d.hrv.readiness":"الجاهزية","wd.d.hrv.readiness.v":"78/100 - جاهز لتمرين مكثف","wd.d.hrv.today.v":"يوصى بتمرين عالي الشدة","wd.d.hrv.note.v":"HRV < 40 ms -> يوم تعاف",
     "partner.modal.title":"ربط ملف الشريك","partner.modal.sub":"قائمة التسوق تحسب من الخطتين الفعليتين","partner.mycode.label":"رمز DUBI الخاص بك","partner.mycode.copy":"نسخ","partner.mycode.note":"شارك هذا الرمز مع شريكك. يجب أن يفتح DUBI على نفس الجهاز ويكمل ملفه ثم يدخل رمزك هنا.","partner.code.input.label":"رمز شريكك","partner.code.placeholder":"مثال DK7MXP","partner.code.search":"بحث","partner.notfound.msg":"لم يتم العثور على الرمز. يجب أن يكون الشريك قد أكمل الإعداد وأنشأ رمز DUBI.","partner.same.msg":"هذا رمزك أنت. أدخل رمز شريكك.","partner.idle.msg":"يتم إنشاء رمز DUBI تلقائيا بعد الإعداد. لكل ملف رمز فريد.","partner.found.label":"تم العثور على الملف","partner.found.code":"الرمز: {code}","partner.found.goal":"الهدف","partner.found.kcal":"سعرات/يوم","partner.found.protein":"بروتين/يوم","partner.found.note":"سيتم إنشاء قائمة التسوق بجمع الاحتياجات الفعلية لكلا الملفين.","partner.save.btn":"ربط هذا الملف",
-    "askdubi.suggestions.label":"مواقف شائعة","askdubi.support":"مستشار - خطة - دعم","askdubi.info":"يمكنك وصف مواقف حقيقية أو طرح أسئلة متابعة - يتذكر DUBI السياق ويمكنه <strong style=\"color:#7A9E73\">تحديث خطة اليوم</strong>.","askdubi.response.label":"رد DUBI","askdubi.fonte":"المصدر:","askdubi.offer.label":"يمكنني إضافته إلى الخطة","askdubi.offer.q":"هل تريد إضافة \"{item}\" إلى خطة اليوم؟","askdubi.apply":"نعم، حدّث الخطة","askdubi.adapt.label":"تعديل الخطة","askdubi.updated":"تم تحديث الخطة","askdubi.updated.sub":"أغلق اللوحة لرؤية التغييرات.","askdubi.input.ph":"صف موقفك أو اطرح سؤالا...","askdubi.input.ph.followup":"أجب أو اطرح سؤالا آخر...","askdubi.send":"إرسال","askdubi.sugg.1":"استيقظت متأخرا، سأتخطى الفطور","askdubi.sugg.2":"لا أستطيع تناول الغداء اليوم","askdubi.sugg.3":"هل أستطيع استبدال الدجاج بالسمك؟","askdubi.sugg.4":"كيف أتعامل مع الجوع مساء؟","askdubi.sugg.5":"سأتناول العشاء خارج المنزل الليلة","askdubi.sugg.6":"كم يجب أن أشرب من الماء؟",
+    "askdubi.suggestions.label":"مواقف شائعة","askdubi.support":"مستشار - خطة - دعم","askdubi.info":"يمكنك وصف مواقف حقيقية أو طرح أسئلة متابعة - يتذكر DUBI السياق ويمكنه <strong style=\"color:#7A9E73\">تحديث خطة اليوم</strong>.","askdubi.response.label":"رد DUBI","askdubi.fonte":"المصدر:","askdubi.offer.label":"يمكنني إضافته إلى الخطة","askdubi.offer.q":"هل تريد إضافة \"{item}\" إلى خطة اليوم؟","askdubi.apply":"نعم، حدّث الخطة","askdubi.adapt.label":"تعديل الخطة","askdubi.updated":"تم تحديث الخطة","askdubi.updated.sub":"أغلق اللوحة لرؤية التغييرات.","askdubi.input.ph":"صف موقفك أو اطرح سؤالا...","askdubi.input.ph.followup":"أجب أو اطرح سؤالا آخر...","askdubi.send":"إرسال","askdubi.sugg.1":"استيقظت متأخرا، سأتخطى الفطور","askdubi.sugg.2":"لا أستطيع تناول الغداء اليوم","askdubi.sugg.3":"هل يمكنني استبدال هذه الوجبة بوصفة كاملة أخرى؟","askdubi.sugg.4":"كيف أتعامل مع الجوع مساء؟","askdubi.sugg.5":"سأتناول العشاء خارج المنزل الليلة","askdubi.sugg.6":"كم يجب أن أشرب من الماء؟",
     "ingr.in.plan":"المكون في خطتك","ingr.macros":"القيم الغذائية","ingr.benefits.label":"فوائد أساسية","ingr.tip.label":"نصيحة DUBI","ingr.source":"المصدر:","ingr.why":"لماذا في خطتك","ingr.why.text":"تم اختياره لإكمال الملف الغذائي للوجبة ودعم هدف السعرات والماكروز اليومي.","ingr.tip.generic":"كل مكون يختاره DUBI لكثافته الغذائية وتناسقه مع بقية الوجبة.","shop.butcher.title":"نصيحة جودة","shop.butcher.text":"يفضل شراء اللحوم والدجاج والبيض من مورد موثوق. للحوم الحمراء، اختر grass-fed عند الإمكان: أوميغا-3 وCLA أعلى من التربية المكثفة.","src.philosophy.label":"فلسفة DUBI","trend.card.weight":"الوزن","trend.card.recovery":"التعافي","trend.card.adherence":"الالتزام","trend.card.energy":"الطاقة","trend.back":"العودة إلى الملخص"
   },
   zh: {
     "wd.d.steps.total":"总步数","wd.d.steps.dist":"距离","wd.d.steps.goal":"目标","wd.d.steps.streak":"连续记录","wd.d.steps.streak.v":"连续 5 天","wd.d.steps.unit":" 步","wd.d.steps.walkcal":"步行热量","wd.d.steps.active":"活跃分钟","wd.d.steps.met":"MET 等效","wd.d.cal.type":"类型","wd.d.cal.type.v":"健身房 - 上肢","wd.d.cal.duration":"时长","wd.d.cal.duration.v":"58 分钟","wd.d.cal.burned":"消耗热量","wd.d.cal.avghr":"平均心率","wd.d.cal.maxhr":"最高心率","wd.d.cal.peak":"峰值强度","wd.d.cal.peak.v":"4 区（无氧阈）","wd.d.cal.dist":"距离","wd.d.zone":"区间","wd.d.sleep.total":"总时长","wd.d.sleep.fell":"入睡","wd.d.sleep.wake":"醒来","wd.d.sleep.quality":"质量","wd.d.sleep.quality.v":"良好 (76/100)","wd.d.sleep.hrv":"夜间 HRV","wd.d.sleep.deep":"深睡","wd.d.sleep.light":"浅睡","wd.d.sleep.awake":"清醒","wd.d.sleep.deepph":"深睡阶段","wd.d.sleep.deepph.v":"18% - 正常范围 (15-25%)","wd.d.sleep.rem.v":"22% - 有利于认知恢复","wd.d.sleep.consist":"作息一致性","wd.d.sleep.consist.v":"高 - 7 晚中 6 晚相同","wd.d.sleep.rec":"建议","wd.d.sleep.rec.v":"保持作息。22:00 后减少屏幕","wd.d.hrv.current":"当前 HRV","wd.d.hrv.baseline":"个人基线","wd.d.hrv.recovery":"恢复指数","wd.d.hrv.recovery.v":"良好 - 高于基线 6%","wd.d.hrv.stress":"生理压力","wd.d.hrv.stress.v":"低","wd.d.hrv.readiness":"准备度","wd.d.hrv.readiness.v":"78/100 - 可进行高强度训练","wd.d.hrv.today.v":"建议高强度训练","wd.d.hrv.note.v":"HRV < 40 ms -> 恢复日",
     "partner.modal.title":"关联伙伴档案","partner.modal.sub":"购物清单按两个真实计划计算","partner.mycode.label":"你的 DUBI 代码","partner.mycode.copy":"复制","partner.mycode.note":"把这个代码分享给伙伴。对方需在同一设备打开 DUBI、完成资料，然后在这里输入你的代码。","partner.code.input.label":"伙伴代码","partner.code.placeholder":"例 DK7MXP","partner.code.search":"搜索","partner.notfound.msg":"未找到代码。伙伴需要完成 onboarding 并生成 DUBI 代码。","partner.same.msg":"这是你自己的代码。请输入伙伴代码。","partner.idle.msg":"DUBI 代码会在 onboarding 完成后自动生成。每个档案都有唯一代码。","partner.found.label":"找到档案","partner.found.code":"代码：{code}","partner.found.goal":"目标","partner.found.kcal":"千卡/天","partner.found.protein":"蛋白/天","partner.found.note":"购物清单会合并两个档案的真实需求。","partner.save.btn":"关联此档案",
-    "askdubi.suggestions.label":"常见情况","askdubi.support":"顾问 - 计划 - 支持","askdubi.info":"你可以描述真实情况或继续提问；DUBI 会记住上下文，并可<strong style=\"color:#7A9E73\">更新今天的计划</strong>。","askdubi.response.label":"DUBI 回复","askdubi.fonte":"来源：","askdubi.offer.label":"我可以加入计划","askdubi.offer.q":"要把“{item}”加入今天的计划吗？","askdubi.apply":"是，更新计划","askdubi.adapt.label":"计划调整","askdubi.updated":"计划已更新","askdubi.updated.sub":"关闭面板查看变化。","askdubi.input.ph":"描述你的情况或提问...","askdubi.input.ph.followup":"回复或继续提问...","askdubi.send":"发送","askdubi.sugg.1":"我起晚了，跳过早餐","askdubi.sugg.2":"今天没法吃午餐","askdubi.sugg.3":"鸡肉可以换成鱼吗？","askdubi.sugg.4":"晚上饿怎么办？","askdubi.sugg.5":"今晚在外面吃晚餐","askdubi.sugg.6":"我该喝多少水？",
+    "askdubi.suggestions.label":"常见情况","askdubi.support":"顾问 - 计划 - 支持","askdubi.info":"你可以描述真实情况或继续提问；DUBI 会记住上下文，并可<strong style=\"color:#7A9E73\">更新今天的计划</strong>。","askdubi.response.label":"DUBI 回复","askdubi.fonte":"来源：","askdubi.offer.label":"我可以加入计划","askdubi.offer.q":"要把“{item}”加入今天的计划吗？","askdubi.apply":"是，更新计划","askdubi.adapt.label":"计划调整","askdubi.updated":"计划已更新","askdubi.updated.sub":"关闭面板查看变化。","askdubi.input.ph":"描述你的情况或提问...","askdubi.input.ph.followup":"回复或继续提问...","askdubi.send":"发送","askdubi.sugg.1":"我起晚了，跳过早餐","askdubi.sugg.2":"今天没法吃午餐","askdubi.sugg.3":"我可以用另一道完整食谱替换这顿饭吗？","askdubi.sugg.4":"晚上饿怎么办？","askdubi.sugg.5":"今晚在外面吃晚餐","askdubi.sugg.6":"我该喝多少水？",
     "ingr.in.plan":"计划中的食材","ingr.macros":"营养数值","ingr.benefits.label":"关键益处","ingr.tip.label":"DUBI 建议","ingr.source":"来源：","ingr.why":"为什么在你的计划中","ingr.why.text":"用于完善这餐的营养结构，并支持当天热量与宏量目标。","ingr.tip.generic":"每个食材都按营养密度和与整餐的配合来选择。","shop.butcher.title":"质量建议","shop.butcher.text":"肉类、鸡肉和鸡蛋建议从可信供应商购买。红肉尽量选择 grass-fed：Omega-3 和 CLA 通常高于集约养殖。","src.philosophy.label":"DUBI 理念","trend.card.weight":"体重","trend.card.recovery":"恢复","trend.card.adherence":"依从性","trend.card.energy":"能量","trend.back":"返回摘要"
   },
   ja: {
-    "partner.modal.title":"パートナープロフィールを連携","partner.modal.sub":"買い物リストは両方の実際のプランから計算されます","partner.mycode.label":"あなたの DUBI コード","partner.mycode.copy":"コピー","partner.code.input.label":"パートナーのコード","partner.code.placeholder":"例 DK7MXP","partner.code.search":"検索","askdubi.suggestions.label":"よくある状況","askdubi.support":"アドバイザー - プラン - サポート","askdubi.info":"実際の状況を説明したり追加質問できます。DUBI は文脈を記憶し、<strong style=\"color:#7A9E73\">今日のプランを更新</strong>できます。","askdubi.send":"送信","askdubi.input.ph":"状況を説明するか質問してください...","askdubi.sugg.1":"起きるのが遅く、朝食を抜きます","askdubi.sugg.2":"今日は昼食を取れません","askdubi.sugg.3":"鶏肉を魚に替えられますか？","askdubi.sugg.4":"夜の空腹はどう管理しますか？","askdubi.sugg.5":"今夜は外食します","askdubi.sugg.6":"水はどれくらい飲むべき？","ingr.in.plan":"プラン内の食材","ingr.macros":"栄養値","ingr.benefits.label":"主な利点","ingr.tip.label":"DUBI のヒント","ingr.source":"出典：","shop.butcher.title":"品質のヒント","shop.butcher.text":"肉、鶏肉、卵は信頼できる店で買うのがおすすめです。赤身肉は可能なら grass-fed を選ぶと、Omega-3 と CLA が多い傾向があります。","src.philosophy.label":"DUBI の哲学","wd.d.hrv.readiness":"準備度"
+    "partner.modal.title":"パートナープロフィールを連携","partner.modal.sub":"買い物リストは両方の実際のプランから計算されます","partner.mycode.label":"あなたの DUBI コード","partner.mycode.copy":"コピー","partner.code.input.label":"パートナーのコード","partner.code.placeholder":"例 DK7MXP","partner.code.search":"検索","askdubi.suggestions.label":"よくある状況","askdubi.support":"アドバイザー - プラン - サポート","askdubi.info":"実際の状況を説明したり追加質問できます。DUBI は文脈を記憶し、<strong style=\"color:#7A9E73\">今日のプランを更新</strong>できます。","askdubi.send":"送信","askdubi.input.ph":"状況を説明するか質問してください...","askdubi.sugg.1":"起きるのが遅く、朝食を抜きます","askdubi.sugg.2":"今日は昼食を取れません","askdubi.sugg.3":"この食事を別の完全なレシピに置き換えられますか？","askdubi.sugg.4":"夜の空腹はどう管理しますか？","askdubi.sugg.5":"今夜は外食します","askdubi.sugg.6":"水はどれくらい飲むべき？","ingr.in.plan":"プラン内の食材","ingr.macros":"栄養値","ingr.benefits.label":"主な利点","ingr.tip.label":"DUBI のヒント","ingr.source":"出典：","shop.butcher.title":"品質のヒント","shop.butcher.text":"肉、鶏肉、卵は信頼できる店で買うのがおすすめです。赤身肉は可能なら grass-fed を選ぶと、Omega-3 と CLA が多い傾向があります。","src.philosophy.label":"DUBI の哲学","wd.d.hrv.readiness":"準備度"
   },
   ru: {
-    "partner.modal.title":"Связать профиль партнера","partner.modal.sub":"Список покупок считается по двум реальным планам","partner.mycode.label":"ТВОЙ КОД DUBI","partner.mycode.copy":"Копировать","partner.code.input.label":"КОД ПАРТНЕРА","partner.code.placeholder":"Напр. DK7MXP","partner.code.search":"Найти","askdubi.suggestions.label":"ЧАСТЫЕ СИТУАЦИИ","askdubi.support":"Советник - План - Поддержка","askdubi.info":"Можно описать реальную ситуацию или задать уточняющий вопрос - DUBI помнит контекст и может <strong style=\"color:#7A9E73\">обновить план на сегодня</strong>.","askdubi.send":"Отправить","askdubi.input.ph":"Опиши ситуацию или задай вопрос...","askdubi.sugg.1":"Я поздно проснулся, пропускаю завтрак","askdubi.sugg.2":"Сегодня не могу пообедать","askdubi.sugg.3":"Можно заменить курицу рыбой?","askdubi.sugg.4":"Как справиться с вечерним голодом?","askdubi.sugg.5":"Сегодня ужинаю вне дома","askdubi.sugg.6":"Сколько воды пить?","ingr.in.plan":"ИНГРЕДИЕНТ В ТВОЕМ ПЛАНЕ","ingr.macros":"ПИЩЕВАЯ ЦЕННОСТЬ","ingr.benefits.label":"КЛЮЧЕВЫЕ ПРЕИМУЩЕСТВА","ingr.tip.label":"СОВЕТ DUBI","ingr.source":"Источник:","shop.butcher.title":"Совет по качеству","shop.butcher.text":"Мясо, курицу и яйца лучше покупать у надежного поставщика. Для красного мяса по возможности выбирай grass-fed: больше Omega-3 и CLA, чем при интенсивном выращивании.","src.philosophy.label":"ФИЛОСОФИЯ DUBI","wd.d.hrv.readiness":"Готовность"
+    "partner.modal.title":"Связать профиль партнера","partner.modal.sub":"Список покупок считается по двум реальным планам","partner.mycode.label":"ТВОЙ КОД DUBI","partner.mycode.copy":"Копировать","partner.code.input.label":"КОД ПАРТНЕРА","partner.code.placeholder":"Напр. DK7MXP","partner.code.search":"Найти","askdubi.suggestions.label":"ЧАСТЫЕ СИТУАЦИИ","askdubi.support":"Советник - План - Поддержка","askdubi.info":"Можно описать реальную ситуацию или задать уточняющий вопрос - DUBI помнит контекст и может <strong style=\"color:#7A9E73\">обновить план на сегодня</strong>.","askdubi.send":"Отправить","askdubi.input.ph":"Опиши ситуацию или задай вопрос...","askdubi.sugg.1":"Я поздно проснулся, пропускаю завтрак","askdubi.sugg.2":"Сегодня не могу пообедать","askdubi.sugg.3":"Можно заменить этот прием пищи другим полноценным рецептом?","askdubi.sugg.4":"Как справиться с вечерним голодом?","askdubi.sugg.5":"Сегодня ужинаю вне дома","askdubi.sugg.6":"Сколько воды пить?","ingr.in.plan":"ИНГРЕДИЕНТ В ТВОЕМ ПЛАНЕ","ingr.macros":"ПИЩЕВАЯ ЦЕННОСТЬ","ingr.benefits.label":"КЛЮЧЕВЫЕ ПРЕИМУЩЕСТВА","ingr.tip.label":"СОВЕТ DUBI","ingr.source":"Источник:","shop.butcher.title":"Совет по качеству","shop.butcher.text":"Мясо, курицу и яйца лучше покупать у надежного поставщика. Для красного мяса по возможности выбирай grass-fed: больше Omega-3 и CLA, чем при интенсивном выращивании.","src.philosophy.label":"ФИЛОСОФИЯ DUBI","wd.d.hrv.readiness":"Готовность"
   }
 };
 Object.keys(I18N_DEEP_COMPLETION).forEach(code => {
@@ -10723,9 +10678,6 @@ function getAiMealListForDay(plan, dayIdx, slots, times) {
       time: times[i] || "--:--",
       data: {
         items: meal.ingredients?.length ? meal.ingredients.map(formatFoodText) : [formatFoodText(meal.description || meal.name)],
-        alts: meal.ingredients?.length
-          ? meal.ingredients.map(item => (item.alternatives || []).map(formatFoodText))
-          : [],
         macros: {
           cal: Number(meal.nutrition?.calories || 0),
           p: Number(meal.nutrition?.protein || 0),
@@ -11241,34 +11193,6 @@ function isWeeklyStaple(key) {
   return WEEKLY_REPEAT_STAPLES.some(staple => key.includes(staple));
 }
 
-function optimizeWeeklyPlanQuality(weekMeals) {
-  const recent = [];
-  return (weekMeals || []).map(day => {
-    const nextDay = {};
-    Object.entries(day || {}).forEach(([mealKey, meal]) => {
-      if (!meal || !Array.isArray(meal.items)) { nextDay[mealKey] = meal; return; }
-      const nextMeal = {...meal, items:[...meal.items]};
-      nextMeal.items = nextMeal.items.map((item, idx) => {
-        const key = weeklyIngredientKey(item);
-        if (!key || isWeeklyStaple(key)) return item;
-        const repeated = recent.slice(-18).filter(k => k === key).length >= 2;
-        if (!repeated || !meal.alts?.[idx]?.length) return item;
-        const alt = meal.alts[idx].find(candidate => {
-          const altKey = weeklyIngredientKey(candidate);
-          return altKey && !isWeeklyStaple(altKey) && !recent.slice(-18).includes(altKey);
-        });
-        return alt || item;
-      });
-      nextMeal.items.forEach(item => {
-        const key = weeklyIngredientKey(item);
-        if (key && !isWeeklyStaple(key)) recent.push(key);
-      });
-      nextDay[mealKey] = nextMeal;
-    });
-    return nextDay;
-  });
-}
-
 function getWeeklyQualityCopy(lang) {
   const map = {
     it: {
@@ -11280,13 +11204,7 @@ function getWeeklyQualityCopy(lang) {
       science:"Scienza collegata",
       scienceOk:"fonti leggibili per ogni pasto",
       sciencePrefix:"DUBI lo collega a",
-      promptTitle:"Lo hai gia' in casa?",
-      promptBody:"non risulta gia' spuntato nella lista della spesa.",
-      promptNo:"No, aggiungilo",
-      promptYes:"Si, ce l'ho",
-      notifTitle:"Ingrediente aggiornato",
-      notifShopping:"Lista della spesa aggiornata automaticamente.",
-      allergyReason:"DUBI ha adattato ingredienti e alternative alle allergie/intolleranze dichiarate, mantenendo calorie, macro e qualita nutrizionale."
+      allergyReason:"DUBI ha selezionato ricette compatibili con le allergie/intolleranze dichiarate, mantenendo calorie, macro e qualita nutrizionale."
     },
     en: {
       title:"Daily quality check",
@@ -11297,13 +11215,7 @@ function getWeeklyQualityCopy(lang) {
       science:"Science link",
       scienceOk:"readable sources for every meal",
       sciencePrefix:"DUBI links this to",
-      promptTitle:"Do you already have it?",
-      promptBody:"is not checked in the shopping list yet.",
-      promptNo:"No, add it",
-      promptYes:"Yes, I have it",
-      notifTitle:"Ingredient updated",
-      notifShopping:"Shopping list updated automatically.",
-      allergyReason:"DUBI adapted ingredients and alternatives to your declared allergies/intolerances while preserving calories, macros and nutritional quality."
+      allergyReason:"DUBI selected recipes compatible with your declared allergies/intolerances while preserving calories, macros and nutritional quality."
     },
     fr: {
       title:"Controle qualite du jour",
@@ -11314,13 +11226,7 @@ function getWeeklyQualityCopy(lang) {
       science:"Lien scientifique",
       scienceOk:"sources lisibles pour chaque repas",
       sciencePrefix:"DUBI le relie a",
-      promptTitle:"Tu l'as deja a la maison ?",
-      promptBody:"n'est pas encore coche dans la liste de courses.",
-      promptNo:"Non, l'ajouter",
-      promptYes:"Oui, je l'ai",
-      notifTitle:"Ingredient mis a jour",
-      notifShopping:"Liste de courses mise a jour automatiquement.",
-      allergyReason:"DUBI adapte les ingredients et alternatives a tes allergies/intolerances declarees, tout en gardant calories, macros et qualite nutritionnelle."
+      allergyReason:"DUBI selectionne des recettes compatibles avec tes allergies/intolerances declarees, tout en gardant calories, macros et qualite nutritionnelle."
     },
     es: {
       title:"Control de calidad del dia",
@@ -11331,13 +11237,7 @@ function getWeeklyQualityCopy(lang) {
       science:"Vinculo cientifico",
       scienceOk:"fuentes claras por comida",
       sciencePrefix:"DUBI lo vincula a",
-      promptTitle:"Ya lo tienes en casa?",
-      promptBody:"todavia no aparece marcado en la lista de compra.",
-      promptNo:"No, anadirlo",
-      promptYes:"Si, lo tengo",
-      notifTitle:"Ingrediente actualizado",
-      notifShopping:"Lista de compra actualizada automaticamente.",
-      allergyReason:"DUBI adapto ingredientes y alternativas a tus alergias/intolerancias declaradas, manteniendo calorias, macros y calidad nutricional."
+      allergyReason:"DUBI selecciono recetas compatibles con tus alergias/intolerancias declaradas, manteniendo calorias, macros y calidad nutricional."
     },
     de: {
       title:"Qualitatscheck des Tages",
@@ -11348,13 +11248,7 @@ function getWeeklyQualityCopy(lang) {
       science:"Wissenschaftlicher Bezug",
       scienceOk:"lesbare Quellen pro Mahlzeit",
       sciencePrefix:"DUBI verbindet es mit",
-      promptTitle:"Hast du es schon zuhause?",
-      promptBody:"ist in der Einkaufsliste noch nicht abgehakt.",
-      promptNo:"Nein, hinzufugen",
-      promptYes:"Ja, habe ich",
-      notifTitle:"Zutat aktualisiert",
-      notifShopping:"Einkaufsliste automatisch aktualisiert.",
-      allergyReason:"DUBI passt Zutaten und Alternativen an deine angegebenen Allergien/Unvertraglichkeiten an und erhalt Kalorien, Makros und Ernahrungsqualitat."
+      allergyReason:"DUBI hat Rezepte ausgewahlt, die mit deinen angegebenen Allergien/Unvertraglichkeiten kompatibel sind, und Kalorien, Makros und Ernahrungsqualitat beibehalten."
     },
     pt: {
       title:"Controlo de qualidade do dia",
@@ -11365,13 +11259,7 @@ function getWeeklyQualityCopy(lang) {
       science:"Ligacao cientifica",
       scienceOk:"fontes claras por refeicao",
       sciencePrefix:"DUBI liga isto a",
-      promptTitle:"Ja tens isto em casa?",
-      promptBody:"ainda nao esta assinalado na lista de compras.",
-      promptNo:"Nao, adicionar",
-      promptYes:"Sim, tenho",
-      notifTitle:"Ingrediente atualizado",
-      notifShopping:"Lista de compras atualizada automaticamente.",
-      allergyReason:"O DUBI adapta ingredientes e alternativas as alergias/intolerancias declaradas, mantendo calorias, macros e qualidade nutricional."
+      allergyReason:"O DUBI selecionou receitas compativeis com as alergias/intolerancias declaradas, mantendo calorias, macros e qualidade nutricional."
     }
   };
   return map[lang] || map.en;
@@ -11437,7 +11325,7 @@ function shoppingTotalsToCategories(totals) {
   return result;
 }
 
-function getShoppingByDay(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
+function getShoppingByDay(userData, plan, weeklyPlans = []) {
   const weekDates = getCurrentWeekIsoDates();
   const hasWeeklyPlans = Array.isArray(weeklyPlans) && weeklyPlans.some(Boolean);
   const hasIngredientPlanSource = (sourcePlan) => Boolean(sourcePlan?.ingredientPlan?.meals || sourcePlan?.meals);
@@ -11472,32 +11360,9 @@ function mergeShoppingDayBreakdown(days = []) {
   return shoppingTotalsToCategories(totals);
 }
 
-function getPersonalizedShopping(userData, plan, appliedSwaps = {}, weeklyPlans = []) {
-  const dayBreakdown = getShoppingByDay(userData, plan, appliedSwaps, weeklyPlans);
+function getPersonalizedShopping(userData, plan, weeklyPlans = []) {
+  const dayBreakdown = getShoppingByDay(userData, plan, weeklyPlans);
   return dayBreakdown.length ? mergeShoppingDayBreakdown(dayBreakdown) : {};
-}
-
-function flattenShoppingItems(userData, plan, swaps, weeklyPlans = []) {
-  const shop = getPersonalizedShopping(userData, plan, swaps, weeklyPlans);
-  return Object.values(shop).flat();
-}
-
-function findShoppingCoverage(userData, plan, swaps, ingredient, weeklyPlans = []) {
-  const base = shoppingItemBase(ingredient);
-  if (!base) return { exists: false, checked: false, item: null };
-  const items = flattenShoppingItems(userData, plan, swaps, weeklyPlans);
-  const item = items.find(entry => {
-    const entryBase = shoppingItemBase(entry);
-    return entryBase === base || entryBase.includes(base) || base.includes(entryBase);
-  });
-  if (!item) return { exists: false, checked: false, item: null };
-
-  try {
-    const checked = JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}");
-    return { exists: true, checked: Boolean(checked[item]), item };
-  } catch(e) {
-    return { exists: true, checked: false, item };
-  }
 }
 
 function mergeShoppingLists(shop1, shop2, name1, name2) {
@@ -11613,7 +11478,6 @@ const Ico = ({n,size=20,c=T.text}) => {
     zap:<svg {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
     refresh:<svg {...p}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>,
     info:<svg {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
-    swap:<svg {...p}><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>,
     steps:<svg {...p}><path d="M13 2l-2 6h6l-2 6"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M4 18h4M14 18h4"/></svg>,
     x:<svg {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
     weight:<svg {...p}><path d="M12 2a3 3 0 013 3v1h3a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h3V5a3 3 0 013-3z"/></svg>,
@@ -12712,11 +12576,11 @@ function getDubiServiceAnswer(t, userData, plan, lang = "it") {
   if (/(come funziona|strutturat|sezion|cosa fa|a cosa serve|come.*app|how.*work|app.*work|sections|structure)/i.test(t)) {
     return isEN ? {
       title:"How DUBI is structured",
-      body:["DUBI has five core areas: Today for the daily plan, Plan for the week and swaps, Shop for the shopping list, Trend for progress and biometrics, Settings for profile/privacy/wearables.","The engine combines onboarding data, declared activity, allergies, preferences, progress and optional wearable signals.","Ask DUBI is the action layer: it explains the system and can adapt today without breaking your nutrition targets."],
+      body:["DUBI has five core areas: Today for the daily plan, Plan for weekly planning and complete meal replacements, Shop for the shopping list, Trend for progress and biometrics, Settings for profile/privacy/wearables.","The engine combines onboarding data, declared activity, allergies, preferences, progress and optional wearable signals.","Ask DUBI is the action layer: it explains the system and can adapt today without breaking your nutrition targets."],
       source:"DUBI product logic"
     } : {
       title:"Come e strutturata DUBI",
-      body:["DUBI ha cinque aree: Oggi per il piano giornaliero, Piano per settimana e sostituzioni, Spesa per la lista acquisti, Trend per progressi/biometrie, Impostazioni per profilo/privacy/wearable.","Il motore usa onboarding, attivita dichiarata, allergie, preferenze, progressi e dati wearable opzionali.","Chiedi a DUBI e il livello operativo: spiega il sistema e puo adattare la giornata senza rompere i target nutrizionali."],
+      body:["DUBI ha cinque aree: Oggi per il piano giornaliero, Piano per organizzare la settimana e sostituire pasti completi, Spesa per la lista acquisti, Trend per progressi/biometrie, Impostazioni per profilo/privacy/wearable.","Il motore usa onboarding, attivita dichiarata, allergie, preferenze, progressi e dati wearable opzionali.","Chiedi a DUBI e il livello operativo: spiega il sistema e puo adattare la giornata senza rompere i target nutrizionali."],
       source:"DUBI · Logica prodotto"
     };
   }
@@ -12920,13 +12784,9 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
   // ── EN RESPONSE OVERRIDES ─────────────────────────────────────────────────
   const enResponses = {
     substitutions: {
-      title: "Substitutions: calibrated alternatives",
-      body: (found, swapMapEN) => [
-        found ? `For ${found}: ${swapMapEN[found]}` : "For any ingredient, the rule is: keep ±10% protein and ±15% calories per meal.",
-        "In the Plan screen, tap an ingredient and choose from the pre-balanced alternatives.",
-        "The plan macros recalculate automatically with the new ingredient.",
-      ],
-      source: "EFSA Dietary Guidelines 2024",
+      title: "Replace a complete meal",
+      body: ["DUBI can replace a meal with another complete recipe selected by the engine.", "Choose the meal to change in Ask DUBI; individual ingredients cannot be replaced."],
+      source: "DUBI Recipe Engine",
     },
     supplements: {
       supps: {
@@ -13101,41 +12961,17 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
   if (serviceAnswer) return serviceAnswer;
 
   if (/(sostitu|swap|cambi|alternativ|substitut|replac|swap|alternative)/.test(t)) {
-    const swapMap = {
-      pollo: "Tacchino, merluzzo, sgombro, tofu, uova (2) — stesso range proteico, profilo calorico simile.",
-      pesce: "Pollo, tacchino, uova, legumi (con cereale intero) — mantieni 25-35g P per pasto.",
-      uova: "Tofu strapazzato (100g), fiocchi di latte (120g), yogurt greco (150g).",
-      riso: "Quinoa (stessa quantità), farro, orzo, patate dolci — tutti carboidrati a basso IG.",
-      pasta: "Riso integrale, quinoa, grano saraceno, pasta di legumi — IG simile o inferiore.",
-      latte: "Latte di avena (più carboidrati), latte di mandorla (meno calorie), latte di soia (più proteine).",
-      yogurt: "Skyr (più proteine), kefir (più probiotici), ricotta (caseina a lento rilascio).",
-      pane: "Gallette di riso (più leggero), pane di segale (IG più basso), crackers integrali.",
-    };
-    const swapMapEN = {
-      chicken: "Turkey, cod, mackerel, tofu, eggs (2) — same protein range, similar caloric profile.",
-      fish: "Chicken, turkey, eggs, legumes (with whole grain) — keep 25-35g P per meal.",
-      eggs: "Scrambled tofu (100g), cottage cheese (120g), Greek yogurt (150g).",
-      rice: "Quinoa (same amount), spelt, barley, sweet potatoes — all low-GI carbs.",
-      pasta: "Brown rice, quinoa, buckwheat, legume pasta — similar or lower GI.",
-      milk: "Oat milk (more carbs), almond milk (fewer calories), soy milk (more protein).",
-      yogurt: "Skyr (more protein), kefir (more probiotics), ricotta (slow-release casein).",
-      bread: "Rice cakes (lighter), rye bread (lower GI), whole grain crackers.",
-    };
-    const found = isEN
-      ? Object.keys(swapMapEN).find(k => t.includes(k))
-      : Object.keys(swapMap).find(k => t.includes(k));
     if (isEN) {
       const r = enResponses.substitutions;
-      return { title: r.title, body: r.body(found, swapMapEN), source: r.source };
+      return { title: r.title, body: r.body, source: r.source };
     }
     return {
-      title: "Sostituzione: ecco le alternative calibrate",
+      title: "Sostituzione del pasto",
       body: [
-        found ? `Per ${found}: ${swapMap[found]}` : "Per qualsiasi ingrediente, la regola è: mantieni ±10% di proteine e ±15% di calorie sul pasto.",
-        "Nella schermata Piano tocca un ingrediente e scegli tra le alternative già bilanciate.",
-        "Le macro del piano si ricalcolano automaticamente con il nuovo ingrediente.",
+        "DUBI può sostituire un pasto con un'altra ricetta completa selezionata dal motore.",
+        "Scegli il pasto da cambiare in Chiedi a DUBI; i singoli ingredienti non possono essere sostituiti.",
       ],
-      source: "EFSA Dietary Guidelines 2024",
+      source: "DUBI Recipe Engine",
     };
   }
 
@@ -16932,7 +16768,7 @@ const ResearchInviteCard = ({userData, setUserData}) => {
   );
 };
 
-const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,planningDay,onOpenSettings,onEditDailySchedule}) => {
+const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDay,onOpenSettings,onEditDailySchedule}) => {
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
   const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
@@ -17258,10 +17094,6 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     if (id.includes("post_workout") || id.includes("post-workout")) return "post_workout";
     return "snack";
   };
-  const getDisplayMealItem = (mealId, item, index) => {
-    const swapKey = `${dayIdx}-${mealId}-${index}`;
-    return (swaps && swaps[swapKey]) ? swaps[swapKey] : item;
-  };
   const getIngredientCheckKey = (mealId, item, index) => {
     const display = splitIngredientDisplay(item);
     const rawId = item?.ingredient_id || item?.id || item?.source_id || item?.food_id || display.full || display.name || index;
@@ -17291,7 +17123,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     setIngChecked(prev => {
       const next = {...prev};
       items.forEach((item, index) => {
-        const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+        const displayItem = item;
         const key = getIngredientCheckKey(mealEntry.id, displayItem, index);
         if (checked) next[key] = true;
         else delete next[key];
@@ -17304,7 +17136,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     .flatMap(mealEntry => {
       const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
       return items.map((item, index) => {
-        const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+        const displayItem = item;
         return {
           ...displayItem,
           mealId: mealEntry.id,
@@ -17320,7 +17152,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
   const consumptionMeals = mealList.map(mealEntry => {
     const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
     const ingredients = items.map((item, index) => {
-      const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+      const displayItem = item;
       const checkKey = getIngredientCheckKey(mealEntry.id, displayItem, index);
       return effectiveCompletedKeys.has(checkKey)
         ? getIngredientConsumptionPayload(mealEntry.id, displayItem, index)
@@ -17344,7 +17176,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
     const items = Array.isArray(mealEntry?.data?.items) ? mealEntry.data.items : [];
     if (!items.length) return status[mealEntry.id] === "done";
     return items.every((item, index) => {
-      const displayItem = getDisplayMealItem(mealEntry.id, item, index);
+      const displayItem = item;
       return effectiveCompletedKeys.has(getIngredientCheckKey(mealEntry.id, displayItem, index));
     });
   };
@@ -17842,7 +17674,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
                   <div style={{borderTop:`1px solid ${T.border}`,paddingTop:12,marginBottom:14}}>
                     <p style={{fontSize:11,color:T.muted,letterSpacing:0.5,marginBottom:8}}>{t("today.ingredients")}</p>
                     {meal.items.map((item,i)=>{
-                      const _tDispItem = getDisplayMealItem(mt.id, item, i);
+                      const _tDispItem = item;
                       const _tDisplay = splitIngredientDisplay(_tDispItem);
                       const _tName = _tDisplay.name;
                       const _tMacros = getIngredientMacroContribution(_tDispItem);
@@ -17967,16 +17799,12 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
 // ═══════════════════════════════════════════════
 // WEEKLY SCREEN — per-day breakfast + alts per tutti
 // ═══════════════════════════════════════════════
-const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
+const WeeklyScreen = ({userData,plan,weeklyPlans = []}) => {
   const { t, lang } = useT();
-  const qCopy = getWeeklyQualityCopy(lang);
 
   const todayDate = getTodayIsoDate();
   const todayIdx = (parseIsoDateLocal(todayDate).getDay()+6)%7;
   const [selDay,setSelDay] = useState(todayIdx);
-  const [swapOpen,setSwapOpen] = useState(null);
-  const [swapNotif,setSwapNotif] = useState(null); // {from, to}
-  const [shoppingPrompt,setShoppingPrompt] = useState(null);
   const [ingModal,setIngModal] = useState(null);
   const [weeklyPlanCache,setWeeklyPlanCache] = useState({});
   const [loadingPlanDates,setLoadingPlanDates] = useState({});
@@ -18140,96 +17968,8 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
     if (key && !isWeeklyStaple(key)) dayIngredientKeys.add(key);
   }));
 
-  const applyIngredientSwap = ({swapKey, mealKey, itemIdx, oldItem, replacement, hadAtHome = null}) => {
-    if (hadAtHome) rememberOwnedShoppingIngredient(userData, replacement);
-    setSwaps(s=>({...s,[swapKey]:replacement}));
-    saveIngredientSwapToBackend({
-      swap_key: swapKey,
-      day_index: selDay,
-      meal_key: mealKey,
-      item_index: itemIdx,
-      original_ingredient: formatFoodText(oldItem),
-      replacement_ingredient: replacement,
-      had_at_home: hadAtHome
-    });
-    setSwapOpen(null);
-    setShoppingPrompt(null);
-    setSwapNotif({from: oldItem || "ingrediente", to: replacement});
-    setTimeout(()=>setSwapNotif(null), 4500);
-  };
-
-  const doSwap = (mealKey,itemIdx,newItem,oldItem) => {
-    const swapKey = `${selDay}-${mealKey}-${itemIdx}`;
-    const replacement = formatFoodText(newItem);
-    const original = formatFoodText(oldItem);
-    const coverageBefore = findShoppingCoverage(userData, plan, swaps, replacement, weeklyPlans);
-    const alreadyAvailable = coverageBefore.exists || coverageBefore.checked || hasOwnedShoppingIngredient(userData, replacement);
-
-    if (!alreadyAvailable) {
-      setShoppingPrompt({swapKey, mealKey, itemIdx, oldItem: original, replacement});
-      return;
-    }
-
-    applyIngredientSwap({swapKey, mealKey, itemIdx, oldItem: original, replacement});
-  };
-
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
-
-      {/* ── Notifica swap ingrediente ── */}
-      {swapNotif && (
-        <div style={{position:"fixed",top:16,left:16,right:16,zIndex:999,borderRadius:16,
-          background:T.accentD,color:"#E8E4DC",padding:"14px 16px",boxShadow:"0 4px 20px rgba(0,0,0,.18)",
-          display:"flex",flexDirection:"column",gap:4,
-          animation:"slideDown .25s ease"}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <Ico n="check" size={16} c="#E8E4DC"/>
-            <span style={{fontSize:14,fontWeight:700}}>{qCopy.notifTitle}</span>
-          </div>
-          <p style={{fontSize:12,opacity:.88,lineHeight:1.4,paddingLeft:24}}>
-            <span style={{textDecoration:"line-through",opacity:.65}}>{swapNotif.from.split("(")[0].trim()}</span>
-            {" → "}<strong>{swapNotif.to.split("(")[0].trim()}</strong>
-          </p>
-          <p style={{fontSize:11,opacity:.75,paddingLeft:24}}>📋 {qCopy.notifShopping}</p>
-        </div>
-      )}
-
-      {shoppingPrompt && (
-        <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(35,33,29,.28)",
-          backdropFilter:"blur(3px)",display:"flex",alignItems:"flex-end",justifyContent:"center",
-          padding:"18px 16px calc(18px + env(safe-area-inset-bottom, 0px))"}}>
-          <div style={{width:"100%",maxWidth:520,background:T.card,border:`1.5px solid ${T.border}`,
-            borderRadius:22,boxShadow:"0 18px 50px rgba(35,33,29,.22)",padding:18,
-            animation:"slideUp .22s ease"}}>
-            <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:14}}>
-              <div style={{width:40,height:40,borderRadius:14,background:T.sel,border:`1px solid ${T.border}`,
-                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Ico n="bag" size={20} c={T.accentD}/>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <p style={{fontSize:15,fontWeight:800,color:T.text,margin:"0 0 5px"}}>
-                  {qCopy.promptTitle}
-                </p>
-                <p style={{fontSize:13,color:T.muted,lineHeight:1.5,margin:0}}>
-                  <strong style={{color:T.text}}>{localizeFood(shoppingPrompt.replacement, lang)}</strong> {qCopy.promptBody}
-                </p>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>applyIngredientSwap({...shoppingPrompt, hadAtHome:false})}
-                style={{flex:1,padding:"13px 12px",borderRadius:14,background:T.card,
-                  border:`1.5px solid ${T.border}`,color:T.text,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-                {qCopy.promptNo}
-              </button>
-              <button onClick={()=>applyIngredientSwap({...shoppingPrompt, hadAtHome:true})}
-                style={{flex:1,padding:"13px 12px",borderRadius:14,background:T.accentD,
-                  border:`1.5px solid ${T.accentD}`,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
-                {qCopy.promptYes}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div style={{padding:"56px 24px 20px"}}>
         <h2 style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:26,fontWeight:700,color:T.text,margin:"0 0 4px"}}>{t("weekly.title")}</h2>
@@ -18334,41 +18074,20 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = [],swaps,setSwaps}) => {
               </div>
             </div>
             {meal.items.map((item,i)=>{
-              const swapKey = `${selDay}-${mKey}-${i}`;
-              const displayItem = swaps[swapKey] || item;
-              const displayName = splitIngredientDisplay(displayItem).name;
-              const hasAlts = Boolean(meal.alts && meal.alts[i] && meal.alts[i].length);
-              const isSwapOpen = swapOpen===`${mKey}-${i}`;
+              const displayName = splitIngredientDisplay(item).name;
               return (
                 <div key={i}>
-                  <div onClick={()=>hasAlts ? setSwapOpen(isSwapOpen?null:`${mKey}-${i}`) : setIngModal(displayItem)}
+                  <div onClick={()=>setIngModal(item)}
                     style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,padding:"5px 4px",borderRadius:9,cursor:"pointer"}}
                     onMouseEnter={e=>{e.currentTarget.style.background=T.sel;}}
                     onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
                     <div style={{width:4,height:4,borderRadius:"50%",background:T.accent,flexShrink:0}} />
-                    <span style={{fontSize:13,color:T.text,flex:1,textDecoration:swaps[swapKey]?"line-through none":"none"}}>{localizeFood(displayName, lang)}</span>
-                    {hasAlts && (
-                      <button onClick={(e)=>{e.stopPropagation();setSwapOpen(isSwapOpen?null:`${mKey}-${i}`);}}
-                        style={{background:"none",border:"none",cursor:"pointer",padding:4,opacity:0.6}}>
-                        <Ico n="swap" size={14} c={T.muted} />
-                      </button>
-                    )}
-                    <button onClick={(e)=>{e.stopPropagation();setIngModal(displayItem);}}
+                    <span style={{fontSize:13,color:T.text,flex:1}}>{localizeFood(displayName, lang)}</span>
+                    <button onClick={(e)=>{e.stopPropagation();setIngModal(item);}}
                       style={{background:"none",border:"none",cursor:"pointer",padding:4,opacity:0.45}}>
                       <Ico n="info" size={13} c={T.muted} />
                     </button>
                   </div>
-                  {isSwapOpen && hasAlts && (
-                    <div style={{marginLeft:16,marginBottom:8,padding:10,background:T.sel,borderRadius:10,border:`1px solid ${T.border}`}}>
-                      <p style={{fontSize:11,color:T.muted,marginBottom:6}}>{t("weekly.alts")}</p>
-                      {meal.alts[i].map((alt,ai)=>(
-                        <button key={ai} onClick={()=>doSwap(mKey,i,alt,displayItem)} title={localizeFood(alt,lang)}
-                          style={{display:"block",width:"100%",textAlign:"left",padding:"8px 10px",marginBottom:4,borderRadius:8,background:T.card,border:`1px solid ${T.border}`,fontSize:13,color:T.text,cursor:"pointer"}}>
-                          {localizeFood(splitIngredientDisplay(alt).name, lang)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -18604,7 +18323,7 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
 
 const shoppingStorageKey = (userData) => `dubi_shopping_checked_${userData?.dubiCode || getAuthEmail() || "guest"}`;
 
-const ShoppingScreen = ({userData, plan, weeklyPlans = [], swaps, partnerProfile, onLinkPartner, onUnlinkPartner}) => {
+const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLinkPartner, onUnlinkPartner}) => {
   const { t, lang } = useT();
 
   const [checked, setChecked] = useState(() => {
@@ -18629,8 +18348,8 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], swaps, partnerProfile
   }, [checked, userData?.dubiCode]);
 
   // ── Lista personalizzata per l'utente corrente ──
-  const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan, swaps, weeklyPlans), [userData, plan, swaps, weeklyPlans]);
-  const shopByDay = React.useMemo(()=>getShoppingByDay(userData, plan, swaps, weeklyPlans), [userData, plan, swaps, weeklyPlans]);
+  const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan, weeklyPlans), [userData, plan, weeklyPlans]);
+  const shopByDay = React.useMemo(()=>getShoppingByDay(userData, plan, weeklyPlans), [userData, plan, weeklyPlans]);
 
   // ── Lista finale: merged se partner attivo, altrimenti solo la mia ──
   // Ogni entry è {item:string, tag:string|null}
@@ -18638,7 +18357,7 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], swaps, partnerProfile
     if (partnerMode && partnerProfile?.userData && partnerProfile?.plan) {
       const partnerName = partnerProfile.userData.dubiCode || "Partner";
       const myName      = userData?.dubiCode || "Tu";
-      const partShop    = getPersonalizedShopping(partnerProfile.userData, partnerProfile.plan, {}, partnerProfile.weeklyPlans || []);
+      const partShop    = getPersonalizedShopping(partnerProfile.userData, partnerProfile.plan, partnerProfile.weeklyPlans || []);
       return mergeShoppingLists(myShop, partShop, null, partnerName); // null tag = condiviso
     }
     // Solo io: wrap in {item, tag:null}
@@ -22894,7 +22613,6 @@ const handleDeleteAccount = async (otp) => {
   handleLogout();
   return result;
 };
-  const [swaps, setSwaps] = useState({});
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
   const [pendingPlanData, setPendingPlanData] = useState(null);
@@ -22920,7 +22638,6 @@ const handleDeleteAccount = async (otp) => {
         reason: 'daily_schedule_resume',
       });
       setPlan(rawPlan ? mapIngredientPlanToFrontend(rawPlan, { ...profile, dailyMealSchedule: rawPlan.daily_meal_schedule || null }) : null);
-      setSwaps(await fetchIngredientSwapsFromBackend());
       setActiveTab('today');
       setPhase('app');
     } catch (error) {
@@ -22979,7 +22696,6 @@ const handleDeleteAccount = async (otp) => {
     const refreshedPlan = mapAiPlanToFrontend(aiPlan, nextUserData);
     setUserData(nextUserData);
     setPlan(refreshedPlan);
-    setSwaps({});
     saveDubiProfile(nextUserData);
   };
 
@@ -22995,7 +22711,6 @@ const handleDeleteAccount = async (otp) => {
 
     setUserData(updatedData);
     setPlan(updatedPlan);
-    setSwaps({});
     saveDubiProfile(updatedData);
     return updatedPlan;
   };
@@ -23210,12 +22925,12 @@ await openAppWithDailySchedule(data);
             <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
             <div className="dubi-screen-motion" style={{height:"var(--dubi-viewport-height, 100vh)",overflowY:"auto",position:"relative"}}>
               {activeTab==="today"    && (healthDataConsentGranted
-                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
+                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="weekly"   && (healthDataConsentGranted
-                ? <WeeklyScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} swaps={swaps} setSwaps={setSwaps} />
+                ? <WeeklyScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
-              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} swaps={swaps} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
+              {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
               {activeTab==="settings" && (
   <SettingsScreen
@@ -23279,7 +22994,7 @@ const HomeConsumptionPreview = () => {
     generatedAt:"home-browser-e2e-v1",
     ingredientPlan:{date:todayIso,engine_version:"recipe_engine_v1",generation_status:"SUCCESS",meals,daySummary:{totalCalories:1221,totalProtein:94.3,totalCarbs:180,totalFat:12.7}},
   });
-  return <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={false} swaps={{}} planningDay={0} onOpenSettings={()=>{}}/>;
+  return <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={false} planningDay={0} onOpenSettings={()=>{}}/>;
 };
 
 const WeeklyWorkoutBadgePreview = () => {
@@ -23301,8 +23016,7 @@ const WeeklyWorkoutBadgePreview = () => {
   const plan = mapIngredientPlanToFrontend(rawPlan,userData);
   plan.planDate = todayIso;
   plan.ingredientPlanDate = todayIso;
-  const [swaps,setSwaps] = useState({});
-  return <WeeklyScreen userData={userData} plan={plan} weeklyPlans={[plan]} swaps={swaps} setSwaps={setSwaps}/>;
+  return <WeeklyScreen userData={userData} plan={plan} weeklyPlans={[plan]} />;
 };
 
 export function DUBIRoot() {
