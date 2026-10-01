@@ -1001,8 +1001,9 @@ const saveOnboardingToBackend = async (data) => {
     training_time: canonicalData.trainingTime,
     breakfast_pref: canonicalData.breakfastPref,
 
-    day_start: `${String(data.dayStart).padStart(2, "0")}:00`,
-    day_end: `${String(data.dayEnd).padStart(2, "0")}:00`,
+    // Keep legacy values stored for the first daily-time suggestion; these are no longer editable onboarding questions.
+    day_start: data.day_start || data.dayStart || null,
+    day_end: data.day_end || data.dayEnd || null,
 
     wearable_provider: getPrimaryWearable(data),
     wearable_providers: getSelectedWearables(data),
@@ -1234,11 +1235,10 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
   const summary = ingredientPlan?.daySummary || {};
   const meals = ingredientMealsToArray(ingredientPlan);
   const mealCount = meals.length || fallbackPlan.mealCount;
-  const mealTimes = calcMealTimes({
-    dayStart: userData?.dayStart || userData?.day_start || 7,
-    dayEnd: userData?.dayEnd || userData?.day_end || 22,
-    meals: mealCount
-  });
+  const dailyMealSchedule = ingredientPlan?.daily_meal_schedule || ingredientPlan?.dailyMealSchedule || userData?.dailyMealSchedule || null;
+  const mealTimes = dailyMealSchedule
+    ? calcMealTimes({ dailyMealSchedule, meals: mealCount })
+    : meals.map((meal) => meal.scheduled_time || meal.scheduledTime).filter(Boolean);
 
   return {
     ...fallbackPlan,
@@ -1248,6 +1248,9 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     fat: Math.round(Number(summary.totalFat || ingredientPlan?.total_fat || fallbackPlan.fat)),
     mealCount,
     mealTimes,
+    dailyMealSchedule,
+    remainingDayPlan: Number(dailyMealSchedule?.kcal_scale_factor || 1) < 1,
+    dailyPlanNotice: dailyMealSchedule?.notice || null,
     aiGenerated: true,
     ingredientGenerated: true,
     ingredientPlan,
@@ -1568,6 +1571,36 @@ const getRuntimeCopy = (key, vars, requestedLang) => {
 };
 
 
+const getDeviceTimezone = () => {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!timezone) throw new Error('device_timezone_unavailable');
+  return timezone;
+};
+
+const fetchDailyMealScheduleQuestion = async () => {
+  const token = getAuthToken();
+  if (!token) throw new Error('missing_token');
+  const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/daily-schedule?timezone=${encodeURIComponent(getDeviceTimezone())}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(payload.error || 'daily_schedule_load_failed'), { payload, status: response.status });
+  return payload;
+};
+
+const saveDailyMealScheduleAnswer = async (answer) => {
+  const token = getAuthToken();
+  if (!token) throw new Error('missing_token');
+  const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/daily-schedule`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...answer, timezone: getDeviceTimezone() }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(payload.error || 'daily_schedule_save_failed'), { payload, status: response.status });
+  return payload;
+};
+
 async function generateIngredientPlan(options = {}) {
   const token = getAuthToken();
   if (!token) throw new Error("missing_token");
@@ -1581,6 +1614,7 @@ async function generateIngredientPlan(options = {}) {
     },
     body: JSON.stringify({
       date: today,
+      timezone: getDeviceTimezone(),
       ...(options.breakfastChoice ? { breakfastChoice: options.breakfastChoice, reason: options.reason || "breakfast_choice" } : {}),
       ...(options.dailyTrainingOverride ? { daily_training_override: options.dailyTrainingOverride } : {})
     })
@@ -1595,7 +1629,7 @@ async function generateIngredientPlan(options = {}) {
     throw failure;
   }
 
-  const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}`, {
+  const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}?timezone=${encodeURIComponent(getDeviceTimezone())}`, {
     headers: { "Authorization": `Bearer ${token}` }
   });
 
@@ -1664,7 +1698,7 @@ const fetchCurrentIngredientPlanFromBackend = async () => {
   if (!token) return null;
   try {
     const today = getTodayIsoDate();
-    const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}`, {
+    const response = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${today}?timezone=${encodeURIComponent(getDeviceTimezone())}`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${token}` }
     });
@@ -1709,7 +1743,7 @@ const fetchIngredientPlanForDate = async (date, options = {}) => {
   const token = getAuthToken();
   if (!token) return null;
 
-  const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${date}`, {
+  const fetchRes = await fetch(`${API_BASE_URL}/plan/ingredient-plan/${date}?timezone=${encodeURIComponent(getDeviceTimezone())}${options.generateIfMissing === false ? '&generateIfMissing=false' : ''}`, {
     method: "GET",
     headers: { "Authorization": `Bearer ${token}` }
   });
@@ -1770,6 +1804,7 @@ const generateAiPlanFromBackend = async (userData, options = {}) => {
     return { plan: mapIngredientPlanToFrontend(ingredientPlan, userData), savedByAi: true };
   } catch (error) {
     console.error("Ingredient plan request failed:", error);
+    if (error?.code === 'DAILY_MEAL_SCHEDULE_REQUIRED') throw error;
     if (options.throwOnFailure) throw error;
     if (String(error?.code || "").startsWith("RECIPE_ENGINE_V1_") || error?.payload?.generation_status === "NO_SAFE_MATCH") {
       return {
@@ -3408,8 +3443,6 @@ const TRANSLATIONS = {
     "pref.bf.sweet": "🥐 Dolce",
     "pref.bf.salty": "🍳 Salata",
     "pref.bf.both": "🔄 Entrambi",
-    "pref.dayStart": "🌅 INIZIO GIORNATA ALIMENTARE",
-    "pref.dayEnd": "🌙 FINE GIORNATA ALIMENTARE",
     "pref.preview": "📊 DUBI calcolerà {n} pasti ottimali per te",
     "pref.preview.times": "Orari: {times}",
 
@@ -3650,7 +3683,6 @@ const TRANSLATIONS = {
     "wear.consent.body":"DUBI usera sonno, HRV, battito a riposo, attivita e recupero solo per personalizzare dieta, timing dei pasti e adattamenti del piano. Puoi revocare il consenso dalle Impostazioni.",
     "wear.primary.note":"Puoi collegare piu wearable. Per ora DUBI salva {provider} come fonte principale e prepara gli altri per la sincronizzazione.",
     "wear.intro.full":"DUBI usa i dati del tuo wearable per adattare la dieta automaticamente — senza che tu debba fare nulla.",
-    "pref.dayStart.plain":"INIZIO GIORNATA ALIMENTARE","pref.dayEnd.plain":"FINE GIORNATA ALIMENTARE",
     "pref.bf.plain.sweet":"Dolce","pref.bf.plain.salty":"Salata","pref.bf.plain.both":"Entrambi",
     "pref.preview.plain":"DUBI calcolerà {n} pasti ottimali per te","pref.preview.times.plain":"Orari: {times}",
     "weekly.bf.sweet":"Dolce","weekly.bf.salty":"Salata",
@@ -3814,7 +3846,6 @@ TRANSLATIONS.en = {
   "pref.training.evening":"Evening","pref.training.evening.r":"18:00 – 22:00",
   "pref.training.varies":"Varies / I don't have a fixed time",
   "pref.bf":"BREAKFAST PREFERENCE (default)","pref.bf.sweet":"🥐 Sweet","pref.bf.salty":"🍳 Savoury","pref.bf.both":"🔄 Both",
-  "pref.dayStart":"🌅 START OF EATING DAY","pref.dayEnd":"🌙 END OF EATING DAY",
   "pref.preview":"📊 DUBI will calculate {n} optimal meals for you","pref.preview.times":"Times: {times}",
   "wear.intro":"DUBI uses data from your wearable to adapt the diet automatically — no effort required.",
   "wear.apple":"Apple Health","wear.apple.d":"Steps, calories, sleep & HRV via HealthKit",
@@ -3935,7 +3966,6 @@ TRANSLATIONS.en = {
   "wear.google.d":"Unified health data on Android",
   "wear.none.d2":"Plan based only on data you entered",
   "wear.intro.full":"DUBI uses your wearable data to adapt your diet automatically — no effort required.",
-  "pref.dayStart.plain":"START OF EATING DAY","pref.dayEnd.plain":"END OF EATING DAY",
   "pref.bf.plain.sweet":"Sweet","pref.bf.plain.salty":"Savoury","pref.bf.plain.both":"Both",
   "pref.preview.plain":"DUBI will calculate {n} optimal meals for you","pref.preview.times.plain":"Times: {times}",
   "weekly.bf.sweet":"Sweet","weekly.bf.salty":"Savoury",
@@ -4102,7 +4132,6 @@ TRANSLATIONS.fr = {
   "pref.training":"À QUELLE HEURE T'ENTRAÎNES-TU HABITUELLEMENT ?",
   "pref.training.morning":"Matin","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"Pause déjeuner","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"Après-midi","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"Soir","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"Variable / pas d'horaire fixe",
   "pref.bf":"PRÉFÉRENCE PETIT-DÉJEUNER (par défaut)","pref.bf.sweet":"🥐 Sucré","pref.bf.salty":"🍳 Salé","pref.bf.both":"🔄 Les deux",
-  "pref.dayStart":"🌅 DÉBUT DE LA JOURNÉE ALIMENTAIRE","pref.dayEnd":"🌙 FIN DE LA JOURNÉE ALIMENTAIRE",
   "pref.preview":"📊 DUBI calculera {n} repas optimaux pour toi","pref.preview.times":"Horaires : {times}",
   "wear.intro":"DUBI utilise les données de ton wearable pour adapter le régime automatiquement — sans effort.",
   "wear.apple":"Apple Health","wear.apple.d":"Pas, calories, sommeil et VFC via HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"VFC, récupération et sommeil via HealthKit","wear.none":"Aucun wearable","wear.none.d":"Plan basé uniquement sur les données saisies",
@@ -4198,7 +4227,6 @@ TRANSLATIONS.fr = {
   "wear.google.d":"Données santé unifiées sur Android",
   "wear.none.d2":"Plan basé uniquement sur les données saisies",
   "wear.intro.full":"DUBI utilise les données de ton wearable pour adapter le régime automatiquement — sans effort.",
-  "pref.dayStart.plain":"DÉBUT DE LA JOURNÉE ALIMENTAIRE","pref.dayEnd.plain":"FIN DE LA JOURNÉE ALIMENTAIRE",
   "pref.bf.plain.sweet":"Sucré","pref.bf.plain.salty":"Salé","pref.bf.plain.both":"Les deux",
   "pref.preview.plain":"DUBI calculera {n} repas optimaux pour toi","pref.preview.times.plain":"Horaires : {times}",
   "weekly.bf.sweet":"Sucré","weekly.bf.salty":"Salé",
@@ -4459,7 +4487,6 @@ TRANSLATIONS.es = {
   "pref.training":"¿A QUÉ HORA SUELES ENTRENAR?",
   "pref.training.morning":"Mañana","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"Pausa comida","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"Tarde","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"Noche","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"Varía / sin horario fijo",
   "pref.bf":"PREFERENCIA DESAYUNO (por defecto)","pref.bf.sweet":"🥐 Dulce","pref.bf.salty":"🍳 Salado","pref.bf.both":"🔄 Ambos",
-  "pref.dayStart":"🌅 INICIO DEL DÍA ALIMENTARIO","pref.dayEnd":"🌙 FIN DEL DÍA ALIMENTARIO",
   "pref.preview":"📊 DUBI calculará {n} comidas óptimas para ti","pref.preview.times":"Horarios: {times}",
   "wear.intro":"DUBI usa los datos de tu wearable para adaptar la dieta automáticamente — sin esfuerzo.",
   "wear.apple":"Apple Watch","wear.apple.d":"A través de Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"VFC, recuperación y sueño vía HealthKit","wear.none":"Sin wearable","wear.none.d":"Plan basado solo en los datos introducidos",
@@ -4555,7 +4582,6 @@ TRANSLATIONS.es = {
   "wear.google.d":"Datos de salud unificados en Android",
   "wear.none.d2":"Plan basado solo en los datos introducidos",
   "wear.intro.full":"DUBI usa los datos de tu wearable para adaptar la dieta automáticamente — sin esfuerzo.",
-  "pref.dayStart.plain":"INICIO DEL DÍA ALIMENTARIO","pref.dayEnd.plain":"FIN DEL DÍA ALIMENTARIO",
   "pref.bf.plain.sweet":"Dulce","pref.bf.plain.salty":"Salado","pref.bf.plain.both":"Ambos",
   "pref.preview.plain":"DUBI calculará {n} comidas óptimas para ti","pref.preview.times.plain":"Horarios: {times}",
   "weekly.bf.sweet":"Dulce","weekly.bf.salty":"Salado",
@@ -4816,7 +4842,6 @@ TRANSLATIONS.de = {
   "pref.training":"WANN TRAINIERST DU MEISTENS?",
   "pref.training.morning":"Morgens","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"Mittagspause","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"Nachmittag","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"Abend","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"Variiert / keine feste Zeit",
   "pref.bf":"FRÜHSTÜCKSPRÄFERENZ (Standard)","pref.bf.sweet":"🥐 Süß","pref.bf.salty":"🍳 Herzhaft","pref.bf.both":"🔄 Beides",
-  "pref.dayStart":"🌅 BEGINN DES ESSTAGS","pref.dayEnd":"🌙 ENDE DES ESSTAGS",
   "pref.preview":"📊 DUBI berechnet {n} optimale Mahlzeiten für dich","pref.preview.times":"Zeiten: {times}",
   "wear.intro":"DUBI nutzt deine Wearable-Daten, um die Ernährung automatisch anzupassen — ganz ohne Aufwand.",
   "wear.apple":"Apple Watch","wear.apple.d":"Über Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"HRV, Erholung und Schlaf via HealthKit","wear.none":"Kein Wearable","wear.none.d":"Plan nur basierend auf eingegebenen Daten",
@@ -4912,7 +4937,6 @@ TRANSLATIONS.de = {
   "wear.google.d":"Einheitliche Gesundheitsdaten auf Android",
   "wear.none.d2":"Plan nur basierend auf eingegebenen Daten",
   "wear.intro.full":"DUBI nutzt deine Wearable-Daten, um die Ernährung automatisch anzupassen — ganz ohne Aufwand.",
-  "pref.dayStart.plain":"BEGINN DES ESSTAGS","pref.dayEnd.plain":"ENDE DES ESSTAGS",
   "pref.bf.plain.sweet":"Süß","pref.bf.plain.salty":"Herzhaft","pref.bf.plain.both":"Beides",
   "pref.preview.plain":"DUBI berechnet {n} optimale Mahlzeiten für dich","pref.preview.times.plain":"Zeiten: {times}",
   "weekly.bf.sweet":"Süß","weekly.bf.salty":"Herzhaft",
@@ -5173,7 +5197,6 @@ TRANSLATIONS.ar = {
   "pref.training":"في أيّ وقت تتدرب عادة؟",
   "pref.training.morning":"الصباح","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"استراحة الغداء","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"بعد الظهر","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"المساء","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"يتغيّر / لا وقت ثابت",
   "pref.bf":"تفضيل الإفطار (افتراضي)","pref.bf.sweet":"🥐 حلو","pref.bf.salty":"🍳 مالح","pref.bf.both":"🔄 كلاهما",
-  "pref.dayStart":"🌅 بداية اليوم الغذائي","pref.dayEnd":"🌙 نهاية اليوم الغذائي",
   "pref.preview":"📊 ستحسب DUBI {n} وجبات مثالية لك","pref.preview.times":"المواعيد: {times}",
   "wear.intro":"تستخدم DUBI بيانات جهازك القابل للارتداء لتعديل النظام الغذائي تلقائياً — دون أيّ جهد منك.",
   "wear.apple":"Apple Watch","wear.apple.d":"عبر Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"HRV والتعافي والنوم عبر HealthKit","wear.none":"بدون جهاز","wear.none.d":"خطة معتمدة على البيانات المُدخَلة فقط",
@@ -5269,7 +5292,6 @@ TRANSLATIONS.ar = {
   "wear.google.d":"بيانات الصحة الموحّدة على Android",
   "wear.none.d2":"خطة مبنية فقط على البيانات المدخلة",
   "wear.intro.full":"تستخدم DUBI بيانات جهازك لتعديل النظام تلقائياً — دون أيّ جهد.",
-  "pref.dayStart.plain":"بداية اليوم الغذائي","pref.dayEnd.plain":"نهاية اليوم الغذائي",
   "pref.bf.plain.sweet":"حلو","pref.bf.plain.salty":"مالح","pref.bf.plain.both":"كلاهما",
   "pref.preview.plain":"ستحسب DUBI {n} وجبات مثلى لك","pref.preview.times.plain":"المواعيد: {times}",
   "weekly.bf.sweet":"حلو","weekly.bf.salty":"مالح",
@@ -5530,7 +5552,6 @@ TRANSLATIONS.pt = {
   "pref.training":"A QUE HORAS TREINAS NORMALMENTE?",
   "pref.training.morning":"Manhã","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"Hora de almoço","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"Tarde","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"Noite","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"Varia / sem horário fixo",
   "pref.bf":"PREFERÊNCIA PEQUENO-ALMOÇO (padrão)","pref.bf.sweet":"🥐 Doce","pref.bf.salty":"🍳 Salgado","pref.bf.both":"🔄 Ambos",
-  "pref.dayStart":"🌅 INÍCIO DO DIA ALIMENTAR","pref.dayEnd":"🌙 FIM DO DIA ALIMENTAR",
   "pref.preview":"📊 A DUBI calculará {n} refeições ótimas para ti","pref.preview.times":"Horários: {times}",
   "wear.intro":"A DUBI usa os dados do teu wearable para adaptar a dieta automaticamente — sem qualquer esforço.",
   "wear.apple":"Apple Watch","wear.apple.d":"Via Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"VFC, recuperação e sono via HealthKit","wear.none":"Sem wearable","wear.none.d":"Plano baseado apenas nos dados introduzidos",
@@ -5626,7 +5647,6 @@ TRANSLATIONS.pt = {
   "wear.google.d":"Dados de saúde unificados no Android",
   "wear.none.d2":"Plano baseado apenas nos dados introduzidos",
   "wear.intro.full":"A DUBI usa os dados do teu wearable para adaptar a dieta automaticamente — sem esforço.",
-  "pref.dayStart.plain":"INÍCIO DO DIA ALIMENTAR","pref.dayEnd.plain":"FIM DO DIA ALIMENTAR",
   "pref.bf.plain.sweet":"Doce","pref.bf.plain.salty":"Salgado","pref.bf.plain.both":"Ambos",
   "pref.preview.plain":"A DUBI calculará {n} refeições ótimas para ti","pref.preview.times.plain":"Horários: {times}",
   "weekly.bf.sweet":"Doce","weekly.bf.salty":"Salgado",
@@ -5887,7 +5907,6 @@ TRANSLATIONS.zh = {
   "pref.training":"通常什么时候训练？",
   "pref.training.morning":"上午","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"午休时段","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"下午","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"晚上","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"不固定 / 随机",
   "pref.bf":"早餐偏好（默认）","pref.bf.sweet":"🥐 甜","pref.bf.salty":"🍳 咸","pref.bf.both":"🔄 都可以",
-  "pref.dayStart":"🌅 进食日开始","pref.dayEnd":"🌙 进食日结束",
   "pref.preview":"📊 DUBI 将为你计算 {n} 顿最佳餐食","pref.preview.times":"时间：{times}",
   "wear.intro":"DUBI 使用你的可穿戴数据自动调整饮食 — 无需任何操作。",
   "wear.apple":"Apple Watch","wear.apple.d":"通过 Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"通过 HealthKit 同步 HRV、恢复与睡眠","wear.none":"无可穿戴","wear.none.d":"仅基于你输入的数据",
@@ -5983,7 +6002,6 @@ TRANSLATIONS.zh = {
   "wear.google.d":"Android 上的统一健康数据",
   "wear.none.d2":"方案仅基于你输入的数据",
   "wear.intro.full":"DUBI 使用你的可穿戴数据自动调整饮食 — 无需任何操作。",
-  "pref.dayStart.plain":"进食日开始","pref.dayEnd.plain":"进食日结束",
   "pref.bf.plain.sweet":"甜","pref.bf.plain.salty":"咸","pref.bf.plain.both":"都可以",
   "pref.preview.plain":"DUBI 将为你计算 {n} 顿最佳餐食","pref.preview.times.plain":"时间：{times}",
   "weekly.bf.sweet":"甜","weekly.bf.salty":"咸",
@@ -6244,7 +6262,6 @@ TRANSLATIONS.ja = {
   "pref.training":"普段いつトレーニングしますか？",
   "pref.training.morning":"朝","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"昼休み","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"午後","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"夜","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"バラバラ / 決まっていない",
   "pref.bf":"朝食の好み（既定）","pref.bf.sweet":"🥐 甘い","pref.bf.salty":"🍳 塩気","pref.bf.both":"🔄 両方",
-  "pref.dayStart":"🌅 食事日の開始","pref.dayEnd":"🌙 食事日の終了",
   "pref.preview":"📊 DUBIはあなたに最適な {n} 食を計算します","pref.preview.times":"時刻: {times}",
   "wear.intro":"DUBIはウェアラブルのデータを使って自動で食事を調整します — 操作は不要です。",
   "wear.apple":"Apple Watch","wear.apple.d":"Apple Health / HealthKit経由","wear.whoop":"WHOOP","wear.whoop.d":"HealthKit経由でHRV・回復・睡眠","wear.none":"ウェアラブルなし","wear.none.d":"入力データのみで作成",
@@ -6340,7 +6357,6 @@ TRANSLATIONS.ja = {
   "wear.google.d":"Androidの統合ヘルスデータ",
   "wear.none.d2":"入力データのみで作成",
   "wear.intro.full":"DUBIはウェアラブルのデータで食事を自動調整 — 操作は不要です。",
-  "pref.dayStart.plain":"食事日の開始","pref.dayEnd.plain":"食事日の終了",
   "pref.bf.plain.sweet":"甘い","pref.bf.plain.salty":"塩気","pref.bf.plain.both":"両方",
   "pref.preview.plain":"DUBIはあなたに最適な{n}食を計算します","pref.preview.times.plain":"時刻: {times}",
   "weekly.bf.sweet":"甘い","weekly.bf.salty":"塩気",
@@ -6601,7 +6617,6 @@ TRANSLATIONS.ru = {
   "pref.training":"В КАКОЕ ВРЕМЯ ОБЫЧНО ТРЕНИРУЕШЬСЯ?",
   "pref.training.morning":"Утро","pref.training.morning.r":"6:00 – 11:00","pref.training.lunch":"Обед","pref.training.lunch.r":"11:00 – 14:00","pref.training.afternoon":"День","pref.training.afternoon.r":"14:00 – 18:00","pref.training.evening":"Вечер","pref.training.evening.r":"18:00 – 22:00","pref.training.varies":"По-разному / нет фикс. времени",
   "pref.bf":"ПРЕДПОЧТЕНИЕ ЗАВТРАКА (по умолч.)","pref.bf.sweet":"🥐 Сладкий","pref.bf.salty":"🍳 Солёный","pref.bf.both":"🔄 Оба",
-  "pref.dayStart":"🌅 НАЧАЛО ПИЩЕВОГО ДНЯ","pref.dayEnd":"🌙 КОНЕЦ ПИЩЕВОГО ДНЯ",
   "pref.preview":"📊 DUBI рассчитает {n} оптимальных приёмов пищи","pref.preview.times":"Время: {times}",
   "wear.intro":"DUBI использует данные носимого устройства, чтобы автоматически адаптировать диету — без усилий с твоей стороны.",
   "wear.apple":"Apple Watch","wear.apple.d":"Через Apple Health / HealthKit","wear.whoop":"WHOOP","wear.whoop.d":"HRV, восстановление и сон через HealthKit","wear.none":"Без носимого","wear.none.d":"План только по введённым данным",
@@ -6697,7 +6712,6 @@ TRANSLATIONS.ru = {
   "wear.google.d":"Единые данные о здоровье на Android",
   "wear.none.d2":"План только по введённым данным",
   "wear.intro.full":"DUBI использует данные носимого устройства, чтобы автоматически адаптировать диету — без усилий.",
-  "pref.dayStart.plain":"НАЧАЛО ПИЩЕВОГО ДНЯ","pref.dayEnd.plain":"КОНЕЦ ПИЩЕВОГО ДНЯ",
   "pref.bf.plain.sweet":"Сладкий","pref.bf.plain.salty":"Солёный","pref.bf.plain.both":"Оба",
   "pref.preview.plain":"DUBI рассчитает {n} оптимальных приёмов пищи","pref.preview.times.plain":"Время: {times}",
   "weekly.bf.sweet":"Сладкий","weekly.bf.salty":"Солёный",
@@ -6950,7 +6964,7 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.edit.reason":"Motivo", "set.edit.double":"Confermo, aggiorna DUBI", "set.edit.cancel":"Annulla", "set.edit.success":"Profilo aggiornato. DUBI ha riallineato il piano.", "set.edit.error":"Non sono riuscito a salvare la modifica. Riprova tra poco.",
     "set.edit.selectField":"Seleziona un campo da modificare.", "set.edit.profile":"Profilo", "set.edit.body":"Corpo e obiettivo", "set.edit.training":"Allenamento", "set.edit.nutrition":"Nutrizione", "set.edit.routine":"Routine",
     "set.field.name":"Nome", "set.field.gender":"Sesso", "set.field.age":"Eta", "set.field.height":"Altezza", "set.field.weight":"Peso attuale", "set.field.goal":"Obiettivo", "set.field.targetWeight":"Peso target", "set.field.targetBf":"Body fat target",
-    "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita",   "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.dayStart":"Inizio giornata", "set.field.dayEnd":"Fine giornata", "set.field.wearable":"Wearable",
+    "set.field.workoutDays":"Giorni allenamento", "set.field.workoutDuration":"Durata allenamento", "set.field.workoutIntensity":"Intensita",   "set.field.diet":"Preferenza alimentare", "set.field.allergies":"Allergie/intolleranze", "set.field.sport":"Sport", "set.field.trainingTime":"Orario allenamento", "set.field.breakfastPref":"Colazione", "set.field.wearable":"Wearable",
     "set.reason.energy":"influenza fabbisogno energetico, macro e porzioni.", "set.reason.foods":"influenza selezione ingredienti, allergeni e alternative sicure.", "set.reason.training":"influenza timing dei carboidrati, pasti pre/post workout e recupero.", "set.reason.routine":"influenza orari e distribuzione dei pasti.", "set.reason.profile":"aggiorna i dati profilo senza rigenerare la dieta.",
     "set.quick.goal":"Obiettivo", "set.quick.diet":"Dieta", "set.quick.training":"Allenamento", "set.quick.allergies":"Allergie",
     "set.logout":"Esci", "set.logout.q":"Sei sicuro di voler uscire?", "set.logout.cancel":"Annulla",
@@ -6971,7 +6985,7 @@ const SETTINGS_EXTRA_TRANSLATIONS = {
     "set.edit.reason":"Reason", "set.edit.double":"I confirm, update DUBI", "set.edit.cancel":"Cancel", "set.edit.success":"Profile updated. DUBI realigned the plan.", "set.edit.error":"I could not save this change. Please try again shortly.",
     "set.edit.selectField":"Select a field to edit.", "set.edit.profile":"Profile", "set.edit.body":"Body and goal", "set.edit.training":"Training", "set.edit.nutrition":"Nutrition", "set.edit.routine":"Routine",
     "set.field.name":"Name", "set.field.gender":"Gender", "set.field.age":"Age", "set.field.height":"Height", "set.field.weight":"Current weight", "set.field.goal":"Goal", "set.field.targetWeight":"Target weight", "set.field.targetBf":"Target body fat",
-    "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity",   "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.dayStart":"Day start", "set.field.dayEnd":"Day end", "set.field.wearable":"Wearable",
+    "set.field.workoutDays":"Training days", "set.field.workoutDuration":"Workout duration", "set.field.workoutIntensity":"Intensity",   "set.field.diet":"Diet preference", "set.field.allergies":"Allergies/intolerances", "set.field.sport":"Sport", "set.field.trainingTime":"Training time", "set.field.breakfastPref":"Breakfast", "set.field.wearable":"Wearable",
     "set.reason.energy":"affects energy needs, macros and portions.", "set.reason.foods":"affects ingredient selection, allergens and safe alternatives.", "set.reason.training":"affects carb timing, pre/post workout meals and recovery.", "set.reason.routine":"affects meal timing and distribution.", "set.reason.profile":"updates profile data without regenerating nutrition.",
     "set.quick.goal":"Goal", "set.quick.diet":"Diet", "set.quick.training":"Training", "set.quick.allergies":"Allergies",
     "set.logout":"Log out", "set.logout.q":"Are you sure you want to log out?", "set.logout.cancel":"Cancel",
@@ -7003,38 +7017,38 @@ const SETTINGS_PROFILE_PATCH_TRANSLATIONS = {
   fr: {
     "set.hero.kicker":"CENTRE PROFIL","set.hero.sub":"Gere les donnees qui guident les plans, repas et adaptations de DUBI.",
     "set.edit.title":"Modification intelligente","set.edit.sub":"Modifie seulement ce dont tu as besoin. Si cela impacte la nutrition, DUBI explique pourquoi avant de mettre a jour le plan.","set.edit.open":"Choisir quoi modifier","set.edit.active":"Editeur de profil","set.edit.close":"Fermer","set.edit.pick":"Que veux-tu mettre a jour?","set.edit.value":"Nouvelle valeur","set.edit.save":"Enregistrer la modification","set.edit.saving":"Enregistrement...","set.edit.confirm":"Confirmer la mise a jour","set.edit.confirmDiet":"Cette modification peut changer calories, macros, ingredients ou distribution des repas.","set.edit.confirmNoDiet":"Cette modification met a jour le profil, mais ne devrait pas changer le plan nutritionnel actuel.","set.edit.reason":"Raison","set.edit.double":"Je confirme, mets DUBI a jour","set.edit.cancel":"Annuler","set.edit.success":"Profil mis a jour. DUBI a realigne le plan.","set.edit.error":"Impossible d'enregistrer la modification. Reessaie bientot.","set.edit.selectField":"Selectionne un champ a modifier.","set.edit.profile":"Profil","set.edit.body":"Corps et objectif","set.edit.training":"Entrainement","set.edit.nutrition":"Nutrition","set.edit.routine":"Routine",
-    "set.field.name":"Nom","set.field.gender":"Sexe","set.field.age":"Age","set.field.height":"Taille","set.field.weight":"Poids actuel","set.field.goal":"Objectif","set.field.targetWeight":"Poids cible","set.field.targetBf":"Masse grasse cible","set.field.workoutDays":"Jours d'entrainement","set.field.workoutDuration":"Duree d'entrainement","set.field.workoutIntensity":"Intensite","set.field.diet":"Preference alimentaire","set.field.allergies":"Allergies/intolerances","set.field.sport":"Sport","set.field.trainingTime":"Horaire d'entrainement","set.field.breakfastPref":"Petit-dejeuner","set.field.dayStart":"Debut de journee","set.field.dayEnd":"Fin de journee","set.field.wearable":"Wearable",
+    "set.field.name":"Nom","set.field.gender":"Sexe","set.field.age":"Age","set.field.height":"Taille","set.field.weight":"Poids actuel","set.field.goal":"Objectif","set.field.targetWeight":"Poids cible","set.field.targetBf":"Masse grasse cible","set.field.workoutDays":"Jours d'entrainement","set.field.workoutDuration":"Duree d'entrainement","set.field.workoutIntensity":"Intensite","set.field.diet":"Preference alimentaire","set.field.allergies":"Allergies/intolerances","set.field.sport":"Sport","set.field.trainingTime":"Horaire d'entrainement","set.field.breakfastPref":"Petit-dejeuner","set.field.wearable":"Wearable",
     "set.reason.energy":"influence les besoins energetiques, macros et portions.","set.reason.foods":"influence le choix des ingredients, allergenes et alternatives sures.","set.reason.training":"influence le timing des glucides, repas pre/post entrainement et recuperation.","set.reason.routine":"influence les horaires et la distribution des repas.","set.reason.profile":"met a jour le profil sans regenerer la nutrition.","set.quick.goal":"Objectif","set.quick.diet":"Regime","set.quick.training":"Entrainement","set.quick.allergies":"Allergies","set.logout":"Se deconnecter","set.logout.q":"Es-tu sur de vouloir te deconnecter?","set.logout.cancel":"Annuler"
   },
   es: {
     "set.hero.kicker":"CENTRO DE PERFIL","set.hero.sub":"Gestiona los datos que guian planes, comidas y adaptaciones de DUBI.",
     "set.edit.title":"Edicion inteligente","set.edit.sub":"Cambia solo lo necesario. Si afecta a la nutricion, DUBI explica por que antes de actualizar el plan.","set.edit.open":"Elegir que modificar","set.edit.active":"Editor de perfil","set.edit.close":"Cerrar","set.edit.pick":"Que quieres actualizar?","set.edit.value":"Nuevo valor","set.edit.save":"Guardar cambio","set.edit.saving":"Guardando...","set.edit.confirm":"Confirmar actualizacion","set.edit.confirmDiet":"Este cambio puede modificar calorias, macros, ingredientes o distribucion de comidas.","set.edit.confirmNoDiet":"Este cambio actualiza el perfil, pero no deberia cambiar el plan nutricional actual.","set.edit.reason":"Motivo","set.edit.double":"Confirmo, actualiza DUBI","set.edit.cancel":"Cancelar","set.edit.success":"Perfil actualizado. DUBI realineo el plan.","set.edit.error":"No pude guardar el cambio. Intentalo mas tarde.","set.edit.selectField":"Selecciona un campo para modificar.","set.edit.profile":"Perfil","set.edit.body":"Cuerpo y objetivo","set.edit.training":"Entrenamiento","set.edit.nutrition":"Nutricion","set.edit.routine":"Rutina",
-    "set.field.name":"Nombre","set.field.gender":"Sexo","set.field.age":"Edad","set.field.height":"Altura","set.field.weight":"Peso actual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso objetivo","set.field.targetBf":"Grasa corporal objetivo","set.field.workoutDays":"Dias de entrenamiento","set.field.workoutDuration":"Duracion del entrenamiento","set.field.workoutIntensity":"Intensidad","set.field.diet":"Preferencia alimentaria","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Deporte","set.field.trainingTime":"Hora de entrenamiento","set.field.breakfastPref":"Desayuno","set.field.dayStart":"Inicio del dia","set.field.dayEnd":"Fin del dia","set.field.wearable":"Wearable",
+    "set.field.name":"Nombre","set.field.gender":"Sexo","set.field.age":"Edad","set.field.height":"Altura","set.field.weight":"Peso actual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso objetivo","set.field.targetBf":"Grasa corporal objetivo","set.field.workoutDays":"Dias de entrenamiento","set.field.workoutDuration":"Duracion del entrenamiento","set.field.workoutIntensity":"Intensidad","set.field.diet":"Preferencia alimentaria","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Deporte","set.field.trainingTime":"Hora de entrenamiento","set.field.breakfastPref":"Desayuno","set.field.wearable":"Wearable",
     "set.reason.energy":"influye en necesidades energeticas, macros y porciones.","set.reason.foods":"influye en seleccion de ingredientes, alergenos y alternativas seguras.","set.reason.training":"influye en timing de carbohidratos, comidas pre/post entrenamiento y recuperacion.","set.reason.routine":"influye en horarios y distribucion de comidas.","set.reason.profile":"actualiza datos del perfil sin regenerar la nutricion.","set.quick.goal":"Objetivo","set.quick.diet":"Dieta","set.quick.training":"Entrenamiento","set.quick.allergies":"Alergias","set.logout":"Cerrar sesion","set.logout.q":"Seguro que quieres cerrar sesion?","set.logout.cancel":"Cancelar"
   },
   de: {
     "set.hero.kicker":"PROFILZENTRUM","set.hero.sub":"Verwalte die Daten, die DUBI Plane, Mahlzeiten und Anpassungen steuern.",
     "set.edit.title":"Intelligente Bearbeitung","set.edit.sub":"Andere nur, was du brauchst. Wenn es die Ernahrung beeinflusst, erklart DUBI warum, bevor der Plan aktualisiert wird.","set.edit.open":"Auswahlen, was geandert wird","set.edit.active":"Profil-Editor","set.edit.close":"Schliessen","set.edit.pick":"Was mochtest du aktualisieren?","set.edit.value":"Neuer Wert","set.edit.save":"Anderung speichern","set.edit.saving":"Speichern...","set.edit.confirm":"Aktualisierung bestatigen","set.edit.confirmDiet":"Diese Anderung kann Kalorien, Makros, Zutaten oder Mahlzeitenverteilung andern.","set.edit.confirmNoDiet":"Diese Anderung aktualisiert das Profil, sollte aber den aktuellen Ernahrungsplan nicht andern.","set.edit.reason":"Grund","set.edit.double":"Ich bestatige, DUBI aktualisieren","set.edit.cancel":"Abbrechen","set.edit.success":"Profil aktualisiert. DUBI hat den Plan neu ausgerichtet.","set.edit.error":"Anderung konnte nicht gespeichert werden. Bitte erneut versuchen.","set.edit.selectField":"Wahle ein Feld zum Bearbeiten.","set.edit.profile":"Profil","set.edit.body":"Korper und Ziel","set.edit.training":"Training","set.edit.nutrition":"Ernahrung","set.edit.routine":"Routine",
-    "set.field.name":"Name","set.field.gender":"Geschlecht","set.field.age":"Alter","set.field.height":"Grosse","set.field.weight":"Aktuelles Gewicht","set.field.goal":"Ziel","set.field.targetWeight":"Zielgewicht","set.field.targetBf":"Ziel-Korperfett","set.field.workoutDays":"Trainingstage","set.field.workoutDuration":"Trainingsdauer","set.field.workoutIntensity":"Intensitat","set.field.diet":"Ernahrungspraferenz","set.field.allergies":"Allergien/Unvertraglichkeiten","set.field.sport":"Sport","set.field.trainingTime":"Trainingszeit","set.field.breakfastPref":"Fruhstuck","set.field.dayStart":"Tagesbeginn","set.field.dayEnd":"Tagesende","set.field.wearable":"Wearable",
+    "set.field.name":"Name","set.field.gender":"Geschlecht","set.field.age":"Alter","set.field.height":"Grosse","set.field.weight":"Aktuelles Gewicht","set.field.goal":"Ziel","set.field.targetWeight":"Zielgewicht","set.field.targetBf":"Ziel-Korperfett","set.field.workoutDays":"Trainingstage","set.field.workoutDuration":"Trainingsdauer","set.field.workoutIntensity":"Intensitat","set.field.diet":"Ernahrungspraferenz","set.field.allergies":"Allergien/Unvertraglichkeiten","set.field.sport":"Sport","set.field.trainingTime":"Trainingszeit","set.field.breakfastPref":"Fruhstuck","set.field.wearable":"Wearable",
     "set.reason.energy":"beeinflusst Energiebedarf, Makros und Portionen.","set.reason.foods":"beeinflusst Zutatenwahl, Allergene und sichere Alternativen.","set.reason.training":"beeinflusst Kohlenhydrat-Timing, Pre/Post-Workout-Mahlzeiten und Erholung.","set.reason.routine":"beeinflusst Zeiten und Mahlzeitenverteilung.","set.reason.profile":"aktualisiert Profildaten ohne Ernahrung neu zu generieren.","set.quick.goal":"Ziel","set.quick.diet":"Ernahrung","set.quick.training":"Training","set.quick.allergies":"Allergien","set.logout":"Abmelden","set.logout.q":"Mochtest du dich wirklich abmelden?","set.logout.cancel":"Abbrechen"
   },
   pt: {
     "set.hero.kicker":"CENTRO DE PERFIL","set.hero.sub":"Gere os dados que orientam planos, refeicoes e adaptacoes da DUBI.",
     "set.edit.title":"Edicao inteligente","set.edit.sub":"Altera apenas o que precisas. Se afetar a nutricao, a DUBI explica antes de atualizar o plano.","set.edit.open":"Escolher o que editar","set.edit.active":"Editor de perfil","set.edit.close":"Fechar","set.edit.pick":"O que queres atualizar?","set.edit.value":"Novo valor","set.edit.save":"Guardar alteracao","set.edit.saving":"A guardar...","set.edit.confirm":"Confirmar atualizacao","set.edit.confirmDiet":"Esta alteracao pode mudar calorias, macros, ingredientes ou distribuicao das refeicoes.","set.edit.confirmNoDiet":"Esta alteracao atualiza o perfil, mas nao devera mudar o plano nutricional atual.","set.edit.reason":"Motivo","set.edit.double":"Confirmo, atualizar DUBI","set.edit.cancel":"Cancelar","set.edit.success":"Perfil atualizado. A DUBI realinhou o plano.","set.edit.error":"Nao foi possivel guardar a alteracao. Tenta novamente.","set.edit.selectField":"Seleciona um campo para editar.","set.edit.profile":"Perfil","set.edit.body":"Corpo e objetivo","set.edit.training":"Treino","set.edit.nutrition":"Nutricao","set.edit.routine":"Rotina",
-    "set.field.name":"Nome","set.field.gender":"Sexo","set.field.age":"Idade","set.field.height":"Altura","set.field.weight":"Peso atual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso alvo","set.field.targetBf":"Gordura corporal alvo","set.field.workoutDays":"Dias de treino","set.field.workoutDuration":"Duracao do treino","set.field.workoutIntensity":"Intensidade","set.field.diet":"Preferencia alimentar","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Desporto","set.field.trainingTime":"Horario do treino","set.field.breakfastPref":"Pequeno-almoco","set.field.dayStart":"Inicio do dia","set.field.dayEnd":"Fim do dia","set.field.wearable":"Wearable",
+    "set.field.name":"Nome","set.field.gender":"Sexo","set.field.age":"Idade","set.field.height":"Altura","set.field.weight":"Peso atual","set.field.goal":"Objetivo","set.field.targetWeight":"Peso alvo","set.field.targetBf":"Gordura corporal alvo","set.field.workoutDays":"Dias de treino","set.field.workoutDuration":"Duracao do treino","set.field.workoutIntensity":"Intensidade","set.field.diet":"Preferencia alimentar","set.field.allergies":"Alergias/intolerancias","set.field.sport":"Desporto","set.field.trainingTime":"Horario do treino","set.field.breakfastPref":"Pequeno-almoco","set.field.wearable":"Wearable",
     "set.reason.energy":"influencia necessidades energeticas, macros e porcoes.","set.reason.foods":"influencia escolha de ingredientes, alergenos e alternativas seguras.","set.reason.training":"influencia timing dos hidratos, refeicoes pre/pos-treino e recuperacao.","set.reason.routine":"influencia horarios e distribuicao das refeicoes.","set.reason.profile":"atualiza dados do perfil sem regenerar nutricao.","set.quick.goal":"Objetivo","set.quick.diet":"Dieta","set.quick.training":"Treino","set.quick.allergies":"Alergias","set.logout":"Sair","set.logout.q":"Tens a certeza que queres sair?","set.logout.cancel":"Cancelar"
   },
   ar: {
-    "set.hero.kicker":"مركز الملف الشخصي","set.hero.sub":"إدارة البيانات التي توجه خطط ووجبات وتعديلات DUBI.","set.edit.title":"تعديل ذكي","set.edit.sub":"غيّر فقط ما تحتاجه. إذا كان يؤثر على التغذية، تشرح DUBI السبب قبل تحديث الخطة.","set.edit.open":"اختر ما تريد تعديله","set.edit.active":"محرر الملف","set.edit.close":"إغلاق","set.edit.pick":"ما الذي تريد تحديثه؟","set.edit.value":"القيمة الجديدة","set.edit.save":"حفظ التغيير","set.edit.saving":"جار الحفظ...","set.edit.confirm":"تأكيد التحديث","set.edit.confirmDiet":"قد يغير هذا السعرات أو الماكروز أو المكونات أو توزيع الوجبات.","set.edit.confirmNoDiet":"يحدث هذا الملف الشخصي ولا يجب أن يغير الخطة الغذائية الحالية.","set.edit.reason":"السبب","set.edit.double":"أؤكد، حدث DUBI","set.edit.cancel":"إلغاء","set.edit.success":"تم تحديث الملف والخطة.","set.edit.error":"تعذر حفظ التغيير. حاول لاحقا.","set.edit.selectField":"اختر حقلا للتعديل.","set.edit.profile":"الملف","set.edit.body":"الجسم والهدف","set.edit.training":"التدريب","set.edit.nutrition":"التغذية","set.edit.routine":"الروتين","set.field.name":"الاسم","set.field.age":"العمر","set.field.height":"الطول","set.field.weight":"الوزن الحالي","set.field.goal":"الهدف","set.field.targetWeight":"الوزن المستهدف","set.field.targetBf":"نسبة الدهون المستهدفة","set.field.workoutDays":"أيام التدريب","set.field.workoutDuration":"مدة التدريب","set.field.workoutIntensity":"الشدة","set.field.diet":"النظام الغذائي","set.field.allergies":"الحساسيات/عدم التحمل","set.field.sport":"الرياضة","set.field.trainingTime":"وقت التدريب","set.field.breakfastPref":"الإفطار","set.field.dayStart":"بداية اليوم","set.field.dayEnd":"نهاية اليوم","set.field.wearable":"الجهاز","set.reason.energy":"يؤثر على الطاقة والماكروز والحصص.","set.reason.foods":"يؤثر على المكونات والحساسيات والبدائل الآمنة.","set.reason.training":"يؤثر على توقيت الكربوهيدرات ووجبات التدريب والتعافي.","set.reason.routine":"يؤثر على أوقات وتوزيع الوجبات.","set.reason.profile":"يحدث بيانات الملف دون إعادة إنشاء التغذية.","set.quick.goal":"الهدف","set.quick.diet":"النظام","set.quick.training":"التدريب","set.quick.allergies":"الحساسيات","set.logout":"تسجيل الخروج","set.logout.q":"هل تريد تسجيل الخروج؟","set.logout.cancel":"إلغاء"
+    "set.hero.kicker":"مركز الملف الشخصي","set.hero.sub":"إدارة البيانات التي توجه خطط ووجبات وتعديلات DUBI.","set.edit.title":"تعديل ذكي","set.edit.sub":"غيّر فقط ما تحتاجه. إذا كان يؤثر على التغذية، تشرح DUBI السبب قبل تحديث الخطة.","set.edit.open":"اختر ما تريد تعديله","set.edit.active":"محرر الملف","set.edit.close":"إغلاق","set.edit.pick":"ما الذي تريد تحديثه؟","set.edit.value":"القيمة الجديدة","set.edit.save":"حفظ التغيير","set.edit.saving":"جار الحفظ...","set.edit.confirm":"تأكيد التحديث","set.edit.confirmDiet":"قد يغير هذا السعرات أو الماكروز أو المكونات أو توزيع الوجبات.","set.edit.confirmNoDiet":"يحدث هذا الملف الشخصي ولا يجب أن يغير الخطة الغذائية الحالية.","set.edit.reason":"السبب","set.edit.double":"أؤكد، حدث DUBI","set.edit.cancel":"إلغاء","set.edit.success":"تم تحديث الملف والخطة.","set.edit.error":"تعذر حفظ التغيير. حاول لاحقا.","set.edit.selectField":"اختر حقلا للتعديل.","set.edit.profile":"الملف","set.edit.body":"الجسم والهدف","set.edit.training":"التدريب","set.edit.nutrition":"التغذية","set.edit.routine":"الروتين","set.field.name":"الاسم","set.field.age":"العمر","set.field.height":"الطول","set.field.weight":"الوزن الحالي","set.field.goal":"الهدف","set.field.targetWeight":"الوزن المستهدف","set.field.targetBf":"نسبة الدهون المستهدفة","set.field.workoutDays":"أيام التدريب","set.field.workoutDuration":"مدة التدريب","set.field.workoutIntensity":"الشدة","set.field.diet":"النظام الغذائي","set.field.allergies":"الحساسيات/عدم التحمل","set.field.sport":"الرياضة","set.field.trainingTime":"وقت التدريب","set.field.breakfastPref":"الإفطار","set.field.wearable":"الجهاز","set.reason.energy":"يؤثر على الطاقة والماكروز والحصص.","set.reason.foods":"يؤثر على المكونات والحساسيات والبدائل الآمنة.","set.reason.training":"يؤثر على توقيت الكربوهيدرات ووجبات التدريب والتعافي.","set.reason.routine":"يؤثر على أوقات وتوزيع الوجبات.","set.reason.profile":"يحدث بيانات الملف دون إعادة إنشاء التغذية.","set.quick.goal":"الهدف","set.quick.diet":"النظام","set.quick.training":"التدريب","set.quick.allergies":"الحساسيات","set.logout":"تسجيل الخروج","set.logout.q":"هل تريد تسجيل الخروج؟","set.logout.cancel":"إلغاء"
   },
   zh: {
-    "set.hero.kicker":"个人资料中心","set.hero.sub":"管理驱动 DUBI 计划、餐食和调整的数据。","set.edit.title":"智能编辑","set.edit.sub":"只修改你需要的内容。如果会影响营养，DUBI 会在更新计划前解释原因。","set.edit.open":"选择要修改的内容","set.edit.active":"资料编辑器","set.edit.close":"关闭","set.edit.pick":"你想更新什么？","set.edit.value":"新值","set.edit.save":"保存修改","set.edit.saving":"保存中...","set.edit.confirm":"确认更新","set.edit.confirmDiet":"此修改可能改变热量、宏量、食材或餐食分配。","set.edit.confirmNoDiet":"此修改会更新资料，但不应改变当前营养计划。","set.edit.reason":"原因","set.edit.double":"确认，更新 DUBI","set.edit.cancel":"取消","set.edit.success":"资料已更新，DUBI 已重新调整计划。","set.edit.error":"无法保存修改，请稍后重试。","set.edit.selectField":"请选择要修改的字段。","set.edit.profile":"资料","set.edit.body":"身体与目标","set.edit.training":"训练","set.edit.nutrition":"营养","set.edit.routine":"作息","set.field.name":"姓名","set.field.age":"年龄","set.field.height":"身高","set.field.weight":"当前体重","set.field.goal":"目标","set.field.targetWeight":"目标体重","set.field.targetBf":"目标体脂","set.field.workoutDays":"训练天数","set.field.workoutDuration":"训练时长","set.field.workoutIntensity":"强度","set.field.diet":"饮食偏好","set.field.allergies":"过敏/不耐受","set.field.sport":"运动","set.field.trainingTime":"训练时间","set.field.breakfastPref":"早餐","set.field.dayStart":"一天开始","set.field.dayEnd":"一天结束","set.field.wearable":"Wearable","set.reason.energy":"影响能量需求、宏量和份量。","set.reason.foods":"影响食材选择、过敏原和安全替代。","set.reason.training":"影响碳水时间、训练前后餐和恢复。","set.reason.routine":"影响餐食时间和分配。","set.reason.profile":"更新资料，不重新生成营养。","set.quick.goal":"目标","set.quick.diet":"饮食","set.quick.training":"训练","set.quick.allergies":"过敏","set.logout":"退出登录","set.logout.q":"确定要退出登录吗？","set.logout.cancel":"取消"
+    "set.hero.kicker":"个人资料中心","set.hero.sub":"管理驱动 DUBI 计划、餐食和调整的数据。","set.edit.title":"智能编辑","set.edit.sub":"只修改你需要的内容。如果会影响营养，DUBI 会在更新计划前解释原因。","set.edit.open":"选择要修改的内容","set.edit.active":"资料编辑器","set.edit.close":"关闭","set.edit.pick":"你想更新什么？","set.edit.value":"新值","set.edit.save":"保存修改","set.edit.saving":"保存中...","set.edit.confirm":"确认更新","set.edit.confirmDiet":"此修改可能改变热量、宏量、食材或餐食分配。","set.edit.confirmNoDiet":"此修改会更新资料，但不应改变当前营养计划。","set.edit.reason":"原因","set.edit.double":"确认，更新 DUBI","set.edit.cancel":"取消","set.edit.success":"资料已更新，DUBI 已重新调整计划。","set.edit.error":"无法保存修改，请稍后重试。","set.edit.selectField":"请选择要修改的字段。","set.edit.profile":"资料","set.edit.body":"身体与目标","set.edit.training":"训练","set.edit.nutrition":"营养","set.edit.routine":"作息","set.field.name":"姓名","set.field.age":"年龄","set.field.height":"身高","set.field.weight":"当前体重","set.field.goal":"目标","set.field.targetWeight":"目标体重","set.field.targetBf":"目标体脂","set.field.workoutDays":"训练天数","set.field.workoutDuration":"训练时长","set.field.workoutIntensity":"强度","set.field.diet":"饮食偏好","set.field.allergies":"过敏/不耐受","set.field.sport":"运动","set.field.trainingTime":"训练时间","set.field.breakfastPref":"早餐","set.field.wearable":"Wearable","set.reason.energy":"影响能量需求、宏量和份量。","set.reason.foods":"影响食材选择、过敏原和安全替代。","set.reason.training":"影响碳水时间、训练前后餐和恢复。","set.reason.routine":"影响餐食时间和分配。","set.reason.profile":"更新资料，不重新生成营养。","set.quick.goal":"目标","set.quick.diet":"饮食","set.quick.training":"训练","set.quick.allergies":"过敏","set.logout":"退出登录","set.logout.q":"确定要退出登录吗？","set.logout.cancel":"取消"
   },
   ja: {
-    "set.hero.kicker":"プロフィールセンター","set.hero.sub":"DUBI のプラン、食事、調整を動かすデータを管理します。","set.edit.title":"スマート編集","set.edit.sub":"必要な項目だけ変更します。栄養に影響する場合、DUBI は更新前に理由を説明します。","set.edit.open":"変更する項目を選択","set.edit.active":"プロフィール編集","set.edit.close":"閉じる","set.edit.pick":"何を更新しますか？","set.edit.value":"新しい値","set.edit.save":"変更を保存","set.edit.saving":"保存中...","set.edit.confirm":"更新を確認","set.edit.confirmDiet":"この変更はカロリー、マクロ、食材、食事配分を変える可能性があります。","set.edit.confirmNoDiet":"プロフィールを更新しますが、現在の栄養プランは変わらない想定です。","set.edit.reason":"理由","set.edit.double":"確認して DUBI を更新","set.edit.cancel":"キャンセル","set.edit.success":"プロフィールを更新し、プランを調整しました。","set.edit.error":"保存できませんでした。後でもう一度お試しください。","set.edit.selectField":"編集する項目を選択してください。","set.edit.profile":"プロフィール","set.edit.body":"身体と目標","set.edit.training":"トレーニング","set.edit.nutrition":"栄養","set.edit.routine":"ルーティン","set.field.name":"名前","set.field.age":"年齢","set.field.height":"身長","set.field.weight":"現在の体重","set.field.goal":"目標","set.field.targetWeight":"目標体重","set.field.targetBf":"目標体脂肪","set.field.workoutDays":"トレーニング日数","set.field.workoutDuration":"トレーニング時間","set.field.workoutIntensity":"強度","set.field.diet":"食事の好み","set.field.allergies":"アレルギー/不耐性","set.field.sport":"スポーツ","set.field.trainingTime":"トレーニング時間帯","set.field.breakfastPref":"朝食","set.field.dayStart":"一日の開始","set.field.dayEnd":"一日の終了","set.field.wearable":"Wearable","set.reason.energy":"エネルギー必要量、マクロ、分量に影響します。","set.reason.foods":"食材、アレルゲン、安全な代替に影響します。","set.reason.training":"炭水化物タイミング、トレ前後食、回復に影響します。","set.reason.routine":"食事時間と配分に影響します。","set.reason.profile":"栄養を再生成せずプロフィールを更新します。","set.quick.goal":"目標","set.quick.diet":"食事","set.quick.training":"トレーニング","set.quick.allergies":"アレルギー","set.logout":"ログアウト","set.logout.q":"ログアウトしますか？","set.logout.cancel":"キャンセル"
+    "set.hero.kicker":"プロフィールセンター","set.hero.sub":"DUBI のプラン、食事、調整を動かすデータを管理します。","set.edit.title":"スマート編集","set.edit.sub":"必要な項目だけ変更します。栄養に影響する場合、DUBI は更新前に理由を説明します。","set.edit.open":"変更する項目を選択","set.edit.active":"プロフィール編集","set.edit.close":"閉じる","set.edit.pick":"何を更新しますか？","set.edit.value":"新しい値","set.edit.save":"変更を保存","set.edit.saving":"保存中...","set.edit.confirm":"更新を確認","set.edit.confirmDiet":"この変更はカロリー、マクロ、食材、食事配分を変える可能性があります。","set.edit.confirmNoDiet":"プロフィールを更新しますが、現在の栄養プランは変わらない想定です。","set.edit.reason":"理由","set.edit.double":"確認して DUBI を更新","set.edit.cancel":"キャンセル","set.edit.success":"プロフィールを更新し、プランを調整しました。","set.edit.error":"保存できませんでした。後でもう一度お試しください。","set.edit.selectField":"編集する項目を選択してください。","set.edit.profile":"プロフィール","set.edit.body":"身体と目標","set.edit.training":"トレーニング","set.edit.nutrition":"栄養","set.edit.routine":"ルーティン","set.field.name":"名前","set.field.age":"年齢","set.field.height":"身長","set.field.weight":"現在の体重","set.field.goal":"目標","set.field.targetWeight":"目標体重","set.field.targetBf":"目標体脂肪","set.field.workoutDays":"トレーニング日数","set.field.workoutDuration":"トレーニング時間","set.field.workoutIntensity":"強度","set.field.diet":"食事の好み","set.field.allergies":"アレルギー/不耐性","set.field.sport":"スポーツ","set.field.trainingTime":"トレーニング時間帯","set.field.breakfastPref":"朝食","set.field.wearable":"Wearable","set.reason.energy":"エネルギー必要量、マクロ、分量に影響します。","set.reason.foods":"食材、アレルゲン、安全な代替に影響します。","set.reason.training":"炭水化物タイミング、トレ前後食、回復に影響します。","set.reason.routine":"食事時間と配分に影響します。","set.reason.profile":"栄養を再生成せずプロフィールを更新します。","set.quick.goal":"目標","set.quick.diet":"食事","set.quick.training":"トレーニング","set.quick.allergies":"アレルギー","set.logout":"ログアウト","set.logout.q":"ログアウトしますか？","set.logout.cancel":"キャンセル"
   },
   ru: {
-    "set.hero.kicker":"ЦЕНТР ПРОФИЛЯ","set.hero.sub":"Управляйте данными, которые направляют планы, приемы пищи и адаптации DUBI.","set.edit.title":"Умное редактирование","set.edit.sub":"Меняйте только нужные данные. Если это влияет на питание, DUBI объяснит почему перед обновлением плана.","set.edit.open":"Выбрать, что изменить","set.edit.active":"Редактор профиля","set.edit.close":"Закрыть","set.edit.pick":"Что обновить?","set.edit.value":"Новое значение","set.edit.save":"Сохранить изменение","set.edit.saving":"Сохранение...","set.edit.confirm":"Подтвердить обновление","set.edit.confirmDiet":"Это изменение может поменять калории, макро, ингредиенты или распределение приемов пищи.","set.edit.confirmNoDiet":"Это обновляет профиль и не должно менять текущий план питания.","set.edit.reason":"Причина","set.edit.double":"Подтверждаю, обновить DUBI","set.edit.cancel":"Отмена","set.edit.success":"Профиль обновлен. DUBI выровнял план.","set.edit.error":"Не удалось сохранить изменение. Попробуйте позже.","set.edit.selectField":"Выберите поле для изменения.","set.edit.profile":"Профиль","set.edit.body":"Тело и цель","set.edit.training":"Тренировки","set.edit.nutrition":"Питание","set.edit.routine":"Рутина","set.field.name":"Имя","set.field.age":"Возраст","set.field.height":"Рост","set.field.weight":"Текущий вес","set.field.goal":"Цель","set.field.targetWeight":"Целевой вес","set.field.targetBf":"Целевой процент жира","set.field.workoutDays":"Дни тренировок","set.field.workoutDuration":"Длительность тренировки","set.field.workoutIntensity":"Интенсивность","set.field.diet":"Пищевые предпочтения","set.field.allergies":"Аллергии/непереносимости","set.field.sport":"Спорт","set.field.trainingTime":"Время тренировки","set.field.breakfastPref":"Завтрак","set.field.dayStart":"Начало дня","set.field.dayEnd":"Конец дня","set.field.wearable":"Wearable","set.reason.energy":"влияет на энергопотребность, макро и порции.","set.reason.foods":"влияет на ингредиенты, аллергены и безопасные замены.","set.reason.training":"влияет на тайминг углеводов, еду до/после тренировки и восстановление.","set.reason.routine":"влияет на время и распределение приемов пищи.","set.reason.profile":"обновляет профиль без пересоздания питания.","set.quick.goal":"Цель","set.quick.diet":"Диета","set.quick.training":"Тренировка","set.quick.allergies":"Аллергии","set.logout":"Выйти","set.logout.q":"Вы уверены, что хотите выйти?","set.logout.cancel":"Отмена"
+    "set.hero.kicker":"ЦЕНТР ПРОФИЛЯ","set.hero.sub":"Управляйте данными, которые направляют планы, приемы пищи и адаптации DUBI.","set.edit.title":"Умное редактирование","set.edit.sub":"Меняйте только нужные данные. Если это влияет на питание, DUBI объяснит почему перед обновлением плана.","set.edit.open":"Выбрать, что изменить","set.edit.active":"Редактор профиля","set.edit.close":"Закрыть","set.edit.pick":"Что обновить?","set.edit.value":"Новое значение","set.edit.save":"Сохранить изменение","set.edit.saving":"Сохранение...","set.edit.confirm":"Подтвердить обновление","set.edit.confirmDiet":"Это изменение может поменять калории, макро, ингредиенты или распределение приемов пищи.","set.edit.confirmNoDiet":"Это обновляет профиль и не должно менять текущий план питания.","set.edit.reason":"Причина","set.edit.double":"Подтверждаю, обновить DUBI","set.edit.cancel":"Отмена","set.edit.success":"Профиль обновлен. DUBI выровнял план.","set.edit.error":"Не удалось сохранить изменение. Попробуйте позже.","set.edit.selectField":"Выберите поле для изменения.","set.edit.profile":"Профиль","set.edit.body":"Тело и цель","set.edit.training":"Тренировки","set.edit.nutrition":"Питание","set.edit.routine":"Рутина","set.field.name":"Имя","set.field.age":"Возраст","set.field.height":"Рост","set.field.weight":"Текущий вес","set.field.goal":"Цель","set.field.targetWeight":"Целевой вес","set.field.targetBf":"Целевой процент жира","set.field.workoutDays":"Дни тренировок","set.field.workoutDuration":"Длительность тренировки","set.field.workoutIntensity":"Интенсивность","set.field.diet":"Пищевые предпочтения","set.field.allergies":"Аллергии/непереносимости","set.field.sport":"Спорт","set.field.trainingTime":"Время тренировки","set.field.breakfastPref":"Завтрак","set.field.wearable":"Wearable","set.reason.energy":"влияет на энергопотребность, макро и порции.","set.reason.foods":"влияет на ингредиенты, аллергены и безопасные замены.","set.reason.training":"влияет на тайминг углеводов, еду до/после тренировки и восстановление.","set.reason.routine":"влияет на время и распределение приемов пищи.","set.reason.profile":"обновляет профиль без пересоздания питания.","set.quick.goal":"Цель","set.quick.diet":"Диета","set.quick.training":"Тренировка","set.quick.allergies":"Аллергии","set.logout":"Выйти","set.logout.q":"Вы уверены, что хотите выйти?","set.logout.cancel":"Отмена"
   }
 };
 Object.keys(SETTINGS_PROFILE_PATCH_TRANSLATIONS).forEach(code => {
@@ -10660,83 +10674,21 @@ function calcTDEE({ gender, age, height, weight, workoutDays, workoutIntensity }
   return fallbackTdee({ gender, age, height, weight, workoutDays, workoutIntensity });
 }
 
-function calcMealCount({ goal, workoutIntensity, workoutDays, dayStart = "07:00", dayEnd = "22:00" }) {
-  const toHour = (value, fallback) => {
-    if (!value) return fallback;
-    if (typeof value === "string" && value.includes(":")) {
-      const hour = parseInt(value.split(":")[0], 10);
-      return Number.isNaN(hour) ? fallback : hour;
-    }
-    const hour = parseInt(value, 10);
-    return Number.isNaN(hour) ? fallback : hour;
-  };
-
-  const start = toHour(dayStart, 7);
-  const end = toHour(dayEnd, 22);
-
+function calcMealCount({ goal, workoutIntensity, workoutDays, dailyMealSchedule = null }) {
+  if (Array.isArray(dailyMealSchedule?.meal_types)) return dailyMealSchedule.meal_types.length;
   let base = { gain: 5, definition: 5, fatLoss: 4, maintain: 4 }[goal] || 4;
 
   if (workoutIntensity === "alta" && workoutDays !== "0") base = Math.min(base + 1, 6);
-  if ((end - start) < 13) base = Math.min(base, 4);
 
   return base;
 }
 
-const calcMealTimes = ({ dayStart, dayEnd, meals }) => {
-  const normalizeTime = (value, fallback) => {
-    if (value === null || value === undefined || value === "") return fallback;
-
-    if (typeof value === "string") {
-      if (value.includes(":")) {
-        const hour = parseInt(value.split(":")[0], 10);
-        if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
-          return `${String(hour).padStart(2, "0")}:00`;
-        }
-        return fallback;
-      }
-
-      const hour = parseInt(value, 10);
-      if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
-        return `${String(hour).padStart(2, "0")}:00`;
-      }
-
-      return fallback;
-    }
-
-    if (typeof value === "number" && !Number.isNaN(value)) {
-      const hour = Math.floor(value);
-      if (hour >= 0 && hour <= 23) {
-        return `${String(hour).padStart(2, "0")}:00`;
-      }
-    }
-
-    return fallback;
-  };
-
-  const toHour = (value, fallback) => {
-    const safe = normalizeTime(value, fallback);
-    const hour = parseInt(String(safe).split(":")[0], 10);
-    return Number.isNaN(hour) ? parseInt(fallback.split(":")[0], 10) : hour;
-  };
-
-  const start = toHour(dayStart, "07:00");
-  const end = toHour(dayEnd, "22:00");
+const calcMealTimes = ({ dailyMealSchedule = null, meals }) => {
+  if (dailyMealSchedule?.meal_schedule && Array.isArray(dailyMealSchedule.meal_types)) {
+    return dailyMealSchedule.meal_types.map((type) => dailyMealSchedule.meal_schedule[type]).filter(Boolean);
+  }
   const mealCount = Math.max(1, Number(meals) || 5);
-
-  if (end <= start) {
-   return ["07:00", "10:00", "13:00", "17:00", "20:00"].slice(0, mealCount);
-  }
-
-  if (mealCount === 1) {
-    return [`${String(start).padStart(2, "0")}:00`];
-  }
-
-  const gap = (end - start) / (mealCount - 1);
-
-  return Array.from({ length: mealCount }, (_, index) => {
-  const hour = Math.round(start + gap * index);
-  return `${String(hour).padStart(2, "0")}:00`;
-});
+  return ["08:00", "11:30", "15:00", "18:30", "22:00", "01:30"].slice(0, mealCount);
 };
 
 function getMealSlots(mealCount) {
@@ -11214,8 +11166,8 @@ function calcPlan(data) {
     carbs = Math.max(0, Math.round((kcal - protein*4 - fat*9) / 4));
   }
 
-  const mealCount = calcMealCount({...data, goal, dayStart:data.dayStart||7, dayEnd:data.dayEnd||22});
-  const mealTimes = calcMealTimes({dayStart:data.dayStart||7, dayEnd:data.dayEnd||22, mealCount});
+  const mealCount = calcMealCount({...data, goal, dailyMealSchedule:data.dailyMealSchedule || null});
+  const mealTimes = calcMealTimes({dailyMealSchedule:data.dailyMealSchedule || null, meals:mealCount});
 
   const bmi = calcBMI(data);
   const bf  = calcBF(data);
@@ -15736,48 +15688,6 @@ const PreferencesStep = ({d, u, page}) => {
         </p>
       )}
 
-      {/* Orario inizio giornata */}
-      <div style={{display:"flex",alignItems:"center",gap:6,margin:"0 0 8px"}}>
-        <Ico n="sunrise" size={13} c={T.muted}/>
-        <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:0}}>{t("pref.dayStart.plain")}</p>
-      </div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
-        {[5,6,7,8,9,10].map(h=>(
-          <button key={h} onClick={()=>u("dayStart",h)}
-            style={{padding:"10px 14px",borderRadius:12,border:`1.5px solid ${d.dayStart===h?T.accent:T.border}`,background:d.dayStart===h?T.sel:T.card,fontSize:14,fontWeight:d.dayStart===h?600:400,color:T.text,cursor:"pointer"}}>
-            {String(h).padStart(2,"0")}:00
-          </button>
-        ))}
-      </div>
-
-      {/* Orario fine giornata */}
-      <div style={{display:"flex",alignItems:"center",gap:6,margin:"0 0 8px"}}>
-        <Ico n="moon" size={13} c={T.muted}/>
-        <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:0}}>{t("pref.dayEnd.plain")}</p>
-      </div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {[19,20,21,22,23].map(h=>(
-          <button key={h} onClick={()=>u("dayEnd",h)}
-            style={{padding:"10px 14px",borderRadius:12,border:`1.5px solid ${d.dayEnd===h?T.accent:T.border}`,background:d.dayEnd===h?T.sel:T.card,fontSize:14,fontWeight:d.dayEnd===h?600:400,color:T.text,cursor:"pointer"}}>
-            {String(h).padStart(2,"0")}:00
-          </button>
-        ))}
-      </div>
-
-      {/* Preview pasti */}
-      {d.dayStart && d.dayEnd && (
-        <div style={{marginTop:16,padding:14,background:T.sel,borderRadius:14,border:`1px solid ${T.border}`}}>
-          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-            <Ico n="fork" size={13} c={T.accentD}/>
-            <p style={{fontSize:12,fontWeight:600,color:T.accentD,margin:0}}>
-              {t("pref.preview.plain",{n:calcMealCount({goal:d.goal||"fatLoss",workoutIntensity:d.workoutIntensity||"moderata",workoutDays:d.workoutDays||"3-4",dayStart:d.dayStart,dayEnd:d.dayEnd})})}
-            </p>
-          </div>
-          <p style={{fontSize:12,color:T.muted,lineHeight:1.5}}>
-            {t("pref.preview.times",{times:calcMealTimes({dayStart:d.dayStart,dayEnd:d.dayEnd,mealCount:calcMealCount({goal:d.goal||"fatLoss",workoutIntensity:d.workoutIntensity||"moderata",workoutDays:d.workoutDays||"3-4",dayStart:d.dayStart,dayEnd:d.dayEnd})}).join(" · ")})}
-          </p>
-        </div>
-      )}
       </>)}
     </div>
   );
@@ -16997,7 +16907,7 @@ const ResearchInviteCard = ({userData, setUserData}) => {
   );
 };
 
-const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,planningDay,onOpenSettings}) => {
+const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,planningDay,onOpenSettings,onEditDailySchedule}) => {
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
   const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
@@ -17543,25 +17453,16 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
 
       <TodayWorkoutCard userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan}/>
       <LegacyMartialArtsPrompt userData={userData} setUserData={setUserData}/>
+      {plan?.dailyMealSchedule && onEditDailySchedule && <button type="button" onClick={onEditDailySchedule} style={{margin:'10px 20px 0',padding:'8px 0',border:0,background:'transparent',color:'#315d4b',fontSize:13,fontWeight:700,cursor:'pointer'}}>{lang === 'it' ? 'Modifica gli orari dei pasti di oggi' : 'Edit today’s meal times'}</button>}
 
-      {/* ── Card mattutine con filtro temporale ──
-          Allenamento: solo fino alle 21:30 | Colazione: solo fino a dayStart+3.5h ── */}
-      {(()=>{
-        const nowH = new Date().getHours() + new Date().getMinutes()/60;
-        const dayStart = Number(userData?.dayStart ?? userData?.day_start ?? 7);
-        const todayKey = new Date().toISOString().slice(0,10);
-        const breakfastAnswered = Boolean(localStorage.getItem("dubi_bf_choice_"       + todayKey));
-        const hasBreakfastPref  = ["variabile","entrambi"].includes(userData?.breakfastPref);
-        const breakfastPending  = hasBreakfastPref && !breakfastAnswered && nowH < (dayStart + 3.5);
-        return (
-          <>
-            {breakfastPending && <MorningBreakfastCard userData={userData} setPlan={setPlan}/>}
-            {!breakfastPending && !(activeNotif && !notifDismissed) && (
-              <ResearchInviteCard userData={userData} setUserData={setUserData}/>
-            )}
-          </>
-        );
-      })()}
+      {(plan?.dailyPlanNotice || plan?.dailyMealSchedule?.notice || plan?.ingredientPlan?.daily_meal_schedule?.notice || plan?.remainingDayPlan) && (
+        <div role="status" style={{margin:'14px 20px 0',padding:'12px 14px',borderRadius:8,background:'#edf4ef',color:'#284b3c',fontSize:13,lineHeight:1.45}}>
+          {plan?.dailyPlanNotice || plan?.dailyMealSchedule?.notice || plan?.ingredientPlan?.daily_meal_schedule?.notice || (lang === 'it' ? 'Piano per il resto della giornata' : 'Plan for the rest of today')}
+        </div>
+      )}
+
+      {/* ── Daily research invitation ── */}
+      {!(activeNotif && !notifDismissed) && <ResearchInviteCard userData={userData} setUserData={setUserData}/>}
 
       {/* ── Notifica giornaliera DUBI (2x al giorno) ── */}
       {activeNotif && !notifDismissed && (
@@ -20991,8 +20892,6 @@ const PROFILE_FIELDS = [
   {key:"sports", label:t("set.field.sport"), section:t("set.edit.training"), type:"sport_chips", impactsDiet:true, reason:t("set.reason.training")},
   {key:"training_time", label:t("set.field.trainingTime"), section:t("set.edit.routine"), type:"select", impactsDiet:true, reason:t("set.reason.training"), options:[["morning",t("training.timing.morning")],["lunch",t("training.timing.lunch")],["afternoon",t("training.timing.afternoon")],["evening",t("training.timing.evening")],["varies",t("training.timing.varies")]]},
   {key:"breakfast_pref", label:t("set.field.breakfastPref"), section:t("set.edit.nutrition"), type:"select", impactsDiet:true, reason:t("set.reason.foods"), options:[["dolce",t("breakfast.sweet")],["salata",t("breakfast.savory")],["entrambi",t("breakfast.both")],["none",t("breakfast.none")]]},
-  {key:"day_start", label:t("set.field.dayStart"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
-  {key:"day_end", label:t("set.field.dayEnd"), section:t("set.edit.routine"), type:"number", unit:":00", impactsDiet:true, reason:t("set.reason.routine")},
   {key:"wearable_provider", label:t("set.field.wearable"), section:t("set.edit.profile"), type:"select", impactsDiet:false, reason:t("set.reason.profile"), options:[["none",t("wear.none")],["apple",t("wear.apple")],["whoop",t("wear.whoop")],["garmin","Garmin"],["oura","Oura"],["polar","Polar"]]},
 ];
 const selectedProfileDef = PROFILE_FIELDS.find(f => f.key === selectedProfileField) || PROFILE_FIELDS[0];
@@ -21080,8 +20979,6 @@ const handleSaveProfile = async () => {
     sport: selectedSports[0] || "",
     trainingTime: normalizeTrainingTime(pick("training_time", userData?.trainingTime || "varies")),
     breakfastPref: toAppBreakfast(pick("breakfast_pref", userData?.breakfastPref || "entrambi")),
-    dayStart: parseProfileHour(pick("day_start", userData?.dayStart || userData?.day_start || 7), 7),
-    dayEnd: parseProfileHour(pick("day_end", userData?.dayEnd || userData?.day_end || 22), 22),
     wearable: pick("wearable_provider", userData?.wearable || "none")
   };
 
@@ -22697,6 +22594,64 @@ const ResetPasswordScreen = ({ token, onComplete }) => {
   );
 };
 
+const DailyMealScheduleScreen = ({ question, onSubmit }) => {
+  const [firstType, setFirstType] = useState(question.existing?.first_meal_type || (question.prompt_kind === 'breakfast' ? 'breakfast' : 'snack'));
+  const [skipBreakfast, setSkipBreakfast] = useState(Boolean(question.existing?.breakfast_skipped));
+  const [edited, setEdited] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const roundForward = (hhmm) => {
+    const [h, m] = String(hhmm || '08:00').split(':').map(Number);
+    const total = Math.min(23 * 60 + 59, Math.ceil((h * 60 + m) / 15) * 15);
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
+  const suggestionUsable = Boolean(question.suggestion?.time && question.suggestion.time >= question.local_time);
+  const [time, setTime] = useState(() => question.existing?.first_meal_time?.slice(0, 5) || (suggestionUsable ? question.suggestion.time : roundForward(question.local_time)));
+  const { lang } = useT();
+  const it = lang !== 'en';
+  const late = question.prompt_kind === 'next_meal';
+  const effectiveType = skipBreakfast && !late ? 'lunch' : firstType;
+  const effectiveTime = time;
+  const submit = async (source = 'user_confirmed') => {
+    setBusy(true); setError('');
+    try {
+      await onSubmit({
+        first_meal_type: effectiveType,
+        first_meal_time: effectiveTime,
+        breakfast_skipped: skipBreakfast,
+        source,
+        replace_existing: Boolean(question.existing),
+      });
+    } catch (err) {
+      setError(err?.message || (it ? 'Non siamo riusciti a salvare la risposta.' : 'We could not save your answer.'));
+      setBusy(false);
+    }
+  };
+  return (
+    <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:22,background:'#E8E4DF'}}>
+      <section style={{width:'100%',maxWidth:390,background:'#fff',padding:24,borderRadius:16,boxShadow:'0 12px 36px rgba(0,0,0,.12)'}}>
+        <div style={{fontSize:12,fontWeight:700,color:'#53685e',marginBottom:10}}>DUBI · {question.day}</div>
+        <h1 style={{fontSize:24,lineHeight:1.2,margin:'0 0 8px',color:'#1f2925'}}>{question.existing ? (it ? 'Modifica gli orari di oggi' : 'Edit today’s meal times') : late ? (it ? 'Qual è il tuo prossimo pasto?' : 'What is your next meal?') : (it ? 'A che ora fai colazione?' : 'What time will you have breakfast?')}</h1>
+        <p style={{fontSize:14,lineHeight:1.5,color:'#626a66',margin:'0 0 20px'}}>{it ? 'La tua risposta serve a costruire il piano per il resto della giornata.' : 'Your answer helps build today’s remaining meal plan.'}</p>
+        {late || skipBreakfast ? (
+          <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600,marginBottom:14}}>{it?'Prossimo pasto':'Next meal'}
+            <select value={late ? firstType : (firstType === 'breakfast' ? 'lunch' : firstType)} onChange={(event)=>{setFirstType(event.target.value);setEdited(true);}} style={{height:44,border:'1px solid #cdd4d0',borderRadius:8,padding:'0 10px',fontSize:15}}>
+              {(question.existing ? ['breakfast','lunch','snack','dinner'] : ['lunch','snack','dinner']).map((type)=><option key={type} value={type}>{({breakfast:it?'Colazione':'Breakfast',lunch:it?'Pranzo':'Lunch',snack:it?'Spuntino':'Snack',dinner:it?'Cena':'Dinner'})[type]}</option>)}
+            </select>
+          </label>
+        ) : null}
+        {!late && <button type="button" onClick={()=>{setSkipBreakfast(value=>!value);setEdited(true);if(!skipBreakfast){setFirstType('lunch');setTime(roundForward(question.local_time) < '12:00' ? '12:00' : roundForward(question.local_time));}else{setFirstType('breakfast');}}} style={{width:'100%',height:42,marginBottom:14,border:'1px solid #ccd3cf',borderRadius:8,background:skipBreakfast?'#edf4ef':'#fff',fontWeight:600,color:'#26352e'}}>{skipBreakfast ? (it?'Colazione prevista':'Breakfast planned') : (it?'Oggi niente colazione':'No breakfast today')}</button>}
+        <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600,marginBottom:18}}>{it?'Orario':'Time'}
+          <input type="time" value={effectiveTime} onChange={(event)=>{setTime(event.target.value);setEdited(true);}} required style={{height:44,border:'1px solid #cdd4d0',borderRadius:8,padding:'0 10px',fontSize:16}} />
+        </label>
+        {suggestionUsable && !edited && !skipBreakfast && <button type="button" disabled={busy} onClick={()=>submit('prefilled_confirmed')} style={{width:'100%',height:46,border:0,borderRadius:8,background:'#275b48',color:'#fff',fontWeight:700,marginBottom:9}}>{it?`Conferma orario abituale · ${question.suggestion.time}`:`Confirm usual time · ${question.suggestion.time}`}</button>}
+        <button type="button" disabled={busy} onClick={()=>submit('user_confirmed')} style={{width:'100%',height:46,border:'1px solid #275b48',borderRadius:8,background:suggestionUsable&&!edited?'#fff':'#275b48',color:suggestionUsable&&!edited?'#275b48':'#fff',fontWeight:700}}>{busy?(it?'Preparazione del piano…':'Preparing your plan…'):(it?'Continua':'Continue')}</button>
+        {error && <p role="alert" style={{fontSize:13,color:'#a5342b',marginTop:12}}>{error}</p>}
+      </section>
+    </main>
+  );
+};
+
 function DUBIApp() {
   const { lang } = useT();
   const { refreshSnapshot, clearSnapshot } = useWearable();
@@ -22708,6 +22663,7 @@ function DUBIApp() {
   const [userData,setUserData] = useState(null);
   const [plan,setPlan] = useState(null);
   const [weeklyPlans,setWeeklyPlans] = useState([]);
+  const [dailyQuestion,setDailyQuestion] = useState(null);
   const [activeTab,setActiveTab] = useState("today");
   const [planningDay, setPlanningDay] = useState(() => {
     try { return parseInt(localStorage.getItem("dubi_planning_day") ?? "0", 10); } catch(e) { return 0; }
@@ -22804,13 +22760,13 @@ function DUBIApp() {
   }
 }, [phase]);
   useEffect(() => {
-    if (phase !== "app" || !userData || !healthDataConsentGranted) {
+    if (phase !== "app" || !userData || !healthDataConsentGranted || dailyQuestion?.before_daily_start) {
       setWeeklyPlans([]);
       return undefined;
     }
 
     let cancelled = false;
-    fetchWeeklyIngredientPlansFromBackend(userData)
+    fetchWeeklyIngredientPlansFromBackend(userData, dailyQuestion?.day || getTodayIsoDate())
       .then(plans => {
         if (!cancelled && Array.isArray(plans) && plans.some(Boolean)) setWeeklyPlans(plans);
       })
@@ -22830,6 +22786,8 @@ function DUBIApp() {
     userData?.workoutDays,
     userData?.trainingTime,
     workoutScheduleSignature(getTrainingSessionsFromData(userData || {}))
+    ,dailyQuestion?.day,
+    dailyQuestion?.before_daily_start
   ]);
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -22875,15 +22833,8 @@ function DUBIApp() {
   const normalizedOnboarding = normalizeOnboarding(data.onboarding);
 
   setUserData(normalizedOnboarding);
-
   await refreshSnapshot({ forceSync: true });
-  const currentAiPlan = await fetchCurrentAiPlanFromBackend(normalizedOnboarding);
-  const sessionPlan = currentAiPlan || (await generateAiPlanFromBackend(normalizedOnboarding)).plan || calcPlan(normalizedOnboarding);
-  setPlan(sessionPlan);
-  setSwaps(await fetchIngredientSwapsFromBackend());
-
-  setActiveTab("today");
-  setPhase("app");
+  await openAppWithDailySchedule(normalizedOnboarding);
   return;
 }
       }
@@ -22926,6 +22877,66 @@ const handleDeleteAccount = async (otp) => {
   const [partnerProfile,setPartnerProfile] = useState(null);
   const [consentData, setConsentData] = useState(null);
   const [pendingPlanData, setPendingPlanData] = useState(null);
+
+  const openAppWithDailySchedule = async (profile) => {
+    setUserData(profile);
+    if (!Boolean(profile?.health_data_consent ?? profile?.healthDataConsent)) {
+      setPlan(null);
+      setActiveTab('today');
+      setPhase('app');
+      return;
+    }
+    try {
+      const question = await fetchDailyMealScheduleQuestion();
+      if (question.should_ask) {
+        setDailyQuestion(question);
+        setPhase('daily-meal-question');
+        return;
+      }
+      setDailyQuestion(question);
+      const rawPlan = await fetchIngredientPlanForDate(question.day, {
+        generateIfMissing: !question.before_daily_start,
+        reason: 'daily_schedule_resume',
+      });
+      setPlan(rawPlan ? mapIngredientPlanToFrontend(rawPlan, { ...profile, dailyMealSchedule: rawPlan.daily_meal_schedule || null }) : null);
+      setSwaps(await fetchIngredientSwapsFromBackend());
+      setActiveTab('today');
+      setPhase('app');
+    } catch (error) {
+      console.error('Daily meal schedule bootstrap failed:', error);
+      setDailyQuestion({ error: error?.message || 'daily_meal_schedule_unavailable' });
+      setPhase('daily-meal-question');
+    }
+  };
+
+  const handleDailyScheduleSubmit = async (answer) => {
+    const result = await saveDailyMealScheduleAnswer(answer);
+    const schedule = result.daily_meal_schedule;
+    const nextUserData = { ...userData, dailyMealSchedule: schedule };
+    const nextPlan = mapIngredientPlanToFrontend(result.plan, nextUserData);
+    migrateTodayStatus(plan, nextPlan, nextUserData);
+    setUserData(nextUserData);
+    setPlan(nextPlan);
+    setDailyQuestion(null);
+    setWeeklyPlans([]);
+    setActiveTab('today');
+    setPhase('app');
+  };
+
+  const handleEditDailySchedule = async () => {
+    if (!window.confirm(lang === 'it'
+      ? 'Aggiornare gli orari di oggi e rigenerare solo il piano di oggi? I pasti già registrati saranno mantenuti.'
+      : 'Update today’s meal times and regenerate only today’s plan? Logged meals will be preserved.')) return;
+    try {
+      const question = await fetchDailyMealScheduleQuestion();
+      if (!question.existing) return;
+      setDailyQuestion(question);
+      setPhase('daily-meal-question');
+    } catch (error) {
+      setDailyQuestion({ error: error?.message || 'daily_meal_schedule_unavailable' });
+      setPhase('daily-meal-question');
+    }
+  };
 
   useEffect(() => {
     if (phase !== "app") return undefined;
@@ -23011,21 +23022,13 @@ const handleDeleteAccount = async (otp) => {
     saveDubiProfile(data);
     setUserData(data);
 
-  const { plan: generatedPlan, savedByAi } = await generateAiPlanFromBackend(data, { force: true, reason: "onboarding_completed" });
-setPlan(generatedPlan);
-if (!savedByAi) await savePlanToBackend(generatedPlan, data);
-
 const isEditingOnboarding = localStorage.getItem("dubi_edit_onboarding") === "true";
 localStorage.removeItem("dubi_edit_onboarding");
-
 if (isEditingOnboarding) {
-  setActiveTab("today");
-  setPhase("app");
+  await openAppWithDailySchedule(data);
   return;
 }
-
-setActiveTab("today");
-setPhase("app");
+await openAppWithDailySchedule(data);
   };
 
   // Quando l'utente entra nell'app (tab today) la prima volta, disattiva isFirstAccess dopo qualche secondo
@@ -23062,18 +23065,18 @@ setPhase("app");
     </div>
   </div>
 )}
+        {phase==="daily-meal-question" && dailyQuestion && (
+          dailyQuestion.error
+            ? <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section><p role="alert">{dailyQuestion.error}</p><button onClick={()=>openAppWithDailySchedule(userData)} style={{marginTop:12,padding:'12px 18px'}}>Riprova</button></section></main>
+            : <DailyMealScheduleScreen question={dailyQuestion} onSubmit={handleDailyScheduleSubmit} />
+        )}
         {phase==="terms" && <WelcomeTermsScreen onAccept={() => setPhase("welcome")} />}
 {phase==="welcome" && <WelcomeScreen onStart={() => { setAuthStartMode(null); setPhase("auth"); }} />}
 {phase==="auth" && <AuthScreen onSuccess={async (existingOnboarding, authUser = null) => {
   if (existingOnboarding) {
    setUserData(existingOnboarding);
    await refreshSnapshot({ forceSync: true });
-   const currentAiPlan = await fetchCurrentAiPlanFromBackend(existingOnboarding);
-   const authPlan = currentAiPlan || (await generateAiPlanFromBackend(existingOnboarding)).plan || calcPlan(existingOnboarding);
-   setPlan(authPlan);
-   setSwaps(await fetchIngredientSwapsFromBackend());
-   setActiveTab("today");
-   setPhase("app");
+   await openAppWithDailySchedule(existingOnboarding);
 } else {
   if (authUser) setUserData(normalizeOnboarding(authUser));
   setActiveTab("today");
@@ -23187,7 +23190,7 @@ setPhase("app");
             <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
             <div className="dubi-screen-motion" style={{height:"var(--dubi-viewport-height, 100vh)",overflowY:"auto",position:"relative"}}>
               {activeTab==="today"    && (healthDataConsentGranted
-                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} />
+                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} swaps={swaps} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="weekly"   && (healthDataConsentGranted
                 ? <WeeklyScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} swaps={swaps} setSwaps={setSwaps} />
