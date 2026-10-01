@@ -1051,47 +1051,6 @@ const saveOnboardingToBackend = async (data) => {
     return { error: "network_error" };
   }
 };
-    const savePlanToBackend = async (plan, userData) => {
-  const token = getAuthToken();
-
-  if (!token || !plan) {
-    console.warn("No auth token or plan found. Plan not saved.");
-    return null;
-  }
-
-  const payload = {
-    calories: Number(plan.calories || plan.kcal || 0),
-    protein: Number(plan.protein || plan.proteins || 0),
-    carbs: Number(plan.carbs || 0),
-    fat: Number(plan.fat || plan.fats || 0),
-    meals_count: plan.meals ? plan.meals.length : Number(plan.mealCount || 0),
-    goal: userData?.goal || null,
-    plan_json: plan
-  };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/plans/save`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      console.error("Failed to save plan:", err);
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Plan save request failed:", error);
-    return null;
-  }
-};
-
 const mapAiPlanToFrontend = (aiPlan, userData) => {
   const ingredientPlan = normalizeIngredientPlanPayload(aiPlan);
   if (ingredientPlan?.meals) {
@@ -17210,13 +17169,12 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
         note: change.planNote,
       }));
       try {
-        const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(userData, {
+        const { plan: updatedPlan } = await generateAiPlanFromBackend(userData, {
           force: true,
           reason: "ask_dubi_regenerate_plan"
         });
         migrateTodayStatus(plan, updatedPlan, userData);
         setPlan?.(updatedPlan);
-        if (!savedByAi) await savePlanToBackend(updatedPlan, userData);
         setTrainingMessage(t("home.training.regenerated"));
       } catch (error) {
         console.error("Ask DUBI regeneration failed:", error);
@@ -17242,13 +17200,12 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,swaps,plan
       if (saved?.error) throw new Error(saved.error);
       setUserData?.(updatedData);
       saveDubiProfile(updatedData);
-      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+      const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
         force: true,
         reason: `home_training_time_${nextTrainingTime}`
       });
       migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan?.(updatedPlan);
-      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
       setTrainingMessage(t("home.training.updated"));
       dubiHaptic("success");
     } catch (error) {
@@ -21062,13 +21019,12 @@ const handleSaveProfile = async () => {
     setUserData(updatedData);
     saveDubiProfile(updatedData);
     if (selectedProfileImpactsDiet) {
-      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+      const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
         force: true,
         reason: `profile_update_${changed.map(f => f.key).join("_") || "settings"}`
       });
       migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan(updatedPlan);
-      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
     }
 
     setEditingProfile(false);
@@ -21123,7 +21079,7 @@ const handleSaveWorkoutSchedule = async () => {
     setUserData(updatedData);
     saveDubiProfile(updatedData);
     if (todayChanged) {
-      const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+      const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
         date: todayIso,
         force: true,
         reason: "workout_schedule_updated",
@@ -21131,7 +21087,6 @@ const handleSaveWorkoutSchedule = async () => {
       });
       migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan(updatedPlan);
-      if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
     }
     setScheduleMessage(lang === "it" ? "Allenamenti aggiornati." : "Workout schedule updated.");
   } catch (error) {
@@ -23032,12 +22987,11 @@ const handleDeleteAccount = async (otp) => {
     const saved = await saveOnboardingToBackend(updatedData);
     if (!saved || saved.error) return null;
 
-    const { plan: updatedPlan, savedByAi } = await generateAiPlanFromBackend(updatedData, {
+    const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
       force: true,
       reason: "manual_activity_checkin"
     });
     if (!updatedPlan) return null;
-    if (!savedByAi) await savePlanToBackend(updatedPlan, updatedData);
 
     setUserData(updatedData);
     setPlan(updatedPlan);
