@@ -13,6 +13,7 @@ import { confirmScheduledTraining as postScheduledTrainingConfirmation } from ".
 import { allPastMealsAnswered, confirmationFromSelection, trainingChangeMessage } from "./trainingChangeConfirmation.mjs";
 import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
+import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -3654,7 +3655,7 @@ const TRANSLATIONS = {
     "askdubi.offer.q":"Vuoi che aggiunga \"{item}\" al tuo piano di oggi?","askdubi.apply":"Sì, aggiorna il piano",
     "askdubi.adapt.label":"ADATTAMENTO PIANO","askdubi.updated":"Piano aggiornato ✓","askdubi.updated.sub":"Chiudi il pannello per vedere le modifiche.",
     "askdubi.input.ph":"Descrivi la tua situazione o fai una domanda…","askdubi.input.ph.followup":"Rispondi o fai un'altra domanda…","askdubi.send":"Invia",
-    "askdubi.sugg.1":"Mi sono svegliato tardi, salto la colazione","askdubi.sugg.2":"Non riesco a fare pranzo oggi",
+    "askdubi.sugg.1":"Posso cambiare la cena con un’altra ricetta?","askdubi.sugg.2":"Perché hai scelto questa ricetta?",
     "askdubi.sugg.3":"Posso cambiare questo pasto con un'altra ricetta completa?","askdubi.sugg.4":"Come gestisco la fame serale?",
     "askdubi.sugg.5":"Sono fuori casa a cena stasera","askdubi.sugg.6":"Quanta acqua devo bere?",
     "safety.badge.hard":"NON COMPATIBILE","safety.badge.soft":"SUGGERIMENTO","safety.badge.confirm":"CONFERMA",
@@ -3942,7 +3943,7 @@ TRANSLATIONS.en = {
   "askdubi.offer.q":"Want me to add \"{item}\" to today\'s plan?","askdubi.apply":"Yes, update the plan",
   "askdubi.adapt.label":"PLAN ADAPTATION","askdubi.updated":"Plan updated ✓","askdubi.updated.sub":"Close the panel to see the changes.",
   "askdubi.input.ph":"Describe your situation or ask a question…","askdubi.input.ph.followup":"Reply or ask another question…","askdubi.send":"Send",
-  "askdubi.sugg.1":"I woke up late, skipping breakfast","askdubi.sugg.2":"Can\'t have lunch today",
+  "askdubi.sugg.1":"Can I change dinner to another recipe?","askdubi.sugg.2":"Why did you choose this recipe?",
   "askdubi.sugg.3":"Can I replace this meal with another complete recipe?","askdubi.sugg.4":"How do I handle evening hunger?",
   "askdubi.sugg.5":"I\'m eating out tonight","askdubi.sugg.6":"How much water should I drink?",
   "safety.badge.hard":"NOT COMPATIBLE","safety.badge.soft":"SUGGESTION","safety.badge.confirm":"CONFIRM",
@@ -4291,8 +4292,8 @@ TRANSLATIONS.fr = {
   "askdubi.input.ph":"Decris ta situation ou pose une question...",
   "askdubi.input.ph.followup":"Reponds ou pose une autre question...",
   "askdubi.send":"Envoyer",
-  "askdubi.sugg.1":"Je me suis reveille tard, je saute le petit-dejeuner",
-  "askdubi.sugg.2":"Je ne peux pas dejeuner aujourd'hui",
+  "askdubi.sugg.1":"Puis-je remplacer le dîner par une autre recette ?",
+  "askdubi.sugg.2":"Pourquoi avez-vous choisi cette recette ?",
   "askdubi.sugg.3":"Puis-je remplacer ce repas par une autre recette complète ?",
   "askdubi.sugg.4":"Comment gerer la faim du soir ?",
   "askdubi.sugg.5":"Je dine dehors ce soir",
@@ -4646,8 +4647,8 @@ TRANSLATIONS.es = {
   "askdubi.input.ph":"Describe tu situacion o haz una pregunta...",
   "askdubi.input.ph.followup":"Responde o haz otra pregunta...",
   "askdubi.send":"Enviar",
-  "askdubi.sugg.1":"Me desperte tarde, salto el desayuno",
-  "askdubi.sugg.2":"No puedo almorzar hoy",
+  "askdubi.sugg.1":"¿Puedo cambiar la cena por otra receta?",
+  "askdubi.sugg.2":"¿Por qué elegiste esta receta?",
   "askdubi.sugg.3":"Puedo sustituir esta comida por otra receta completa?",
   "askdubi.sugg.4":"Como gestiono el hambre nocturna?",
   "askdubi.sugg.5":"Ceno fuera esta noche",
@@ -5001,8 +5002,8 @@ TRANSLATIONS.de = {
   "askdubi.input.ph":"Beschreibe deine Situation oder stelle eine Frage...",
   "askdubi.input.ph.followup":"Antworte oder stelle eine weitere Frage...",
   "askdubi.send":"Senden",
-  "askdubi.sugg.1":"Ich bin spat aufgewacht und lasse das Fruhstuck aus",
-  "askdubi.sugg.2":"Ich kann heute nicht zu Mittag essen",
+  "askdubi.sugg.1":"Kann ich das Abendessen durch ein anderes Rezept ersetzen?",
+  "askdubi.sugg.2":"Warum hast du dieses Rezept ausgewählt?",
   "askdubi.sugg.3":"Kann ich diese Mahlzeit durch ein anderes vollständiges Rezept ersetzen?",
   "askdubi.sugg.4":"Wie gehe ich mit Hunger am Abend um?",
   "askdubi.sugg.5":"Ich esse heute Abend auswarts",
@@ -5356,8 +5357,8 @@ TRANSLATIONS.ar = {
   "askdubi.input.ph":"صف موقفك أو اطرح سؤالا...",
   "askdubi.input.ph.followup":"أجب أو اطرح سؤالا آخر...",
   "askdubi.send":"إرسال",
-  "askdubi.sugg.1":"استيقظت متأخرا، سأتخطى الفطور",
-  "askdubi.sugg.2":"لا أستطيع تناول الغداء اليوم",
+  "askdubi.sugg.1":"هل يمكنني تغيير العشاء إلى وصفة أخرى؟",
+  "askdubi.sugg.2":"لماذا اخترت هذه الوصفة؟",
   "askdubi.sugg.3":"هل يمكنني استبدال هذه الوجبة بوصفة كاملة أخرى؟",
   "askdubi.sugg.4":"كيف أتعامل مع الجوع مساء؟",
   "askdubi.sugg.5":"سأتناول العشاء خارج المنزل الليلة",
@@ -5711,8 +5712,8 @@ TRANSLATIONS.pt = {
   "askdubi.input.ph":"Descreve a tua situacao ou faz uma pergunta...",
   "askdubi.input.ph.followup":"Responde ou faz outra pergunta...",
   "askdubi.send":"Enviar",
-  "askdubi.sugg.1":"Acordei tarde, salto o pequeno-almoco",
-  "askdubi.sugg.2":"Nao consigo almocar hoje",
+  "askdubi.sugg.1":"Posso trocar o jantar por outra receita?",
+  "askdubi.sugg.2":"Porque escolheste esta receita?",
   "askdubi.sugg.3":"Posso substituir esta refeição por outra receita completa?",
   "askdubi.sugg.4":"Como gerir a fome ao fim do dia?",
   "askdubi.sugg.5":"Vou jantar fora hoje",
@@ -6066,8 +6067,8 @@ TRANSLATIONS.zh = {
   "askdubi.input.ph":"描述你的情况或提问...",
   "askdubi.input.ph.followup":"回复或继续提问...",
   "askdubi.send":"发送",
-  "askdubi.sugg.1":"我起晚了，跳过早餐",
-  "askdubi.sugg.2":"今天没法吃午餐",
+  "askdubi.sugg.1":"我可以把晚餐换成另一道食谱吗？",
+  "askdubi.sugg.2":"为什么选择这道食谱？",
   "askdubi.sugg.3":"我可以用另一道完整食谱替换这顿饭吗？",
   "askdubi.sugg.4":"晚上饿怎么办？",
   "askdubi.sugg.5":"今晚在外面吃晚餐",
@@ -6421,8 +6422,8 @@ TRANSLATIONS.ja = {
   "askdubi.input.ph":"状況を説明するか質問してください...",
   "askdubi.input.ph.followup":"返信するか、別の質問をしてください…",
   "askdubi.send":"送信",
-  "askdubi.sugg.1":"起きるのが遅く、朝食を抜きます",
-  "askdubi.sugg.2":"今日は昼食を取れません",
+  "askdubi.sugg.1":"夕食を別のレシピに変更できますか？",
+  "askdubi.sugg.2":"このレシピを選んだ理由は何ですか？",
   "askdubi.sugg.3":"この食事を別の完全なレシピに置き換えられますか？",
   "askdubi.sugg.4":"夜の空腹はどう管理しますか？",
   "askdubi.sugg.5":"今夜は外食します",
@@ -6776,8 +6777,8 @@ TRANSLATIONS.ru = {
   "askdubi.input.ph":"Опиши ситуацию или задай вопрос...",
   "askdubi.input.ph.followup":"Ответьте или задайте другой вопрос…",
   "askdubi.send":"Отправить",
-  "askdubi.sugg.1":"Я поздно проснулся, пропускаю завтрак",
-  "askdubi.sugg.2":"Сегодня не могу пообедать",
+  "askdubi.sugg.1":"Можно заменить ужин другим рецептом?",
+  "askdubi.sugg.2":"Почему выбран этот рецепт?",
   "askdubi.sugg.3":"Можно заменить этот прием пищи другим полноценным рецептом?",
   "askdubi.sugg.4":"Как справиться с вечерним голодом?",
   "askdubi.sugg.5":"Сегодня ужинаю вне дома",
@@ -9541,6 +9542,60 @@ Object.entries(PROMPT14_UI_TRANSLATIONS_2).forEach(([code, additions]) => {
   const current = TRANSLATIONS[code] || (TRANSLATIONS[code] = {});
   Object.entries(additions).forEach(([key, value]) => { if (current[key] === undefined) current[key] = value; });
 });
+const WEEKLY_MEAL_REPLACEMENT_TRANSLATIONS = {
+  it: {
+    "weekly.replace.button":"Cambia pasto","weekly.replace.title":"Cambiare questo pasto?","weekly.replace.description":"Il pasto sarà sostituito con un’altra ricetta completa. Calorie e macronutrienti previsti per questo pasto restano quelli del piano; il resto della giornata non cambia.","weekly.replace.confirm":"Conferma sostituzione","weekly.replace.cancel":"Annulla","weekly.replace.loading":"Sostituzione in corso…","weekly.replace.success":"Pasto sostituito con una ricetta completa.","weekly.replace.frozen":"Questo pasto è già passato o risulta registrato come mangiato e non può essere sostituito.","weekly.replace.noSafe":"Non è disponibile una ricetta sicura per questo pasto. Il piano è rimasto invariato.","weekly.replace.error":"Non è stato possibile sostituire il pasto. Il piano è rimasto invariato."
+  },
+  en: {
+    "weekly.replace.button":"Change meal","weekly.replace.title":"Change this meal?","weekly.replace.description":"This meal will be replaced with another complete recipe. The calories and macros planned for this meal stay as planned; the rest of the day does not change.","weekly.replace.confirm":"Confirm replacement","weekly.replace.cancel":"Cancel","weekly.replace.loading":"Replacing meal…","weekly.replace.success":"Meal replaced with a complete recipe.","weekly.replace.frozen":"This meal has passed or is already recorded as eaten, so it cannot be replaced.","weekly.replace.noSafe":"No safe recipe is available for this meal. The plan is unchanged.","weekly.replace.error":"The meal could not be replaced. The plan is unchanged."
+  },
+  fr: {
+    "weekly.replace.button":"Changer le repas","weekly.replace.title":"Changer ce repas ?","weekly.replace.description":"Ce repas sera remplacé par une autre recette complète. Les calories et macros prévues pour ce repas restent celles du plan ; le reste de la journée ne change pas.","weekly.replace.confirm":"Confirmer le remplacement","weekly.replace.cancel":"Annuler","weekly.replace.loading":"Remplacement en cours…","weekly.replace.success":"Repas remplacé par une recette complète.","weekly.replace.frozen":"Ce repas est passé ou déjà enregistré comme consommé ; il ne peut pas être remplacé.","weekly.replace.noSafe":"Aucune recette sûre n’est disponible pour ce repas. Le plan reste inchangé.","weekly.replace.error":"Impossible de remplacer ce repas. Le plan reste inchangé."
+  },
+  es: {
+    "weekly.replace.button":"Cambiar comida","weekly.replace.title":"¿Cambiar esta comida?","weekly.replace.description":"Esta comida se sustituirá por otra receta completa. Se mantienen las calorías y los macros previstos para esta comida; el resto del día no cambia.","weekly.replace.confirm":"Confirmar cambio","weekly.replace.cancel":"Cancelar","weekly.replace.loading":"Sustituyendo comida…","weekly.replace.success":"Comida sustituida por una receta completa.","weekly.replace.frozen":"Esta comida ya pasó o consta como consumida y no se puede sustituir.","weekly.replace.noSafe":"No hay una receta segura disponible para esta comida. El plan no ha cambiado.","weekly.replace.error":"No se pudo sustituir la comida. El plan no ha cambiado."
+  },
+  de: {
+    "weekly.replace.button":"Mahlzeit ändern","weekly.replace.title":"Diese Mahlzeit ändern?","weekly.replace.description":"Diese Mahlzeit wird durch ein anderes vollständiges Rezept ersetzt. Die geplanten Kalorien und Makros dieser Mahlzeit bleiben erhalten; der Rest des Tagesplans bleibt unverändert.","weekly.replace.confirm":"Änderung bestätigen","weekly.replace.cancel":"Abbrechen","weekly.replace.loading":"Mahlzeit wird ersetzt…","weekly.replace.success":"Mahlzeit durch ein vollständiges Rezept ersetzt.","weekly.replace.frozen":"Diese Mahlzeit ist bereits vergangen oder als gegessen erfasst und kann nicht ersetzt werden.","weekly.replace.noSafe":"Für diese Mahlzeit ist kein sicheres Rezept verfügbar. Der Plan bleibt unverändert.","weekly.replace.error":"Die Mahlzeit konnte nicht ersetzt werden. Der Plan bleibt unverändert."
+  },
+  ar: {
+    "weekly.replace.button":"تغيير الوجبة","weekly.replace.title":"هل تريد تغيير هذه الوجبة؟","weekly.replace.description":"سيتم استبدال هذه الوجبة بوصفة كاملة أخرى. تبقى السعرات والعناصر الغذائية المخططة لهذه الوجبة كما هي، ولا يتغير باقي اليوم.","weekly.replace.confirm":"تأكيد الاستبدال","weekly.replace.cancel":"إلغاء","weekly.replace.loading":"جارٍ استبدال الوجبة…","weekly.replace.success":"تم استبدال الوجبة بوصفة كاملة.","weekly.replace.frozen":"انتهى وقت هذه الوجبة أو سُجلت بالفعل على أنها مأكولة، لذلك لا يمكن استبدالها.","weekly.replace.noSafe":"لا تتوفر وصفة آمنة لهذه الوجبة. لم تتغير الخطة.","weekly.replace.error":"تعذر استبدال الوجبة. لم تتغير الخطة."
+  },
+  pt: {
+    "weekly.replace.button":"Alterar refeição","weekly.replace.title":"Alterar esta refeição?","weekly.replace.description":"Esta refeição será substituída por outra receita completa. As calorias e os macros previstos para esta refeição mantêm-se; o resto do dia não muda.","weekly.replace.confirm":"Confirmar substituição","weekly.replace.cancel":"Cancelar","weekly.replace.loading":"A substituir refeição…","weekly.replace.success":"Refeição substituída por uma receita completa.","weekly.replace.frozen":"Esta refeição já passou ou está registada como consumida e não pode ser substituída.","weekly.replace.noSafe":"Não há uma receita segura disponível para esta refeição. O plano não foi alterado.","weekly.replace.error":"Não foi possível substituir a refeição. O plano não foi alterado."
+  },
+  zh: {
+    "weekly.replace.button":"更换餐食","weekly.replace.title":"更换这顿餐食？","weekly.replace.description":"这顿餐食将替换为另一份完整食谱。本餐计划的热量和宏量营养素保持不变；当天其余安排不变。","weekly.replace.confirm":"确认更换","weekly.replace.cancel":"取消","weekly.replace.loading":"正在更换餐食…","weekly.replace.success":"已更换为一份完整食谱。","weekly.replace.frozen":"这顿餐食的时间已过或已记录为吃过，不能更换。","weekly.replace.noSafe":"没有适合这顿餐食的安全食谱。计划未更改。","weekly.replace.error":"无法更换这顿餐食。计划未更改。"
+  },
+  ja: {
+    "weekly.replace.button":"食事を変更","weekly.replace.title":"この食事を変更しますか？","weekly.replace.description":"この食事を別の完全なレシピに置き換えます。この食事に予定されたカロリーとマクロは維持され、1日のほかの内容は変わりません。","weekly.replace.confirm":"変更を確定","weekly.replace.cancel":"キャンセル","weekly.replace.loading":"食事を置き換えています…","weekly.replace.success":"完全なレシピに置き換えました。","weekly.replace.frozen":"この食事の時間は過ぎているか、食べた記録があるため置き換えできません。","weekly.replace.noSafe":"この食事に使える安全なレシピがありません。プランは変更されていません。","weekly.replace.error":"食事を置き換えできませんでした。プランは変更されていません。"
+  },
+  ru: {
+    "weekly.replace.button":"Заменить приём пищи","weekly.replace.title":"Заменить этот приём пищи?","weekly.replace.description":"Этот приём пищи будет заменён другим полноценным рецептом. Запланированные для него калории и макросы сохраняются; остальная часть дня не меняется.","weekly.replace.confirm":"Подтвердить замену","weekly.replace.cancel":"Отмена","weekly.replace.loading":"Замена приёма пищи…","weekly.replace.success":"Приём пищи заменён полноценным рецептом.","weekly.replace.frozen":"Время этого приёма пищи уже прошло или он отмечен как съеденный, поэтому заменить его нельзя.","weekly.replace.noSafe":"Для этого приёма пищи нет подходящего безопасного рецепта. План не изменён.","weekly.replace.error":"Не удалось заменить приём пищи. План не изменён."
+  }
+};
+Object.entries(WEEKLY_MEAL_REPLACEMENT_TRANSLATIONS).forEach(([code, additions]) => {
+  Object.assign(TRANSLATIONS[code] || (TRANSLATIONS[code] = {}), additions);
+  TRANSLATIONS[code]["plan.error.frozenMeal"] = additions["weekly.replace.frozen"];
+  TRANSLATIONS[code]["plan.error.noSafeMatch"] = additions["weekly.replace.noSafe"];
+  TRANSLATIONS[code]["plan.error.generate"] = additions["weekly.replace.error"];
+});
+const ASK_DUBI_SUPPORTED_SUGGESTIONS = {
+  it: ["Posso cambiare la cena con un’altra ricetta?", "Perché hai scelto questa ricetta?"],
+  en: ["Can I change dinner to another recipe?", "Why did you choose this recipe?"],
+  fr: ["Puis-je remplacer le dîner par une autre recette ?", "Pourquoi avez-vous choisi cette recette ?"],
+  es: ["¿Puedo cambiar la cena por otra receta?", "¿Por qué elegiste esta receta?"],
+  de: ["Kann ich das Abendessen durch ein anderes Rezept ersetzen?", "Warum hast du dieses Rezept ausgewählt?"],
+  ar: ["هل يمكنني تغيير العشاء إلى وصفة أخرى؟", "لماذا اخترت هذه الوصفة؟"],
+  pt: ["Posso trocar o jantar por outra receita?", "Porque escolheste esta receita?"],
+  zh: ["我可以把晚餐换成另一道食谱吗？", "为什么选择这道食谱？"],
+  ja: ["夕食を別のレシピに変更できますか？", "このレシピを選んだ理由は何ですか？"],
+  ru: ["Можно заменить ужин другим рецептом?", "Почему выбран этот рецепт?"],
+};
+Object.entries(ASK_DUBI_SUPPORTED_SUGGESTIONS).forEach(([code, suggestions]) => {
+  TRANSLATIONS[code]["askdubi.sugg.1"] = suggestions[0];
+  TRANSLATIONS[code]["askdubi.sugg.2"] = suggestions[1];
+});
 
 const PROMPT27C_TRANSLATIONS = {
   it: {
@@ -12302,27 +12357,8 @@ const ASK_DUBI_SUGGESTION_KEYS = [
   "askdubi.sugg.4","askdubi.sugg.5","askdubi.sugg.6",
 ];
 
-// ── PLAN CHANGE DETECTION ──
-// Ritorna un oggetto planChange se il messaggio implica una modifica al piano di oggi.
-// action: "skip_meal" | "shift_times" | "light_day"
-function getPlanDecisionCopy(lang) {
-  const map = {
-    it: {today:"Adattamento di oggi",todaySub:"Non rigenera la settimana: corregge solo orari, pasto o guida pratica per la giornata.",regenerate:"Richiede rigenerazione piano",regenerateSub:"Questa modifica cambia fabbisogno, allergie, obiettivo o struttura dei pasti: passa da Impostazioni per confermare.",ask:"Doppia conferma richiesta",temporary:"Temporaneo"},
-    en: {today:"Today's adaptation",todaySub:"It does not regenerate the week: it only adjusts timing, a meal or practical guidance for today.",regenerate:"Plan regeneration required",regenerateSub:"This changes needs, allergies, goal or meal structure: use Settings to confirm.",ask:"Double check required",temporary:"Temporary"},
-    fr: {today:"Adaptation du jour",todaySub:"Ne regenere pas la semaine : ajuste seulement les horaires, un repas ou une consigne du jour.",regenerate:"Regeneration du plan requise",regenerateSub:"Cela change besoins, allergies, objectif ou structure des repas : confirme dans Reglages.",ask:"Double confirmation requise",temporary:"Temporaire"},
-    es: {today:"Adaptacion de hoy",todaySub:"No regenera la semana: solo ajusta horarios, una comida o una guia practica para hoy.",regenerate:"Requiere regenerar el plan",regenerateSub:"Cambia necesidades, alergias, objetivo o estructura: confirma desde Ajustes.",ask:"Doble confirmacion requerida",temporary:"Temporal"},
-    de: {today:"Anpassung fur heute",todaySub:"Regeneriert nicht die Woche: passt nur Zeiten, eine Mahlzeit oder Tageshinweise an.",regenerate:"Plan-Regeneration erforderlich",regenerateSub:"Das andert Bedarf, Allergien, Ziel oder Mahlzeitenstruktur: bitte in Einstellungen bestatigen.",ask:"Doppelte Bestatigung erforderlich",temporary:"Temporar"},
-    pt: {today:"Adaptacao de hoje",todaySub:"Nao regenera a semana: ajusta apenas horarios, uma refeicao ou orientacao pratica de hoje.",regenerate:"Requer regeneracao do plano",regenerateSub:"Isto altera necessidades, alergias, objetivo ou estrutura: confirma nas Definicoes.",ask:"Dupla confirmacao necessaria",temporary:"Temporario"}
-  };
-  return map[lang] || map.en;
-}
-
 function classifyPlanDecision(planChange, lang) {
-  if (!planChange) return null;
-  const c = getPlanDecisionCopy(lang);
-  const regenerationActions = ["regenerate_plan", "profile_change", "allergy_change", "goal_change", "open_settings"];
-  if (regenerationActions.includes(planChange.action)) return {label:c.regenerate, sub:c.regenerateSub, badge:c.ask, tone:"regen"};
-  return {label:c.today, sub:c.todaySub, badge:c.temporary, tone:"today"};
+  return isSupportedPlanChange(planChange) ? planChange.action : null;
 }
 
 function detectMealSlotFromText(t, plan) {
@@ -12620,17 +12656,7 @@ function getDubiServiceAnswer(t, userData, plan, lang = "it") {
   return null;
 }
 
-function detectPlanChange(t, plan, userData, lang = "it") {
-  const slots = plan?.mealCount || 4;
-  if (/(nuov[ao].*(allerg|intoller)|sono allerg|sono intoller|ho scoperto.*allerg|glutine|lattosio|celiach|cambio.*obiettivo|voglio.*massa|voglio.*definizione|devo.*dimagrire|peso.*cambiato|sono ingrassat|sono dimagrit|regenera.*piano|rifai.*piano|nuova dieta|new allergy|intoleran|change.*goal|regenerate.*plan|new diet)/i.test(t)) {
-    return {
-      action: "regenerate_plan",
-      banner: "Rigenerazione piano richiesta",
-      planNote: "Questa modifica non va applicata solo a oggi: puo cambiare calorie, macro, ingredienti sicuri e lista della spesa. Vai in Impostazioni > Modifica intelligente, aggiorna il campo corretto e conferma: DUBI rigenera il piano spiegando il motivo.",
-      confirmLabel: "Apri Impostazioni",
-    };
-  }
-
+function detectPlanChange(t, plan) {
   const hasReplacementIntent = /(non mi piace|non voglio|odio|stufo|stufa|cambia|cambiami|sostituisci|sostituire|swap|alternativa|replace|change.*meal|don't like|do not like|vorrei.*(altro|altor|divers|camb|alternativ)|voglio.*(altro|altor|divers|camb|alternativ)|mangiare.*(altro|altor|divers)|mangiarmi.*(altro|altor|divers)|preferirei.*(altro|altor|divers))/i.test(t);
   const mealToReplace = hasReplacementIntent ? detectMealSlotFromText(t, plan) : null;
   if (mealToReplace) {
@@ -12643,137 +12669,6 @@ function detectPlanChange(t, plan, userData, lang = "it") {
       confirmLabel: "Sì, cambia questo pasto"
     };
   }
-
-  // Meal timing changes require a canonical backend regeneration.
-  if (/(svegliato|alzato|dormito).*(tardi|mezzogiorno|pranzo|ora di pranzo|a pranzo)|mi.*sveglio.*tard|noon|wake.*up.*late/i.test(t) ||
-      /(colazione.*salto|salto.*colazione|non.*colazione.*stamatt|non riesco.*colazione|impossibile.*colazione)/i.test(t)) {
-    return {
-      action: "regenerate_plan",
-      banner: "Aggiornamento del piano richiesto",
-      planNote: "Per cambiare la struttura dei pasti DUBI deve rigenerare il piano dal catalogo di ricette complete e sicure.",
-      confirmLabel: "Apri Impostazioni",
-    };
-  }
-
-  // Never fabricate a compensatory meal in the client.
-  if (/(non riesco.*pranzo|salto.*pranzo|pranzo.*salto|senza pranzo|non posso.*pranzo|impossibile.*pranzo)/i.test(t)) {
-    return {
-      action: "regenerate_plan",
-      banner: "Aggiornamento del piano richiesto",
-      planNote: "Per cambiare la struttura dei pasti DUBI deve rigenerare il piano dal catalogo di ricette complete e sicure.",
-      confirmLabel: "Apri Impostazioni",
-    };
-  }
-
-  // Never fabricate a compensatory meal in the client.
-  if (/(non riesco.*cena|salto.*cena|cena.*salto|senza cena|non posso.*cena|sento.*poco.*fame.*sera)/i.test(t)) {
-    return {
-      action: "regenerate_plan",
-      banner: "Aggiornamento del piano richiesto",
-      planNote: "Per cambiare la struttura dei pasti DUBI deve rigenerare il piano dal catalogo di ricette complete e sicure.",
-      confirmLabel: "Apri Impostazioni",
-    };
-  }
-
-  // Fuori casa / ristorante a pranzo
-  if (/(fuori casa|ristorante|lavoro|mensa|bar).*(pranzo|colazione)/i.test(t) ||
-      /(pranzo|colazione).*(fuori|ristorante|non cucino)/i.test(t)) {
-    return {
-      action: "restaurant_note",
-      mealId: "pranzo",
-      banner: "Pranzo fuori casa · guida ordine smart attiva",
-      planNote: "Pranzo fuori? Ordina: proteina magra (pollo/pesce) + verdure + carboidrato semplice. Evita fritti e salse pesanti. Le calorie sono invariate.",
-      confirmLabel: "Ok, ho capito",
-    };
-  }
-
-  // Fuori casa / ristorante a cena
-  if (/(fuori casa|ristorante|aperitivo|evento|festa).*(cena|stasera|sera)/i.test(t) ||
-      /(cena|stasera).*(fuori|ristorante|non cucino|non sono)/i.test(t)) {
-    return {
-      action: "restaurant_note",
-      mealId: "cena",
-      banner: "Cena fuori casa · piano adattato per la sera",
-      planNote: "Cena al ristorante: priorità proteina (almeno 30g), verdure abbondanti, carboidrati moderati. Un bicchiere di vino è ok. L'importante è il totale di giornata.",
-      confirmLabel: "Ok, ho capito",
-    };
-  }
-
-  // Giornata pesante / stressante → pasto leggero
-  if (/(stomaco.*chiuso|non ho fame|poco appetito|giornata pesante|stomaco in.*sens|nausea|stress)/i.test(t)) {
-    return {
-      action: "light_day",
-      banner: "Giornata difficile · piano alleggerito attivato",
-      planNote: "Nessun problema. Nelle giornate difficili privilegia cibi facili: riso bianco, pollo bollito, brodo, frutta matura. Non forzare le porzioni.",
-      confirmLabel: "Ok, aiutami",
-    };
-  }
-
-  // ── Orario allenamento specificato → ricalcola orari pasti ─────────────────
-  // Rileva frasi tipo "mi alleno alle 6", "training at 7am", "vado in palestra alle 18"
-  const timeRgx = /(?:alleno|mi alleno|mi allena|workout|training|palestra|gym|allenamento|train|vado in palestra)\s*(?:alle?|at|@|verso)?\s*(\d{1,2})(?:[:\.](\d{2}))?\s*(mattina|pomeriggio|sera|notte|am|pm|di mattina|al pomeriggio|in palestra)?/i;
-  const timeRgx2 = /(?:alle?|at|@)\s*(\d{1,2})(?:[:\.](\d{2}))?\s*(mattina|pomeriggio|sera|am|pm|di mattina)?\s*(?:mi alleno|alleno|workout|training|palestra|gym|allenamento)/i;
-  const tm = t.match(timeRgx) || t.match(timeRgx2);
-  if (tm) {
-    let hour = parseInt(tm[1]);
-    const min  = tm[2] ? parseInt(tm[2]) : 0;
-    const period = (tm[3] || "").toLowerCase();
-    if ((period.includes("pomeriggio") || period.includes("pm") || period.includes("afternoon")) && hour < 12) hour += 12;
-    if ((period.includes("sera") || period.includes("evening") || period.includes("notte")) && hour < 12) hour += 12;
-    if (hour >= 24) hour = 23;
-
-    const trainingH = hour + min / 60;
-    const mealCount = plan?.mealCount || 4;
-    const fmt = h => {
-      const hh = Math.max(5, Math.min(23, Math.floor(h)));
-      const mm = Math.round((h - Math.floor(h)) * 60);
-      return `${String(hh).padStart(2,"0")}:${String(mm < 60 ? mm : 0).padStart(2,"0")}`;
-    };
-
-    // Costruisce orari intelligenti centrati sull'allenamento
-    let customTimes;
-    if (trainingH <= 8) {
-      // Mattina presto (5-8): pre-WO prima, colazione/post-WO dopo
-      customTimes = mealCount <= 3
-        ? [fmt(trainingH + 1.5), fmt(13), fmt(20)]
-        : mealCount === 4
-          ? [fmt(trainingH - 0.5), fmt(trainingH + 1.5), fmt(16.5), fmt(20)]
-          : [fmt(trainingH - 0.5), fmt(trainingH + 1.5), fmt(13), fmt(16.5), fmt(20)];
-    } else if (trainingH <= 12) {
-      // Tardo mattino (9-12): colazione normale, pre-WO snack, post-WO a pranzo
-      customTimes = mealCount <= 3
-        ? [fmt(7), fmt(trainingH + 1.5), fmt(20)]
-        : mealCount === 4
-          ? [fmt(7), fmt(trainingH - 1), fmt(trainingH + 1.5), fmt(20)]
-          : [fmt(7), fmt(trainingH - 1), fmt(trainingH + 1.5), fmt(16.5), fmt(20)];
-    } else if (trainingH <= 17) {
-      // Pomeriggio (13-17): colazione, pranzo, pre-WO snack, cena post-WO
-      customTimes = mealCount <= 3
-        ? [fmt(7.5), fmt(13), fmt(trainingH + 1.5)]
-        : mealCount === 4
-          ? [fmt(7.5), fmt(13), fmt(trainingH - 1), fmt(trainingH + 1.5)]
-          : [fmt(7.5), fmt(10.5), fmt(13), fmt(trainingH - 1), fmt(trainingH + 1.5)];
-    } else {
-      // Sera (18+): tutti i pasti prima, cena post-WO
-      customTimes = mealCount <= 3
-        ? [fmt(7.5), fmt(13), fmt(trainingH + 1)]
-        : mealCount === 4
-          ? [fmt(7.5), fmt(12.5), fmt(trainingH - 1), fmt(trainingH + 1)]
-          : [fmt(7.5), fmt(10.5), fmt(13), fmt(trainingH - 1), fmt(trainingH + 1)];
-    }
-
-    const hourStr = `${String(hour).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
-    return {
-      action: "shift_times",
-      trainingHour: hour,
-      trainingMin: min,
-      customTimes,
-      banner: `Piano orari aggiornato · allenamento alle ${hourStr}`,
-      planNote: `Ho riorganizzato gli orari dei tuoi pasti attorno all'allenamento delle ${hourStr}. Il pre-workout è posizionato 30–60 min prima, la colazione principale subito dopo il training per massimizzare il recupero muscolare (finestra anabolica, ISSN 2017).`,
-      confirmLabel: `Sì, aggiorna gli orari per le ${hourStr}`,
-    };
-  }
-
   return null;
 }
 
@@ -12810,145 +12705,22 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
     energy: (n) => ({ title:"Low energy: most common causes", body:["Probability order: 1st sleep (<7h), 2nd dehydration, 3rd too many simple sugars at breakfast, 4th excessive caloric deficit.","Plan changes must use a complete recipe selected by the DUBI backend.","If it persists beyond 2 weeks with a correct plan and adequate sleep, check ferritin, vitamin D, TSH with your doctor."], source:"Walker, Sleep & Human Health 2017" }),
     plateau: { title:"Plateau and metabolic adaptation", body:["A plateau is physiological: the body adapts and reduces TDEE by 10–15% after 4–8 weeks of deficit.","Strategy: refeed day (1 day at TDEE every 2 weeks) to reset leptin and thyroid hormones.","Track progress with photos + body measurements, not just the scale: weight fluctuates by 1–3kg for water, glycogen, cycle."], source:"Hall et al., Cell Metabolism 2019" },
     protein: (w, p_lo, p_hi) => ({ title:"Protein: dose, timing, sources", body:[`Target for ${w}kg: ${p_lo}–${p_hi}g/day (1.6–2.2g/kg). Optimal in 4–5 meals of 25–40g each.`,"Leucine is the main trigger for mTOR (protein synthesis): minimum 2.5g per meal (≈25g of protein from chicken/eggs).","Any meal addition must use a complete recipe selected by the DUBI backend."], source:"ISSN Protein Position Stand 2017" }),
-    mealSkip: { title:"Skipped meal: no drama", body:["One skipped meal compromises nothing. Metabolism doesn't drop after a single meal.","Don't compensate with double portions: you overload digestion and create an insulin spike.","At the next meal add +15–20g of protein and a normal portion of carbs. The plan stays balanced."], source:"ISSN Meal Frequency Review 2017" },
     fallback: (n) => ({ title:`Got it${n?","+n:""}`, body:["That's a good question — let me be precise.","DUBI combines Mifflin-St Jeor, WHO/EFSA/ISSN guidelines and your data to give you personalized answers.","Can you describe the situation better? (e.g. time of day, what you're feeling, which meal is involved) That way I can help you concretely."], source:"DUBI — Scientific method" }),
   };
 
   const n = userData?.name ? ` ${userData.name.split(" ")[0]}` : "";
   const w = userData?.weight || 70;
 
-  // ── PRIORITY 0: follow-up che fa riferimento alla risposta precedente ──
-  const wantsAdd = /(aggiungi|aggiungerlo|includerlo|includere|mettilo|metti.*piano|aggiorna.*piano|s[iì].*piano|puoi.*aggiunger|voglio.*aggiunger|aggiungilo|inseriscilo|lo.*voglio.*piano|aggiornami|sì.*aggiorna|si.*aggiorna|lo.*aggiungi|yes.*add|ok.*aggiorna)/i.test(t);
-  if (context?.addableItem && wantsAdd) {
-    return {
-      title: "Aggiornamento del piano richiesto",
-      body: ["DUBI non costruisce pasti nel frontend. La modifica deve essere generata dal backend usando una ricetta completa e sicura."],
-      source: "DUBI · Piano personalizzato",
-      planChange: {
-        action: "regenerate_plan",
-        banner: "Aggiornamento del piano richiesto",
-        planNote: "La modifica richiede una rigenerazione canonica del piano.",
-        confirmLabel: "Apri Impostazioni",
-      },
-    };
-  }
-  // follow-up generico che fa riferimento al contesto precedente
-  if (context?.addableItem && !wantsAdd) {
-    const item = context.addableItem;
-    const refersCtx = /(questo|quello|lo stesso|di questo|perché|ma.*se|e se|invece|alternativa|opzione|quant[oa]|quando|come.*lo|come.*la|posso|puoi|capisco|intendi)/i.test(t);
-    if (refersCtx) {
-      return {
-        title: `Sì, puoi aggiungerlo al tuo piano`,
-        body: [
-          `"${item.label}" è perfettamente compatibile con il tuo obiettivo.`,
-          item.description,
-          `Vuoi che lo inserisca adesso nel piano di oggi?`,
-        ],
-        source: "DUBI · Consulenza personalizzata",
-        addableItem: item,
-        offerAdd: true,
-      };
-    }
-  }
-
   // ── PRIORITY 1: rilevamento plan change ──
-  const pc = detectPlanChange(t, plan, userData, lang);
-  if (pc) {
-    const msgs = {
-      skip_meal: {
-        colazione: {
-          title: "Nessun problema, adatto il piano",
-          body: [
-            "Svegliarsi tardi accade — non cambia nulla sull'obiettivo di lungo periodo.",
-            "Ho spostato le calorie della colazione al pranzo. Mangerai di più a pranzo e ti sembrerà naturale.",
-            "Idratati subito con 500ml d'acqua: dopo ore di sonno il corpo è in deficit idrico.",
-          ],
-        },
-        pranzo: {
-          title: "Pranzo saltato: ecco come compensare",
-          body: [
-            "Saltare il pranzo non è un problema se gestito bene.",
-            "Ho redistribuito le calorie del pranzo tra colazione, spuntino e cena. Non avrai un deficit.",
-            "Bevi acqua abbondante e assicurati che lo spuntino pomeridiano contenga una fonte proteica.",
-          ],
-        },
-        cena: {
-          title: "Cena leggera o saltata",
-          body: [
-            "Va bene — non forzare mai quando non hai fame.",
-            "Per proteggere la massa muscolare durante il sonno, consiglio uno snack proteico leggero: skyr 150g o ricotta 100g con frutta secca.",
-            "Domani riprendi il piano normale senza compensazioni.",
-          ],
-        },
-      },
-      restaurant_note: {
-        pranzo: {
-          title: "Pranzo fuori: ordina smart",
-          body: [
-            "Nessuna rinuncia — mangiare fuori è parte della vita.",
-            "Strategia: scegli proteina magra (pollo, pesce, uova), verdure abbondanti, carboidrato semplice (riso, pane integrale). Evita fritti e salse pesanti.",
-            "Porzione proteina = dimensione del palmo. Carboidrati = pugno chiuso. Verdure = senza limite.",
-          ],
-        },
-        cena: {
-          title: "Cena al ristorante: goditela",
-          body: [
-            "La dieta non è fatta di una singola cena — è la media settimanale che conta.",
-            "Priorità: proteina (almeno 30g), verdure abbondanti, carboidrati moderati. Un bicchiere di vino è accettabile.",
-            "Evita il pane prima del pasto e le salse cremose. Il resto è flessibile.",
-          ],
-        },
-      },
-      replace_meal: {
-        title: "Perfetto, ti preparo un'alternativa sensata",
-        body: [
-          "Ho scelto un pasto alternativo coerente con dieta, preferenze e vincoli del tuo profilo.",
-          "Mantengo lo stesso blocco di calorie e macronutrienti del pasto originale, così non si rompe la giornata.",
-          "Se vuoi cambiare una regola permanente, tipo allergie o obiettivo, DUBI ti porta invece in Impostazioni per rigenerare il piano in modo corretto.",
-        ],
-      },
-      shift_times: {
-        title: "Orari aggiornati intorno all'allenamento",
-        body: [
-          "Ho riorganizzato il timing dei pasti per supportare energia prima del training e recupero dopo.",
-          "Il totale calorico e i macro non cambiano: cambia solo il momento in cui li distribuiamo.",
-          "Così il piano rimane stabile, ma più adatto alla giornata reale.",
-        ],
-      },
-      regenerate_plan: {
-        title: "Qui serve rigenerare il piano",
-        body: [
-          "Questa modifica cambia le fondamenta del piano: fabbisogno, obiettivo, allergie, preferenze o struttura dei pasti.",
-          "Per sicurezza DUBI non la applica in silenzio solo a oggi.",
-          "Ti porto in Impostazioni, aggiorni il dato e DUBI rigenera il piano con la nuova logica.",
-        ],
-      },
-      light_day: {
-        title: "Giornata difficile: il corpo parla",
-        body: [
-          `${n ? n+", l" : "L"}'appetito ridotto in giornate stressanti è un meccanismo fisiologico, non un problema.`,
-          "Cibi facili per oggi: riso bianco o patate bollite, pollo o tacchino leggero, brodo, banana, frutta matura.",
-          "Non forzare le porzioni. L'obiettivo oggi è nutrirti senza stress. Domani il piano riprende normale.",
-        ],
-      },
-    };
-
-    const msgData = pc.action === "skip_meal"
-      ? msgs.skip_meal[pc.mealId] || msgs.skip_meal.colazione
-      : pc.action === "restaurant_note"
-      ? msgs.restaurant_note[pc.mealId] || msgs.restaurant_note.pranzo
-      : pc.action === "replace_meal"
-      ? msgs.replace_meal
-      : pc.action === "shift_times"
-      ? msgs.shift_times
-      : pc.action === "regenerate_plan"
-      ? msgs.regenerate_plan
-      : msgs.light_day;
-
+  const pc = detectPlanChange(t, plan);
+  if (pc?.action === "replace_meal") {
     return {
-      title: msgData.title,
-      body: msgData.body,
-      source: "ISSN Meal Frequency Review 2017 · Hall et al., Cell Metabolism 2019",
+      title: "Perfetto, ti preparo un'alternativa sensata",
+      body: [
+        "DUBI sostituirà il pasto con una ricetta completa selezionata dal motore.",
+        "Il piano si aggiornerà solo se il backend conferma la sostituzione.",
+      ],
+      source: "DUBI Recipe Engine",
       planChange: pc,
     };
   }
@@ -13052,7 +12824,6 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
         "Fame serale? Aggiungi uno snack proteico a cena: skyr, ricotta, uova sode. Non è un errore, è strategia.",
       ],
       source: "Leidy et al., Obesity 2015",
-      offerAdd: false,
     };
   }
 
@@ -13080,7 +12851,6 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
         "Se persiste oltre 2 settimane con piano corretto e sonno adeguato, valuta ferritina, vitamina D, TSH con il medico.",
       ],
       source: "Walker, Sleep & Human Health 2017",
-      offerAdd: false,
     };
   }
 
@@ -13102,14 +12872,7 @@ function answerAskDubi(q, userData, plan, context = null, lang = "it") {
         "Whey post-workout per rapidità, caseina prima di dormire per anti-catabolismo notturno.",
       ],
       source: "ISSN Protein Position Stand 2017",
-      offerAdd: false,
     };
-  }
-
-  // ── INFORMATIVA: salto pasto generico ──
-  if (/(salto|salta|skip|saltare|ho saltato|perso un pasto|skipped|missed.*meal)/.test(t)) {
-    if (isEN) return enResponses.mealSkip;
-    return { title:"Pasto saltato: nessun dramma", body:["Un pasto saltato non compromette nulla. Il metabolismo non si abbassa dopo un singolo pasto.","Non compensare con porzioni doppie: sovraccarichi la digestione e crei un picco insulinico.","Al pasto successivo aggiungi +15-20g di proteine e una porzione normale di carboidrati. Il piano rimane bilanciato."], source:"ISSN Meal Frequency Review 2017" };
   }
 
   // ── FALLBACK: risposta consulenziale generica ──
@@ -13240,16 +13003,19 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
     }, 250);
   };
 
-  const applyChange = (msgId, planChange) => {
-    if (!planChange) return;
-    dubiHaptic(planChange.action === "regenerate_plan" ? "warning" : "success");
-    const settingsActions = ["profile_change", "allergy_change", "goal_change", "open_settings"];
-    setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
+  const applyChange = async (msgId, planChange) => {
+    if (!isSupportedPlanChange(planChange)) return;
+    const settingsActions = ["open_settings"];
     if (settingsActions.includes(planChange.action)) {
+      dubiHaptic("success");
+      setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
       if (onOpenSettings) setTimeout(() => { onClose?.(); onOpenSettings(); }, 250);
       return;
     }
-    if (onPlanChange) onPlanChange(planChange);
+    if (planChange.action === "replace_meal" && onPlanChange) {
+      const applied = await onPlanChange(planChange);
+      if (applied) setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
+    }
   };
 
   const hasMessages = messages.length > 0;
@@ -13350,11 +13116,11 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
             // messaggio DUBI
             const a = msg.ans;
             if (!a) return null;
-            const decision = classifyPlanDecision(a.planChange, lang);
+            const decision = classifyPlanDecision(a.planChange);
             return (
               <div key={msg.id} className="dubi-chat-bubble" style={{marginBottom:16}}>
                 {/* Card risposta */}
-                <div style={{padding:"14px 16px",background:T.card,border:`1.5px solid ${T.accent}`,borderRadius:18,marginBottom:a.planChange||a.offerAdd ? 8 : 0}}>
+                <div style={{padding:"14px 16px",background:T.card,border:`1.5px solid ${T.accent}`,borderRadius:18,marginBottom:decision ? 8 : 0}}>
                   <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
                     <Ico n="info" size={13} c={T.accentD}/>
                     <span style={{fontSize:10,fontWeight:700,color:T.accentD,letterSpacing:0.5}}>{t("askdubi.response.label")}</span>
@@ -13367,21 +13133,12 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
                 </div>
 
                 {/* Card adattamento piano (con planChange) */}
-                {a.planChange && !msg.applied && (
+                {decision && !msg.applied && (
                   <div style={{padding:"14px 16px",background:T.accentD+"12",border:`1.5px solid ${T.accentD}`,borderRadius:14}}>
                     <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
                       <Ico n="refresh" size={13} c={T.accentD}/>
                       <span style={{fontSize:10,fontWeight:700,color:T.accentD,letterSpacing:0.5}}>{t("askdubi.adapt.label")}</span>
                     </div>
-                    {decision && (
-                      <div style={{margin:"0 0 10px",padding:"9px 10px",borderRadius:12,background:T.card,border:`1px solid ${decision.tone==="regen"?"#C9A87C":T.border}`}}>
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:4}}>
-                          <span style={{fontSize:12,fontWeight:800,color:T.text}}>{decision.label}</span>
-                          <span style={{fontSize:9,fontWeight:800,color:decision.tone==="regen"?"#B8893A":T.accentD,textTransform:"uppercase",letterSpacing:.6}}>{decision.badge}</span>
-                        </div>
-                        <p style={{fontSize:11,color:T.muted,lineHeight:1.45,margin:0}}>{decision.sub}</p>
-                      </div>
-                    )}
                     <p style={{fontSize:13,color:T.text,lineHeight:1.5,margin:"0 0 12px"}}>{a.planChange.planNote}</p>
                     <button className="dubi-pressable" data-no-haptic="true" onClick={()=>applyChange(msg.id, a.planChange)}
                       style={{width:"100%",padding:"12px",background:T.accentD,color:"#E8E4DC",border:"none",
@@ -13392,7 +13149,7 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
                 )}
 
                 {/* Successo dopo apply */}
-                {(a.planChange || a.offerAdd) && msg.applied && (
+                {decision && msg.applied && (
                   <div className="dubi-success-pop" style={{padding:"12px 16px",background:T.sel,border:`1.5px solid ${T.accent}`,borderRadius:14,display:"flex",gap:10,alignItems:"center"}}>
                     <div style={{width:32,height:32,borderRadius:10,background:T.accentD,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                       <Ico n="check" size={16} c="#E8E4DC"/>
@@ -16945,76 +16702,35 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
   }, [notifDismissed, wearableSnapshot, lang, userData?.trainingTime, plan.mealTimes, planAdaptations.customTimes]);
 
   const handlePlanChange = async (change) => {
-    if (!change) return;
-    dubiHaptic(change.action === "regenerate_plan" ? "warning" : "success");
-    if (change.action === "skip_meal") {
+    if (change?.action !== "replace_meal") return false;
+    dubiHaptic("success");
+    try {
+      await replaceMealAndCommit({
+        date: todayDateKey,
+        mealId: change.mealId,
+        userData,
+        requestReplacement: (date, mealType) => {
+          if (date !== todayDateKey || mealType !== change.mealId) {
+            throw new Error("Meal replacement context changed before request");
+          }
+          return replaceIngredientPlanMeal(todayDateKey, change.mealId);
+        },
+        mapPlan: mapIngredientPlanToFrontend,
+        commitPlan: setPlan,
+      });
       setPlanAdaptations(a => ({
         ...a,
-        skipped: [...new Set([...a.skipped, change.mealId])],
-        banner: change.banner,
-        note: change.planNote,
+        banner: change.banner || a.banner,
+        note: change.planNote || a.note,
       }));
-      setStatus(s => ({...s, [change.mealId]: "skip"}));
-    } else if (change.action === "replace_meal") {
-      try {
-        const ingredientPlan = await replaceIngredientPlanMeal(todayDateKey, change.mealId);
-        const updatedPlan = mapIngredientPlanToFrontend(ingredientPlan, userData);
-        setPlan?.(updatedPlan);
-        setPlanAdaptations(a => ({
-          ...a,
-          banner: change.banner || a.banner,
-          note: change.planNote || a.note,
-        }));
-      } catch (error) {
-        const controlled = String(error?.code || "").startsWith("RECIPE_ENGINE_V1_")
-          || error?.payload?.generation_status === "NO_SAFE_MATCH";
-        setPlanAdaptations(a => ({
-          ...a,
-          banner: controlled
-            ? getRuntimeCopy("plan.error.noSafeMatch", null, lang)
-            : getRuntimeCopy("plan.error.generate", null, lang),
-          note: null,
-        }));
-      }
-    } else if (change.action === "light_day") {
+      return true;
+    } catch (error) {
       setPlanAdaptations(a => ({
         ...a,
-        banner: change.banner,
-        note: change.planNote,
+        banner: getRuntimeCopy(getMealReplacementErrorKey(error), null, lang),
+        note: null,
       }));
-    } else if (change.action === "restaurant_note") {
-      // Conferma visiva: mostra banner con guida ristorante
-      setPlanAdaptations(a => ({
-        ...a,
-        banner: change.banner,
-        note: change.planNote,
-      }));
-    } else if (change.action === "shift_times") {
-      // Ricalcola orari pasti attorno all'orario di allenamento
-      setPlanAdaptations(a => ({
-        ...a,
-        banner: change.banner,
-        note: change.planNote,
-        customTimes: change.customTimes,
-        trainingHour: change.trainingHour,
-      }));
-    } else if (change.action === "regenerate_plan") {
-      setPlanAdaptations(a => ({
-        ...a,
-        banner: change.banner,
-        note: change.planNote,
-      }));
-      try {
-        const { plan: updatedPlan } = await generateAiPlanFromBackend(userData, {
-          force: true,
-          reason: "ask_dubi_regenerate_plan"
-        });
-        migrateTodayStatus(plan, updatedPlan, userData);
-        setPlan?.(updatedPlan);
-        setTrainingMessage(t("home.training.regenerated"));
-      } catch (error) {
-        console.error("Ask DUBI regeneration failed:", error);
-      }
+      return false;
     }
   };
 
@@ -17799,7 +17515,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
 // ═══════════════════════════════════════════════
 // WEEKLY SCREEN — per-day breakfast + alts per tutti
 // ═══════════════════════════════════════════════
-const WeeklyScreen = ({userData,plan,weeklyPlans = []}) => {
+const WeeklyScreen = ({userData,plan,setPlan,weeklyPlans = []}) => {
   const { t, lang } = useT();
 
   const todayDate = getTodayIsoDate();
@@ -17808,6 +17524,9 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = []}) => {
   const [ingModal,setIngModal] = useState(null);
   const [weeklyPlanCache,setWeeklyPlanCache] = useState({});
   const [loadingPlanDates,setLoadingPlanDates] = useState({});
+  const [replaceMealDialog,setReplaceMealDialog] = useState(null);
+  const [replaceMealBusy,setReplaceMealBusy] = useState(false);
+  const [replaceMealNotice,setReplaceMealNotice] = useState(null);
 
   // ── Banner stagionale — visibile ad ogni accesso, svanisce dopo 30s ──
   const [showSeasonBanner, setShowSeasonBanner] = useState(true);
@@ -17943,6 +17662,42 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = []}) => {
     }
   }));
 
+  const confirmMealReplacement = useCallback(async () => {
+    if (!replaceMealDialog || replaceMealBusy) return;
+    const { date, mealId } = replaceMealDialog;
+    setReplaceMealBusy(true);
+    setReplaceMealNotice(null);
+    try {
+      await replaceMealAndCommit({
+        date,
+        mealId,
+        userData,
+        requestReplacement: replaceIngredientPlanMeal,
+        mapPlan: mapIngredientPlanToFrontend,
+        commitPlan: (updatedPlan) => {
+          const datedPlan = { ...updatedPlan, planDate: date, ingredientPlanDate: date };
+          setWeeklyPlanCache(previous => ({ ...previous, [date]: datedPlan }));
+          if (date === todayDate) setPlan?.(datedPlan);
+        },
+      });
+      setReplaceMealNotice({ date, mealId, messageKey: "weekly.replace.success" });
+      setReplaceMealDialog(null);
+    } catch (error) {
+      const errorKey = getMealReplacementErrorKey(error);
+      setReplaceMealNotice({
+        date,
+        mealId,
+        messageKey: errorKey === "plan.error.frozenMeal"
+          ? "weekly.replace.frozen"
+          : errorKey === "plan.error.noSafeMatch"
+            ? "weekly.replace.noSafe"
+            : "weekly.replace.error",
+      });
+    } finally {
+      setReplaceMealBusy(false);
+    }
+  }, [replaceMealDialog, replaceMealBusy, userData, todayDate, setPlan]);
+
   // Fattori di scala indipendenti per macro (stessa logica di TodayScreen)
   const wBaseCal = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.cal||0), 0);
   const wBaseP   = adjustedMealEntries.reduce((s,m) => s + (m.meal?.macros?.p||0),   0);
@@ -18036,8 +17791,15 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = []}) => {
             {getRuntimeCopy("plan.error.noSafeMatch", null, lang)}
           </div>
         )}
+        {replaceMealNotice?.date === selectedDate && (
+          <div role="status" data-testid="weekly-meal-replacement-status"
+            style={{marginBottom:10,padding:12,background:T.card,border:`1px solid ${T.border}`,borderRadius:12,color:T.text,fontSize:12,lineHeight:1.5}}>
+            {t(replaceMealNotice.messageKey)}
+          </div>
+        )}
         {adjustedMealEntries.map((entry)=>{
           const {id:mKey,label,icon,time,meal,carbTargetPct} = entry;
+          const engineMealType = meal?.meal_type || meal?.mealType || ENGINE_MEAL_TYPE_BY_UI_SLOT[mKey] || mKey;
           const mealDisplay = getMealDisplayModel({ entry, meal, fallbackLabel: label });
           const displayWorkoutLabel = mealDisplay.workoutLabel;
           const weeklyMacros = wScaleMx(meal.macros);
@@ -18106,10 +17868,55 @@ const WeeklyScreen = ({userData,plan,weeklyPlans = []}) => {
                 </span>
               </div>
             )}
+            <button
+              type="button"
+              data-testid={`weekly-replace-meal-${engineMealType}`}
+              onClick={() => {
+                setReplaceMealNotice(null);
+                setReplaceMealDialog({ date: selectedDate, mealId: engineMealType, label });
+              }}
+              disabled={replaceMealBusy}
+              style={{marginTop:10,padding:"9px 12px",borderRadius:10,border:`1px solid ${T.border}`,background:T.bg,
+                color:T.accentD,fontSize:12,fontWeight:700,cursor:replaceMealBusy?"wait":"pointer",fontFamily:"inherit"}}
+            >
+              {t("weekly.replace.button")}
+            </button>
           </div>
           );
         })}
       </div>
+      {replaceMealDialog && (
+        <div role="presentation" onClick={() => !replaceMealBusy && setReplaceMealDialog(null)}
+          style={{position:"fixed",inset:0,zIndex:DUBI_MODAL_Z,display:"flex",alignItems:"flex-end",justifyContent:"center",
+            background:"rgba(0,0,0,.48)",padding:16}}>
+          <section role="dialog" aria-modal="true" aria-labelledby="weekly-replace-title" data-testid="weekly-replace-confirmation"
+            onClick={event => event.stopPropagation()}
+            style={{width:"100%",maxWidth:480,background:T.bg,borderRadius:20,padding:20,boxShadow:"0 12px 40px rgba(0,0,0,.24)"}}>
+            <h3 id="weekly-replace-title" style={{fontSize:18,color:T.text,margin:"0 0 8px"}}>
+              {t("weekly.replace.title")} · {replaceMealDialog.label}
+            </h3>
+            <p style={{fontSize:13,color:T.muted,lineHeight:1.55,margin:"0 0 14px"}}>
+              {t("weekly.replace.description")}
+            </p>
+            {replaceMealNotice?.date === replaceMealDialog.date && replaceMealNotice?.mealId === replaceMealDialog.mealId && (
+              <p role="alert" data-testid="weekly-meal-replacement-error"
+                style={{fontSize:12,color:replaceMealNotice.messageKey === "weekly.replace.success" ? T.accentD : "#B45F5F",lineHeight:1.5,margin:"0 0 14px"}}>
+                {t(replaceMealNotice.messageKey)}
+              </p>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button type="button" onClick={() => setReplaceMealDialog(null)} disabled={replaceMealBusy}
+                style={{flex:1,padding:12,borderRadius:11,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontWeight:700}}>
+                {t("weekly.replace.cancel")}
+              </button>
+              <button type="button" data-testid="weekly-replace-meal-confirm" onClick={confirmMealReplacement} disabled={replaceMealBusy}
+                style={{flex:1,padding:12,borderRadius:11,border:"none",background:T.accentD,color:"#E8E4DC",fontWeight:700}}>
+                {replaceMealBusy ? t("weekly.replace.loading") : t("weekly.replace.confirm")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {ingModal && <IngredientModal ingredient={ingModal} onClose={()=>setIngModal(null)}/>}
     </div>
   );
@@ -22928,7 +22735,7 @@ await openAppWithDailySchedule(data);
                 ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="weekly"   && (healthDataConsentGranted
-                ? <WeeklyScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} />
+                ? <WeeklyScreen userData={userData} plan={plan} setPlan={setPlan} weeklyPlans={weeklyPlans} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
