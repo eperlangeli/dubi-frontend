@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { canonicalSportId, classifySportSearch, searchSports } from "../src/sportSearchModel.mjs";
+import { canonicalSportId, classifySportSearch, isKnownSportId, searchSports } from "../src/sportSearchModel.mjs";
 import { normalizeTrainingSessions } from "../src/workoutScheduleModel.mjs";
 
 const sports = [
@@ -18,6 +18,10 @@ assert.equal(searchSports(sports,"tiro con l'arco","it")[0].sport_id,"archery");
 assert.equal(searchSports(sports,"arco","it")[0].sport_id,"archery");
 assert.equal(searchSports(sports,"archery","en")[0].sport_id,"archery");
 assert.equal(classifySportSearch(sports,"ultra pickleball").kind,"unmatched");
+assert.equal(isKnownSportId(sports, sports[0].sport_id), true);
+const legacyId = Symbol("persisted-legacy-sport");
+assert.equal(isKnownSportId([], legacyId, new Set([legacyId])), true);
+assert.equal(isKnownSportId([], Symbol("unmapped-sport")), false);
 for (const [oldId,newId] of Object.entries({football:"soccer",kayak:"canoe_kayak",nordic_ski:"cross_country_ski",sprint:"sprint_track",surf:"surfing",equestrian:"horse_riding",baseball:"baseball_softball",cycling:"cycling_road",gym:"resistance_training"})) assert.equal(canonicalSportId(oldId),newId);
 assert.equal(normalizeTrainingSessions([{day_of_week:1,sport_id:"gym",start_time:"18:00",duration_min:60}])[0].sport_id,"resistance_training");
 assert.equal(normalizeTrainingSessions([{day_of_week:1,sport_id:"custom:climbing_wall",start_time:"18:00",duration_min:60}])[0].sport_id,"custom:climbing_wall");

@@ -18,6 +18,9 @@ export const canonicalSportId = (value) => {
   return LEGACY_SPORT_ID_ALIASES[key]||key;
 };
 
+export const isKnownSportId = (sports, sportId, legacySportIds = new Set()) =>
+  sports.some(sport => sport.sport_id === sportId) || legacySportIds.has(sportId);
+
 const distance = (a, b) => {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i += 1) {

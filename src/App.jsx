@@ -11,7 +11,7 @@ import { buildWeeklyPlanCache, cacheWeeklyPlanFetchResult, finishWeeklyPlanLoadi
 import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessionComplete, normalizeTrainingSessions, removeTrainingSession, trainingSessionsOverlap, upsertTrainingSession, workoutScheduleSignature } from "./workoutScheduleModel.mjs";
 import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
 import { allPastMealsAnswered, confirmationFromSelection, trainingChangeMessage } from "./trainingChangeConfirmation.mjs";
-import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
+import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, isKnownSportId, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
@@ -469,7 +469,7 @@ const formatSportList = (sports, legacySport, t) => {
 const getTrainingTimeLabelLocalized = (value, t) => t(`training.timing.${normalizeTrainingTime(value)}`);
 
 const SPORT_INTERNAL_GROUPS = { martial_arts:"strength_power" };
-const sportInternalGroup = id => SPORT_CATALOG.find(sport => sport.sport_id === id)?.internal_group || SPORT_INTERNAL_GROUPS[id] || null;
+const LEGACY_SPORT_IDS = new Set(Object.keys(SPORT_INTERNAL_GROUPS));
 const WEIGHT_CLASS_SPORTS = new Set(["boxing","martial_arts","wrestling","judo","mma","muay_thai","karate","taekwondo","bjj","kickboxing"]);
 const durationToMinutes = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -505,8 +505,7 @@ const buildSportOnboardingContract = (data = {}) => {
   const details = data.sportSelectionMetadata || data.sport_selection_metadata || {};
   const primary = primaryId ? sportEntryForContract(primaryId, data.customSportName || data.custom_sport_name || "", details[primaryId] || {}) : null;
   const secondaries = sports.slice(1).map(id => sportEntryForContract(id, "", details[id] || {}));
-  const internalGroup = primary && !primary.is_custom ? sportInternalGroup(primary.sport_id) : null;
-  const semanticStatus = !primary ? "UNKNOWN" : primary.is_custom ? "SEMANTIC_MAPPING_REQUIRED" : internalGroup ? "APPROVED" : "UNKNOWN";
+  const semanticStatus = !primary ? "UNKNOWN" : primary.is_custom ? "SEMANTIC_MAPPING_REQUIRED" : isKnownSportId(SPORT_CATALOG, primary.sport_id, LEGACY_SPORT_IDS) ? "APPROVED" : "UNKNOWN";
   const weightClassApplicable = Boolean(primary && WEIGHT_CLASS_SPORTS.has(primary.sport_id));
   return {
     contract_version: "nutrition_engine_onboarding_contract_v1",
@@ -530,7 +529,6 @@ const buildSportOnboardingContract = (data = {}) => {
     },
     sport_profile: {
       profile_version: "nutrition_engine_sport_profile_v1",
-      internal_group: internalGroup,
       modifiers: weightClassApplicable ? ["combat_or_weight_class_context"] : [],
       semantic_mapping_status: semanticStatus,
       professional_status: semanticStatus
