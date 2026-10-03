@@ -1,0 +1,3 @@
+*.png binary
+*.jar binary
+android/gradlew.bat text eol=crlf
