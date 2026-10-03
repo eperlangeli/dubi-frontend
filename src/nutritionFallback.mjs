@@ -1,8 +1,10 @@
+import { normalizeSex } from "./normalizeSex.mjs";
+
 export const normalizeLegacyGoal = (goal) =>
   String(goal || "").trim().toLowerCase() === "competition" ? "maintain" : goal;
 
 export const fallbackTdee = ({ gender, age, height, weight, workoutDays, workoutIntensity }) => {
-  const male = gender === "M" || String(gender).toLowerCase() === "male";
+  const male = normalizeSex(gender) === "male";
   const bmr = male
     ? 10 * weight + 6.25 * height - 5 * age + 5
     : 10 * weight + 6.25 * height - 5 * age - 161;

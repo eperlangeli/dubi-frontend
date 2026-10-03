@@ -13,6 +13,8 @@ import { confirmScheduledTraining as postScheduledTrainingConfirmation } from ".
 import { allPastMealsAnswered, confirmationFromSelection, trainingChangeMessage } from "./trainingChangeConfirmation.mjs";
 import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, isKnownSportId, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
+import { normalizeSex } from "./normalizeSex.mjs";
+import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -609,7 +611,7 @@ const normalizeOnboarding = (data) => {
   return {
     ...data,
 
-    gender: data.gender === "male" ? "M" : data.gender === "female" ? "F" : data.gender,
+    gender: data.gender === "" || data.gender == null ? "" : normalizeSex(data.gender) === "male" ? "M" : "F",
     goal: toAppGoal(data.goal),
     diet: toCanonicalDiet(data.diet),
     allergies: serializeCanonicalList(data.allergies),
@@ -978,6 +980,12 @@ const isAuthorizationUrlUsable = (url = "") => {
 
 const saveOnboardingToBackend = async (data) => {
   const token = getAuthToken();
+  let sex;
+  try {
+    sex = normalizeSex(data.gender);
+  } catch (error) {
+    return { error: error.code };
+  }
   const canonicalData = canonicalizeOnboardingForBackend(data);
 
   if (!token) {
@@ -987,7 +995,7 @@ const saveOnboardingToBackend = async (data) => {
 
   const payload = {
     name: data.name || "",
-    gender: data.gender === "M" ? "male" : data.gender === "F" ? "female" : data.gender,
+    gender: sex,
     age: Number(data.age),
     height: Number(data.height),
     weight: Number(data.weight),
@@ -10659,7 +10667,7 @@ const LanguageSelector = ({ position="absolute" }) => {
 // ═══════════════════════════════════════════════
 function calcTDEE({ gender, age, height, weight, workoutDays, workoutIntensity }) {
   // Mirrors routes/plan.js calculateActivityKcal until the approved MET model replaces it.
-  return fallbackTdee({ gender, age, height, weight, workoutDays, workoutIntensity });
+  return fallbackTdee({ gender: normalizeSex(gender), age, height, weight, workoutDays, workoutIntensity });
 }
 
 function calcMealCount({ goal, workoutIntensity, workoutDays, dailyMealSchedule = null }) {
@@ -10802,9 +10810,9 @@ function getCarbTargetPct(trainingTime, mealId, sport) {
 function getGreeting(name, isFirstAccess, gender) {
   const n = (name && name.trim()) ? name.trim().split(" ")[0] : "";
   if (isFirstAccess) {
-    const g = String(gender || "").toLowerCase();
-    const isFemale = g === "f" || g === "female" || g === "femmina" || g === "woman";
-    return { prefixKey: isFemale ? "today.greet.welcome.f" : "today.greet.welcome", name: n };
+    let sex = null;
+    try { sex = normalizeSex(gender); } catch {}
+    return { prefixKey: sex === "female" ? "today.greet.welcome.f" : "today.greet.welcome", name: n };
   }
   const h = new Date().getHours();
   let prefixKey;
@@ -10819,13 +10827,14 @@ function calcBMI({height, weight}) {
   return weight / (hm*hm);
 }
 function calcBF({gender, age, height, weight}) {
+  const sex = normalizeSex(gender);
   const bmi = calcBMI({height, weight});
   const base = 1.20*bmi + 0.23*(age||30);
-  return gender === "M" ? base - 16.2 : base - 5.4;
+  return sex === "male" ? base - 16.2 : base - 5.4;
 }
 function bfCategory(bf, gender) {
   // Categorie ACE/ACSM
-  if (gender === "M") {
+  if (normalizeSex(gender) === "male") {
     if (bf < 6)  return {label:"Essenziale", risk:"low-hard",  color:"#C47B7B"};
     if (bf < 14) return {label:"Atletica",   risk:"ok",        color:"#0F0F0F"};
     if (bf < 18) return {label:"Fitness",    risk:"ok",        color:"#0F0F0F"};
@@ -10848,6 +10857,7 @@ function bfCategory(bf, gender) {
 // 3 livelli: HARD (override) · SOFT (avviso) · COERENZA (conferma)
 // ═══════════════════════════════════════════════
 function runSafetyChecks(data) {
+  const sex = normalizeSex(data.gender);
   const bmi = calcBMI(data);
   const bf  = calcBF(data);
   const bfCat = bfCategory(bf, data.gender);
@@ -10891,12 +10901,12 @@ function runSafetyChecks(data) {
       title: "La tua percentuale di grasso è già al limite essenziale",
       titleEN: "Your body fat percentage is already at the essential limit",
       body: [
-        `La tua massa grassa stimata rientra nella zona essenziale (${data.gender==="F"?"< 14%":"< 6%"}) secondo ACSM 2021.`,
+        `La tua massa grassa stimata rientra nella zona essenziale (${sex==="female"?"< 14%":"< 6%"}) secondo ACSM 2021.`,
         "Un ulteriore deficit calorico può compromettere la funzione ormonale, immunitaria e la performance atletica.",
         "Devi scegliere un obiettivo adatto alla tua composizione corporea attuale per poter continuare.",
       ],
       bodyEN: [
-        `Your estimated body fat falls in the essential zone (${data.gender==="F"?"< 14%":"< 6%"}) according to ACSM 2021.`,
+        `Your estimated body fat falls in the essential zone (${sex==="female"?"< 14%":"< 6%"}) according to ACSM 2021.`,
         "A further caloric deficit can compromise hormonal function, immunity and athletic performance.",
         "You need to choose a goal suited to your current body composition to continue.",
       ],
@@ -10918,12 +10928,12 @@ function runSafetyChecks(data) {
       title: "Un surplus calorico ora peggiorerebbe la situazione",
       titleEN: "A caloric surplus now would worsen the situation",
       body: [
-        `La tua percentuale di massa grassa è elevata (${data.gender==="F"?"> 32%":"> 25%"}) secondo le linee guida ACE/ACSM.`,
+        `La tua percentuale di massa grassa è elevata (${sex==="female"?"> 32%":"> 25%"}) secondo le linee guida ACE/ACSM.`,
         "Aggiungere calorie in surplus in questa condizione incrementa prevalentemente il tessuto adiposo, non la massa muscolare.",
         "Devi scegliere un obiettivo compatibile con la tua composizione attuale per generare un piano efficace.",
       ],
       bodyEN: [
-        `Your body fat percentage is elevated (${data.gender==="F"?"> 32%":"> 25%"}) according to ACE/ACSM guidelines.`,
+        `Your body fat percentage is elevated (${sex==="female"?"> 32%":"> 25%"}) according to ACE/ACSM guidelines.`,
         "Adding surplus calories in this condition increases mostly fat tissue, not muscle mass.",
         "You need to choose a goal compatible with your current composition to generate an effective plan.",
       ],
@@ -11112,20 +11122,8 @@ function calcPlan(data) {
   // fatLoss:   -20%  → ~300–500 kcal/die per la maggior parte degli utenti (ACSM Guidelines 2021)
   // definition: -15% → deficit moderato ~250–350 kcal/die per recomposizione (Barakat et al., S&C 2020)
   // gain:      +15%  → surplus minimo per lean bulk (ISSN 2021)
-  const goalAdj = { fatLoss:-0.18, maintain:0, gain:0.14, definition:-0.14 };
-  const adj = goalAdj[goal] || 0;
-  let kcal = Math.round(tdee*(1+adj));
-
-  // ── Pavimento calorico: max(BMR×1.1, ACSM minimum) ──
-  // ACSM raccomanda: donne ≥1200 kcal, uomini ≥1500 kcal (ACSM Position Stand 2021)
-  // Mifflin×1.1 garantisce copertura del metabolismo basale + termogenesi alimentare
-  const bmr = data.gender === "M"
-    ? 10*data.weight + 6.25*data.height - 5*data.age + 5
-    : 10*data.weight + 6.25*data.height - 5*data.age - 161;
-  const acsmFloor = data.gender === "M" ? 1500 : 1200;
-  const minCal = Math.max(Math.round(bmr * 1.1), acsmFloor);
-  let calorieFloor = false;
-  if (kcal < minCal) { kcal = minCal; calorieFloor = true; }
+  const energy = calculateProfileCalorieTarget({ ...data, tdee, goal });
+  const { calories: kcal, calorieFloor, minCalories: minCal } = energy;
 
   // ── Macro ratios per obiettivo ──
   // ── Fat ratio per obiettivo (% calorie) ──
@@ -14382,8 +14380,8 @@ const GoalStep = ({d, u, page}) => {
       ? (t("goal.warn.bmi.high"))
       : null : null;
 
-const minBf = d.gender === "F" ? 14 : 6; // ACSM: grasso essenziale min + margine di sicurezza
-  const maxBf = d.gender === "F" ? 38 : 32;
+const minBf = normalizeSex(d.gender) === "female" ? 14 : 6; // ACSM: grasso essenziale min + margine di sicurezza
+  const maxBf = normalizeSex(d.gender) === "female" ? 38 : 32;
   const bfNum = d.targetBf !== "" && d.targetBf != null ? parseFloat(d.targetBf) : null;
   const bfWarn = bfNum !== null
     ? bfNum < minBf
@@ -15556,9 +15554,11 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   const healthConsentRequired = step === 0 && !data.healthDataConsent;
   const wearableConsentRequired = step === 5 && selectedWearables.length > 0;
   const isValidNum = (v, min, max) => Number.isFinite(Number(v)) && v !== null && v !== "" && Number(v) >= min && Number(v) <= max;
+  let genderComplete = false;
+  try { normalizeSex(data.gender); genderComplete = true; } catch {}
   const physicalIncomplete = step === 1 && (
     subStep === 0
-      ? !data.gender
+      ? !genderComplete
       : !(isValidNum(data.age, 14, 85) && isValidNum(data.height, 140, 220) && isValidNum(data.weight, 35, 250))
   );
   const selectedWorkoutCount = Number.parseInt(String(data.workoutDays || "0").split("-")[0],10) || 0;
@@ -20522,7 +20522,7 @@ const handleSaveProfile = async () => {
   const updatedData = {
     ...userData,
     name: pick("name", userData?.name || ""),
-    gender: pick("gender", userData?.gender || "M"),
+    gender: pick("gender", userData?.gender || ""),
     age: Number(pick("age", userData?.age || 18)),
     height: Number(pick("height", userData?.height || 170)),
     weight: Number(pick("weight", userData?.weight || 70)),
@@ -20540,6 +20540,12 @@ const handleSaveProfile = async () => {
     breakfastPref: toAppBreakfast(pick("breakfast_pref", userData?.breakfastPref || "entrambi")),
     wearable: pick("wearable_provider", userData?.wearable || "none")
   };
+  try {
+    updatedData.gender = normalizeSex(updatedData.gender) === "male" ? "M" : "F";
+  } catch (error) {
+    setProfileMessage(error.code);
+    return;
+  }
 
   setSavingProfile(true);
   setConfirmProfileSave(false);
@@ -20547,8 +20553,8 @@ const handleSaveProfile = async () => {
   try {
     const saved = await saveOnboardingToBackend(updatedData);
 
-    if (!saved) {
-      setProfileMessage(t("set.edit.error"));
+    if (!saved || saved.error) {
+      setProfileMessage(saved?.error || t("set.edit.error"));
       return;
     }
 
@@ -22700,7 +22706,11 @@ await openAppWithDailySchedule(data);
                 legalAcceptedAt: c?.legalAcceptedAt || c?.privacyAcceptedAt || new Date().toISOString(),
                 healthDataConsentAt: c?.healthDataConsentAt || c?.privacyAcceptedAt || new Date().toISOString()
               };
-              await saveOnboardingToBackend(dataToGenerate);
+              const saved = await saveOnboardingToBackend(dataToGenerate);
+              if (saved?.error) {
+                setBetaAccessMessage(saved.error);
+                return;
+              }
               if (getOAuthWearableProvider(dataToGenerate) && dataToGenerate?.wearableConsent) {
                 setPendingPlanData(dataToGenerate);
                 setPhase("wearable-connect");
