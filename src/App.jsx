@@ -499,6 +499,7 @@ const getTrainingSessionsFromData = (data = {}) => normalizeTrainingSessions(
   ?? data.sport_onboarding_contract?.training?.sessions
   ?? []
 ).map(session=>({...session,sport_id:session.sport_id?toCanonicalSport(session.sport_id):session.sport_id}));
+const WORKOUT_DAYS_BANDS = new Set(["0","1-2","3-4","5-6","7"]);
 const buildSportOnboardingContract = (data = {}) => {
   const sports = normalizeSports(data.sports, data.sport);
   const primaryId = sports[0] || "";
@@ -507,11 +508,16 @@ const buildSportOnboardingContract = (data = {}) => {
   const secondaries = sports.slice(1).map(id => sportEntryForContract(id, "", details[id] || {}));
   const semanticStatus = !primary ? "UNKNOWN" : primary.is_custom ? "SEMANTIC_MAPPING_REQUIRED" : isKnownSportId(SPORT_CATALOG, primary.sport_id, LEGACY_SPORT_IDS) ? "APPROVED" : "UNKNOWN";
   const weightClassApplicable = Boolean(primary && WEIGHT_CLASS_SPORTS.has(primary.sport_id));
+  const workoutDaysBand = data.workoutDaysBand ?? data.workout_days_band
+    ?? (WORKOUT_DAYS_BANDS.has(String(data.workoutDays ?? data.workout_days ?? ""))
+      ? String(data.workoutDays ?? data.workout_days)
+      : null);
   return {
     contract_version: "nutrition_engine_onboarding_contract_v1",
     sports: { primary, secondary: secondaries },
     training: {
-      sessions_per_week: Number(data.workoutDays ?? data.workout_days ?? 0) || 0,
+      sessions_per_week: null,
+      workout_days_band: workoutDaysBand,
       usual_duration_min: durationToMinutes(data.workoutDuration ?? data.workout_duration),
       sessions: getTrainingSessionsFromData(data),
       double_sessions: Boolean(data.doubleSessions ?? data.double_sessions ?? false)
@@ -991,6 +997,7 @@ const saveOnboardingToBackend = async (data) => {
     target_body_fat: data.targetBf ? Number(data.targetBf) : null,
 
     workout_days: parseInt(String(data.workoutDays).split("-")[0], 10),
+    workout_days_band: canonicalData.sportOnboardingContract.training.workout_days_band,
     workout_duration: data.workoutDuration,
     workout_intensity: canonicalData.workoutIntensity,
 
@@ -15237,6 +15244,7 @@ const PreferencesStep = ({d, u, page}) => {
         legacySport={d.sport}
         onChange={sessions=>{
           u("trainingSessions",sessions);
+          // This legacy field remains a visible distinct-weekday count; backend session totals use training_sessions.
           u("workoutDays",String(new Set(sessions.map(session=>session.day_of_week)).size));
           u("doubleSessions",[...new Set(sessions.map(session=>session.day_of_week))]
             .some(day=>sessions.filter(session=>session.day_of_week===day).length > 1));
@@ -15482,7 +15490,11 @@ const normalizeInitialOnboardingData = (source) => {
     weight: source.weight || defaultOnboardingData.weight,
     goal: toAppGoal(source.goal || defaultOnboardingData.goal),
     targetWeight: source.target_weight || source.targetWeight || "",
-    workoutDays: source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
+    workoutDays: source.workout_days_band || source.workoutDaysBand || source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
+    workoutDaysBand: source.workout_days_band || source.workoutDaysBand
+      || source.sport_onboarding_contract?.training?.workout_days_band
+      || source.sportOnboardingContract?.training?.workout_days_band
+      || null,
     workoutDuration: source.workout_duration || source.workoutDuration || defaultOnboardingData.workoutDuration,
     workoutIntensity: toAppIntensity(source.workout_intensity || source.workoutIntensity || defaultOnboardingData.workoutIntensity),
     diet: toCanonicalDiet(source.diet || defaultOnboardingData.diet),
