@@ -4,6 +4,12 @@ import { normalizeSex } from "../src/normalizeSex.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "../src/nutritionFallback.mjs";
 import { calculateProfileCalorieTarget } from "../src/planEnergy.mjs";
 
+const maleFloorCheck = calculateProfileCalorieTarget({
+  gender: "male", age: 30, height: 175, weight: 80, tdee: 1800, goal: "fatLoss"
+});
+assert.equal(maleFloorCheck.minCalories, Math.round(maleFloorCheck.bmr));
+assert.equal(maleFloorCheck.calories, Math.round(maleFloorCheck.bmr));
+
 function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -74,7 +80,7 @@ for (const profile of profiles) {
     : 10 * Number(profile.weight) + 6.25 * Number(profile.height) - 5 * Number(profile.age) - 161;
   const beforeCalories = Math.max(
     Math.round(tdeeBefore * (1 + (goalAdjustment[goal] || 0))),
-    Math.round(beforeBmr * 1.1),
+    Math.round(beforeBmr * 1.0),
     oldGender === "M" ? 1500 : 1200
   );
   const afterCalories = calculateProfileCalorieTarget({

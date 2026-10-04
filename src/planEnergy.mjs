@@ -8,7 +8,7 @@ export function calculateProfileCalorieTarget({ gender, age, height, weight, tde
     ? 10 * weight + 6.25 * height - 5 * age + 5
     : 10 * weight + 6.25 * height - 5 * age - 161;
   const acsmFloor = sex === "male" ? 1500 : 1200;
-  const minCalories = Math.max(Math.round(bmr * 1.1), acsmFloor);
+  const minCalories = Math.max(Math.round(bmr * 1.0), acsmFloor);
   const calorieFloor = calories < minCalories;
   if (calorieFloor) calories = minCalories;
   return { calories, calorieFloor, minCalories, bmr };
