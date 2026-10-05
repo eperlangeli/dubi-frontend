@@ -12,6 +12,7 @@ import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessi
 import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
 import { allPastMealsAnswered, confirmationFromSelection, trainingChangeMessage } from "./trainingChangeConfirmation.mjs";
 import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, isKnownSportId, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
+import { trainingEligibility } from "./trainingEligibilityModel.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 import { normalizeSex } from "./normalizeSex.mjs";
 import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
@@ -14587,15 +14588,12 @@ const SportSearchPicker = ({ value, legacyValue = "", selectionMetadata = {}, on
   const catalog=useSportCatalog();
   const selected=normalizeSports(value,legacyValue);
   const [query,setQuery]=useState("");
-  const [customMode,setCustomMode]=useState(false);
-  const [answers,setAnswers]=useState({movement_type:"",usual_duration:"",intensity:"",session_role:""});
+  const [declined,setDeclined]=useState(false);
   const matches=searchSports(catalog,query,lang);
   const result=query.trim()?classifySportSearch(catalog,query):null;
   const suggestion=result?.kind==="unmatched"?result.suggestion:null;
-  const labels=lang==="it"?["Tipo di movimento","Durata abituale","Intensità","Ruolo della sessione"]:["Movement type","Usual duration","Intensity","Session role"];
-  const keys=["movement_type","usual_duration","intensity","session_role"];
   const inputStyle={width:"100%",boxSizing:"border-box",padding:11,borderRadius:12,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:13};
-  useEffect(()=>{setCustomMode(false);},[query]);
+  useEffect(()=>{setDeclined(false);},[query]);
   useEffect(()=>{
     const normalized=normalizeSportSearch(query);if(normalized.length<2||matches.length)return undefined;
     const day=new Date().toISOString().slice(0,10),key=`${normalized}|${day}`;
@@ -14606,24 +14604,88 @@ const SportSearchPicker = ({ value, legacyValue = "", selectionMetadata = {}, on
     },450);return()=>window.clearTimeout(timer);
   },[query,matches.length]);
   const add=(id,metadata={})=>{if(selected.includes(id)||selected.length>=5)return;onChange([...selected,id],metadata);setQuery("");};
-  const customSave=()=>{
-    if(keys.some(key=>!answers[key].trim()))return;
-    const name=query.trim(),id=`custom:${normalizeSportSearch(name).replace(/\s+/g,"_").slice(0,48)||"unspecified"}`;
-    add(id,{[id]:{custom_name:name,custom_context:answers,selection_method:"CUSTOM_MAPPING_REQUIRED"}});
-    setAnswers({movement_type:"",usual_duration:"",intensity:"",session_role:""});setCustomMode(false);
-  };
+  // D-022: nessuno sport personalizzato. Se lo sport non c'è, DUBI consiglia il più simile e l'utente sceglie dal catalogo.
+  const popular=POPULAR_SPORT_IDS.map(id=>catalog.find(row=>row.sport_id===id)).filter(Boolean);
+  const chip=(sport)=><button type="button" key={sport.sport_id} onClick={()=>add(sport.sport_id)} style={{padding:"7px 10px",borderRadius:999,border:`1px solid ${selected.includes(sport.sport_id)?T.accent:T.border}`,background:selected.includes(sport.sport_id)?T.sel:T.card,color:T.text,fontSize:11,fontWeight:800}}>{lang==="it"?sport.name_it:sport.name_en}</button>;
   return <div>
     <input aria-label={lang==="it"?"Cerca uno sport":"Search sports"} value={query} onChange={event=>setQuery(event.target.value)} placeholder={lang==="it"?"Cerca in italiano o inglese":"Search in Italian or English"} style={inputStyle}/>
-    {!query.trim()&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>{POPULAR_SPORT_IDS.map(id=>{const sport=catalog.find(row=>row.sport_id===id);return sport&&<button type="button" key={id} onClick={()=>add(id)} style={{padding:"7px 10px",borderRadius:999,border:`1px solid ${selected.includes(id)?T.accent:T.border}`,background:selected.includes(id)?T.sel:T.card,color:T.text,fontSize:11,fontWeight:800}}>{lang==="it"?sport.name_it:sport.name_en}</button>;})}</div>}
+    {!query.trim()&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>{popular.map(chip)}</div>}
     {query.trim()&&matches.length>0&&<div role="listbox" style={{maxHeight:190,overflowY:"auto",marginTop:6,border:`1px solid ${T.border}`,borderRadius:12,background:T.card}}>{matches.slice(0,8).map(sport=><button type="button" role="option" key={sport.sport_id} onClick={()=>add(sport.sport_id)} style={{display:"block",width:"100%",padding:10,border:0,borderBottom:`1px solid ${T.border}`,background:selected.includes(sport.sport_id)?T.sel:"transparent",color:T.text,textAlign:"left",fontSize:12}}>{lang==="it"?sport.name_it:sport.name_en}</button>)}</div>}
-    {query.trim()&&!matches.length&&suggestion&&!customMode&&<div style={{marginTop:10,padding:12,borderRadius:12,background:T.sel,border:`1px solid ${T.border}`}}>
-      <p style={{margin:"0 0 9px",fontSize:12,color:T.text}}>{lang==="it"?`Non ho «${query}» in lista. Il più simile è ${suggestion.name_it}: va bene?`:`I don't have “${query}” in the list. The closest match is ${suggestion.name_en}. Is that right?`}</p>
-      <div style={{display:"flex",gap:8}}><button type="button" onClick={()=>add(suggestion.sport_id,{[suggestion.sport_id]:{selection_method:"USER_CONFIRMED_SUGGESTION",searched_text:query.trim()}})}>{lang==="it"?"Sì":"Yes"}</button><button type="button" onClick={()=>setCustomMode(true)}>{lang==="it"?"No, scelgo io":"No, describe mine"}</button></div>
+    {query.trim()&&!matches.length&&suggestion&&!declined&&<div data-testid="sport-suggestion" style={{marginTop:10,padding:12,borderRadius:12,background:T.sel,border:`1px solid ${T.border}`}}>
+      <p style={{margin:"0 0 9px",fontSize:12,color:T.text}}>{lang==="it"?`Non ho «${query.trim()}» in lista. Il più simile è ${suggestion.name_it}: va bene?`:`I don't have “${query.trim()}” in the list. The closest match is ${suggestion.name_en}. Is that right?`}</p>
+      <div style={{display:"flex",gap:8}}><button type="button" onClick={()=>add(suggestion.sport_id,{[suggestion.sport_id]:{selection_method:"USER_CONFIRMED_SUGGESTION",searched_text:query.trim()}})}>{lang==="it"?"Sì":"Yes"}</button><button type="button" onClick={()=>setDeclined(true)}>{lang==="it"?"No, scelgo io":"No, I'll choose"}</button></div>
     </div>}
-    {query.trim()&&!matches.length&&!suggestion&&!customMode&&<button type="button" onClick={()=>setCustomMode(true)} style={{marginTop:9}}>{lang==="it"?"Non è questo: descrivi il tuo sport":"No match: describe your sport"}</button>}
-    {customMode&&<div style={{display:"grid",gap:7,marginTop:10}}><p style={{fontSize:11,color:T.muted,margin:0}}>{lang==="it"?"La mappatura resta in attesa di valutazione; non vengono dedotte calorie.":"Mapping remains pending review; no calories are inferred."}</p>{keys.map((key,index)=><input key={key} aria-label={labels[index]} placeholder={labels[index]} value={answers[key]} onChange={event=>setAnswers(prev=>({...prev,[key]:event.target.value}))} style={inputStyle}/>)}<button type="button" disabled={keys.some(key=>!answers[key].trim())} onClick={customSave}>{lang==="it"?"Salva sport da valutare":"Save for review"}</button></div>}
+    {query.trim()&&!matches.length&&(!suggestion||declined)&&<div data-testid="sport-not-in-catalog" style={{marginTop:10}}>
+      <p style={{margin:"0 0 8px",fontSize:12,color:T.text}}>{lang==="it"?`Non ho «${query.trim()}» in lista. Scegli lo sport più simile per tipo di sforzo, oppure prova un altro nome.`:`I don't have “${query.trim()}” in the list. Pick the most similar sport by type of effort, or try another name.`}</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{popular.map(chip)}</div>
+    </div>}
     {selected.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:9}}>{selected.map(id=><button type="button" key={id} onClick={()=>onChange(selected.filter(item=>item!==id))} style={{padding:"6px 9px",borderRadius:999,border:`1px solid ${T.border}`,background:T.sel,color:T.text,fontSize:11}}>{selectionMetadata[id]?.custom_name||catalog.find(item=>item.sport_id===id)?.[lang==="it"?"name_it":"name_en"]||(id.startsWith("custom:")?id.slice(7).replace(/_/g," "):getSportLabel(id,t,lang))} ×</button>)}</div>}
     <p style={{margin:"9px 2px 0",fontSize:11,fontWeight:800,color:T.accentD}}>{selected.length} / 5 {lang==="it"?"selezionati":"selected"}</p>
+  </div>;
+};
+
+// D-019 (Registro decisioni, 5 ottobre 2026): chi si allena ma non ha uno sport valido sceglie,
+// prima del piano, uno o più sport del catalogo, ognuno confermato, oppure "Non pratico sport".
+// Un testo salvato non si converte mai da solo: si propone lo sport più vicino e l'utente conferma.
+const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan }) => {
+  const {lang}=useT();
+  const it=lang==="it";
+  const [step,setStep]=useState("intro");
+  const [chosen,setChosen]=useState(eligibility.valid);
+  const [metadata,setMetadata]=useState({});
+  const [answered,setAnswered]=useState({});
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState("");
+  const pending=eligibility.invalid.filter(item=>item.suggestion&&!answered[item.raw]&&!chosen.includes(item.suggestion.sport_id));
+  const saveProfile=async(updated,reason)=>{
+    setBusy(true);setMessage("");
+    try{
+      const saved=await saveOnboardingToBackend(updated);
+      if(!saved||saved.error)throw new Error(saved?.error||"sport_save_failed");
+      setUserData(updated);saveDubiProfile(updated);
+      const {plan:nextPlan}=await generateAiPlanFromBackend(updated,{date:getTodayIsoDate(),force:true,reason,throwOnFailure:true});
+      if(nextPlan)setPlan(nextPlan);
+    }catch(error){
+      console.error("Sport selection save failed:",error);
+      setMessage(it?"Non sono riuscito a salvare. Riprova tra poco.":"Could not save. Please try again shortly.");
+    }finally{setBusy(false);}
+  };
+  const confirmSports=()=>{
+    if(!chosen.length||pending.length)return;
+    saveProfile({...userData,sports:chosen,sport:chosen[0],sportSelectionMetadata:{...(userData?.sportSelectionMetadata||{}),...metadata}},"sport_required_confirmed");
+  };
+  const noSport=()=>saveProfile({...userData,sports:[],sport:"",workoutDays:"0",workout_days:0,workoutDaysBand:"0",workout_days_band:"0",trainingSessions:[],training_sessions:[],doubleSessions:false,double_sessions:false},"sport_required_no_training");
+  const answer=(item,accepted)=>{
+    setAnswered(prev=>({...prev,[item.raw]:true}));
+    if(accepted&&chosen.length<5&&!chosen.includes(item.suggestion.sport_id)){
+      setChosen(prev=>[...prev,item.suggestion.sport_id]);
+      setMetadata(prev=>({...prev,[item.suggestion.sport_id]:{selection_method:"USER_CONFIRMED_SUGGESTION",searched_text:item.text}}));
+    }
+  };
+  const btn=(primary)=>({flex:1,padding:12,borderRadius:12,border:primary?"none":`1px solid ${T.border}`,background:primary?T.accentD:T.bg,color:primary?"#E8E4DC":T.text,fontWeight:900,fontSize:13,cursor:"pointer"});
+  return <div data-testid="sport-required-screen" role="dialog" aria-modal="true" style={{position:"fixed",inset:0,zIndex:1000,background:T.bg,overflowY:"auto",padding:"calc(28px + env(safe-area-inset-top, 0px)) 20px calc(28px + env(safe-area-inset-bottom, 0px))"}}>
+    <div style={{maxWidth:520,margin:"0 auto"}}>
+      <h2 style={{fontSize:22,fontWeight:900,color:T.text,margin:"0 0 12px"}}>{it?"Quali sport pratichi?":"Which sports do you practise?"}</h2>
+      <p style={{fontSize:14,lineHeight:1.55,color:T.text,margin:"0 0 10px"}}>{it?"Per costruire il tuo piano, DUBI ha bisogno di sapere quali sport pratichi. Ogni disciplina richiede un'energia diversa: con questa informazione calcoliamo con precisione cosa mangiare nei giorni di allenamento e in quelli di riposo.":"To build your plan, DUBI needs to know which sports you practise. Each discipline requires different energy: with this information we calculate precisely what to eat on training days and on rest days."}</p>
+      <p style={{fontSize:12,lineHeight:1.5,color:T.muted,margin:"0 0 18px"}}>{it?"Puoi sceglierne più di uno e modificarli quando vuoi dalle impostazioni.":"You can choose more than one and change them anytime in settings."}</p>
+      {step==="intro"&&<div style={{display:"flex",gap:8}}>
+        <button type="button" data-testid="sport-required-choose" onClick={()=>setStep("choose")} disabled={busy} style={btn(true)}>{it?"Scegli i tuoi sport":"Choose your sports"}</button>
+        <button type="button" data-testid="sport-required-none" onClick={noSport} disabled={busy} style={btn(false)}>{it?"Non pratico sport":"I don't practise sports"}</button>
+      </div>}
+      {step==="choose"&&<div>
+        {pending.map(item=><div key={item.raw} data-testid="sport-required-suggestion" style={{marginBottom:10,padding:12,borderRadius:12,background:T.sel,border:`1px solid ${T.border}`}}>
+          <p style={{margin:"0 0 9px",fontSize:13,color:T.text}}>{it?`Hai indicato «${item.text}»: intendi ${item.suggestion.name_it}?`:`You entered “${item.text}”: do you mean ${item.suggestion.name_en}?`}</p>
+          <div style={{display:"flex",gap:8}}><button type="button" onClick={()=>answer(item,true)}>{it?"Sì":"Yes"}</button><button type="button" onClick={()=>answer(item,false)}>{it?"No, scelgo io":"No, I'll choose"}</button></div>
+        </div>)}
+        {eligibility.invalid.filter(item=>item.text&&!item.suggestion).map(item=><p key={item.raw} style={{fontSize:12,color:T.text,margin:"0 0 10px"}}>{it?`Hai indicato «${item.text}», che non è nel nostro elenco. Scegli lo sport più simile qui sotto.`:`You entered “${item.text}”, which is not in our list. Choose the most similar sport below.`}</p>)}
+        <SportSearchPicker value={chosen} selectionMetadata={metadata} onChange={(next,meta={})=>{setChosen(next);setMetadata(prev=>({...prev,...meta}));}}/>
+        <div style={{display:"flex",gap:8,marginTop:16}}>
+          <button type="button" data-testid="sport-required-confirm" onClick={confirmSports} disabled={busy||!chosen.length||pending.length>0} style={{...btn(true),opacity:(busy||!chosen.length||pending.length>0)?0.5:1}}>{it?"Conferma":"Confirm"}</button>
+          <button type="button" onClick={noSport} disabled={busy} style={btn(false)}>{it?"Non pratico sport":"I don't practise sports"}</button>
+        </div>
+      </div>}
+      {message&&<p role="alert" style={{fontSize:12,color:"#9A3D32",marginTop:12}}>{message}</p>}
+    </div>
   </div>;
 };
 
@@ -16536,6 +16598,9 @@ const ResearchInviteCard = ({userData, setUserData}) => {
 };
 
 const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDay,onOpenSettings,onEditDailySchedule}) => {
+  // D-018 / D-019: card solo per chi fa sport; chi si allena senza sport valido sceglie prima del piano.
+  const sportCatalog = useSportCatalog();
+  const eligibility = trainingEligibility({ userData, rawSports: normalizeSports(userData?.sports, userData?.sport), catalog: sportCatalog, legacyIds: LEGACY_SPORT_IDS });
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
   const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
@@ -17032,7 +17097,8 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
-      <TodayWorkoutCard userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan}/>
+      {eligibility.status === "sport_required" && <SportRequiredScreen userData={userData} eligibility={eligibility} setUserData={setUserData} setPlan={setPlan}/>}
+      {eligibility.status === "eligible" && <TodayWorkoutCard userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan}/>}
       <LegacyMartialArtsPrompt userData={userData} setUserData={setUserData}/>
       {plan?.dailyMealSchedule && onEditDailySchedule && <button type="button" onClick={onEditDailySchedule} style={{margin:'10px 20px 0',padding:'8px 0',border:0,background:'transparent',color:'#315d4b',fontSize:13,fontWeight:700,cursor:'pointer'}}>{lang === 'it' ? 'Modifica gli orari dei pasti di oggi' : 'Edit today’s meal times'}</button>}
 

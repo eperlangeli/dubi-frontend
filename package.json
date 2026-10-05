@@ -23,7 +23,8 @@
     "check:config": "node scripts/validate-app-config.js",
     "test:home-browser": "node scripts/test-home-consumption-browser.mjs",
     "test:routing-safety": "node scripts/test-no-name-substitution.mjs",
-    "test:training-card": "node scripts/test-today-workout-card.mjs"
+    "test:training-card": "node scripts/test-today-workout-card.mjs",
+    "test:training-eligibility": "node scripts/test-training-eligibility.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

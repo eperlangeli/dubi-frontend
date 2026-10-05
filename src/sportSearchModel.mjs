@@ -10,6 +10,17 @@ export const LEGACY_SPORT_ID_ALIASES = Object.freeze({
   football:"soccer", kayak:"canoe_kayak", nordic_ski:"cross_country_ski", sprint:"sprint_track",
   surf:"surfing", equestrian:"horse_riding", baseball:"baseball_softball", cycling:"cycling_road", gym:"resistance_training",
 });
+// Sinonimi di ricerca (D-019 / D-022): servono solo a trovare e a proporre uno sport del catalogo.
+// Non assegnano mai uno sport da soli: l'utente conferma sempre la proposta.
+export const SPORT_SEARCH_SYNONYMS = Object.freeze({
+  skateboarding: ["skate"],
+  calisthenics: ["corpo libero", "a corpo libero", "bodyweight", "street workout"],
+});
+const searchNames = (sport) => [
+  sport.sport_id.replace(/_/g, " "), sport.name_it, sport.name_en,
+  ...(SPORT_SEARCH_SYNONYMS[sport.sport_id] || []),
+].map(normalizeSportSearch).filter(Boolean);
+
 export const canonicalSportId = (value) => {
   const raw=String(value||"").trim().toLowerCase();
   if(/^custom:[a-z0-9_:-]+$/.test(raw))return raw;
@@ -39,8 +50,7 @@ export const searchSports = (sports, query, language = "it") => {
   const q = normalizeSportSearch(query);
   const name = (sport) => language === "it" ? sport.name_it : sport.name_en;
   if (!q) return POPULAR_SPORT_IDS.map((id) => sports.find((sport) => sport.sport_id === id)).filter(Boolean);
-  return sports.filter((sport) => [sport.sport_id.replace(/_/g, " "), sport.name_it, sport.name_en]
-    .some((value) => normalizeSportSearch(value).includes(q)))
+  return sports.filter((sport) => searchNames(sport).some((value) => value.includes(q)))
     .sort((a, b) => name(a).localeCompare(name(b), language));
 };
 
@@ -48,10 +58,14 @@ export const suggestSport = (sports, query) => {
   const q = normalizeSportSearch(query);
   if (!q) return null;
   const candidates = sports.map((sport) => {
-    const names = [sport.sport_id.replace(/_/g, " "), sport.name_it, sport.name_en].map(normalizeSportSearch);
+    const names = searchNames(sport);
     const score = Math.max(...names.map((candidate) => {
       if (candidate === q) return 1;
-      if (candidate.includes(q) || q.includes(candidate)) return Math.min(candidate.length, q.length) / Math.max(candidate.length, q.length);
+      if (candidate.includes(q) || q.includes(candidate)) {
+        const ratio = Math.min(candidate.length, q.length) / Math.max(candidate.length, q.length);
+        // Contenimento di una parola intera di almeno 4 lettere ("skate" in "skateboard"): proposta forte.
+        return Math.min(candidate.length, q.length) >= 4 ? 0.7 + 0.3 * ratio : ratio;
+      }
       return 1 - distance(q, candidate) / Math.max(q.length, candidate.length, 1);
     }));
     return { sport, score };
@@ -62,5 +76,6 @@ export const suggestSport = (sports, query) => {
 export const classifySportSearch = (sports, query) => {
   const exact = sports.find((sport) => [sport.sport_id.replace(/_/g, " "), sport.name_it, sport.name_en]
     .some((value) => normalizeSportSearch(value) === normalizeSportSearch(query)));
+  // Un sinonimo non è mai "exact": diventa solo una proposta da confermare.
   return exact ? { kind: "exact", sport: exact } : { kind: "unmatched", suggestion: suggestSport(sports, query) };
 };
