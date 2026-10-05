@@ -65,4 +65,17 @@ assert(!app.includes('CUSTOM_MAPPING_REQUIRED'), 'D-022: no custom sport mapping
 assert(!app.includes('Salva sport da valutare'), 'D-022: no custom sport save');
 assert(!app.includes('descrivi il tuo sport'), 'D-022: no free-text sport description');
 
+// D-018: l'assistente apre solo la schermata dell'allenamento
+const { SUPPORTED_PLAN_CHANGE_ACTIONS, isSupportedPlanChange } = await import('../src/meal-replacement.mjs');
+assert(SUPPORTED_PLAN_CHANGE_ACTIONS.includes('open_training_card'));
+assert.equal(isSupportedPlanChange({ action: 'set_sport' }), false);
+assert(app.includes('planChange.action === "open_training_card"'), 'assistant action handled');
+assert(app.includes('onOpenTrainingCard={openTrainingCardFromAssistant}'), 'assistant wired to TodayScreen');
+assert(app.includes('mode="activate"'), 'activation screen for users without declared training');
+assert(app.includes('data-testid="sport-activation-routine"'), 'activation asks days, duration and intensity');
+// nessuna risposta preselezionata nella schermata di attivazione (D-011 B)
+assert(app.includes('const [daysBand,setDaysBand]=useState("");'));
+assert(app.includes('const [duration,setDuration]=useState("");'));
+assert(app.includes('const [intensity,setIntensity]=useState("");'));
+
 console.log(JSON.stringify({ test: 'training-eligibility-d018-d019-d022', failures_total: 0 }, null, 2));

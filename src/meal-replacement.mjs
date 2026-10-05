@@ -1,6 +1,7 @@
 export const SUPPORTED_PLAN_CHANGE_ACTIONS = Object.freeze([
   "replace_meal",
   "open_settings",
+  "open_training_card",
 ]);
 
 export function isSupportedPlanChange(change) {

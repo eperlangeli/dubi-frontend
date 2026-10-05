@@ -12,7 +12,7 @@ import { buildTodayWorkoutCardState, getTrainingSessionsForDate, isTrainingSessi
 import { confirmScheduledTraining as postScheduledTrainingConfirmation } from "./trainingConfirmationApi.mjs";
 import { allPastMealsAnswered, confirmationFromSelection, trainingChangeMessage } from "./trainingChangeConfirmation.mjs";
 import { canonicalSportId as canonicalSportCatalogId, classifySportSearch, isKnownSportId, normalizeSportSearch, POPULAR_SPORT_IDS, searchSports } from "./sportSearchModel.mjs";
-import { trainingEligibility } from "./trainingEligibilityModel.mjs";
+import { declaresTraining, trainingEligibility } from "./trainingEligibilityModel.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 import { normalizeSex } from "./normalizeSex.mjs";
 import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
@@ -12927,7 +12927,7 @@ const makeAskThreadTitle = (messages) => {
   return words.join(" ") || "Chat DUBI";
 };
 
-const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) => {
+const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings, onOpenTrainingCard}) => {
   const { t, lang } = useT();
   const [threads, setThreads] = useState(() => loadAskDubiThreads(userData));
   const [activeThreadId, setActiveThreadId] = useState(null);
@@ -13014,6 +13014,13 @@ const AskDubiModal = ({onClose, userData, plan, onPlanChange, onOpenSettings}) =
       dubiHaptic("success");
       setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
       if (onOpenSettings) setTimeout(() => { onClose?.(); onOpenSettings(); }, 250);
+      return;
+    }
+    if (planChange.action === "open_training_card") {
+      // D-018: nessun dato passa dall'assistente; si apre solo la schermata dell'allenamento.
+      dubiHaptic("success");
+      setMessages(ms => ms.map(m => m.id===msgId ? {...m, applied:true} : m));
+      setTimeout(() => { onClose?.(); onOpenTrainingCard?.(); }, 250);
       return;
     }
     if (planChange.action === "replace_meal" && onPlanChange) {
@@ -14627,10 +14634,17 @@ const SportSearchPicker = ({ value, legacyValue = "", selectionMetadata = {}, on
 // D-019 (Registro decisioni, 5 ottobre 2026): chi si allena ma non ha uno sport valido sceglie,
 // prima del piano, uno o più sport del catalogo, ognuno confermato, oppure "Non pratico sport".
 // Un testo salvato non si converte mai da solo: si propone lo sport più vicino e l'utente conferma.
-const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan }) => {
-  const {lang}=useT();
+// mode "required": D-019 (si allena senza sport valido). mode "activate": D-018, aperta dall'assistente da chi
+// non ha ancora dichiarato di fare sport; in quel caso chiede anche giorni, durata e intensità, senza preselezioni.
+const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan, mode = "required", onClose }) => {
+  const {lang,t}=useT();
   const it=lang==="it";
+  const activate=mode==="activate";
+  const needsRoutine=activate&&!declaresTraining(userData);
   const [step,setStep]=useState("intro");
+  const [daysBand,setDaysBand]=useState("");
+  const [duration,setDuration]=useState("");
+  const [intensity,setIntensity]=useState("");
   const [chosen,setChosen]=useState(eligibility.valid);
   const [metadata,setMetadata]=useState({});
   const [answered,setAnswered]=useState({});
@@ -14645,14 +14659,17 @@ const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan }) =>
       setUserData(updated);saveDubiProfile(updated);
       const {plan:nextPlan}=await generateAiPlanFromBackend(updated,{date:getTodayIsoDate(),force:true,reason,throwOnFailure:true});
       if(nextPlan)setPlan(nextPlan);
+      onClose?.();
     }catch(error){
       console.error("Sport selection save failed:",error);
       setMessage(it?"Non sono riuscito a salvare. Riprova tra poco.":"Could not save. Please try again shortly.");
     }finally{setBusy(false);}
   };
+  const routineMissing=needsRoutine&&(!daysBand||!duration||!intensity);
   const confirmSports=()=>{
-    if(!chosen.length||pending.length)return;
-    saveProfile({...userData,sports:chosen,sport:chosen[0],sportSelectionMetadata:{...(userData?.sportSelectionMetadata||{}),...metadata}},"sport_required_confirmed");
+    if(!chosen.length||pending.length||routineMissing)return;
+    const routine=needsRoutine?{workoutDays:daysBand,workoutDaysBand:daysBand,workout_days_band:daysBand,workoutDuration:duration,workout_duration:duration,workoutIntensity:intensity,workout_intensity:intensity}:{};
+    saveProfile({...userData,...routine,sports:chosen,sport:chosen[0],sportSelectionMetadata:{...(userData?.sportSelectionMetadata||{}),...metadata}},activate?"training_activated_from_assistant":"sport_required_confirmed");
   };
   const noSport=()=>saveProfile({...userData,sports:[],sport:"",workoutDays:"0",workout_days:0,workoutDaysBand:"0",workout_days_band:"0",trainingSessions:[],training_sessions:[],doubleSessions:false,double_sessions:false},"sport_required_no_training");
   const answer=(item,accepted)=>{
@@ -14670,7 +14687,9 @@ const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan }) =>
       <p style={{fontSize:12,lineHeight:1.5,color:T.muted,margin:"0 0 18px"}}>{it?"Puoi sceglierne più di uno e modificarli quando vuoi dalle impostazioni.":"You can choose more than one and change them anytime in settings."}</p>
       {step==="intro"&&<div style={{display:"flex",gap:8}}>
         <button type="button" data-testid="sport-required-choose" onClick={()=>setStep("choose")} disabled={busy} style={btn(true)}>{it?"Scegli i tuoi sport":"Choose your sports"}</button>
-        <button type="button" data-testid="sport-required-none" onClick={noSport} disabled={busy} style={btn(false)}>{it?"Non pratico sport":"I don't practise sports"}</button>
+        {activate
+          ?<button type="button" data-testid="sport-activation-cancel" onClick={()=>onClose?.()} disabled={busy} style={btn(false)}>{it?"Annulla":"Cancel"}</button>
+          :<button type="button" data-testid="sport-required-none" onClick={noSport} disabled={busy} style={btn(false)}>{it?"Non pratico sport":"I don't practise sports"}</button>}
       </div>}
       {step==="choose"&&<div>
         {pending.map(item=><div key={item.raw} data-testid="sport-required-suggestion" style={{marginBottom:10,padding:12,borderRadius:12,background:T.sel,border:`1px solid ${T.border}`}}>
@@ -14679,9 +14698,25 @@ const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan }) =>
         </div>)}
         {eligibility.invalid.filter(item=>item.text&&!item.suggestion).map(item=><p key={item.raw} style={{fontSize:12,color:T.text,margin:"0 0 10px"}}>{it?`Hai indicato «${item.text}», che non è nel nostro elenco. Scegli lo sport più simile qui sotto.`:`You entered “${item.text}”, which is not in our list. Choose the most similar sport below.`}</p>)}
         <SportSearchPicker value={chosen} selectionMetadata={metadata} onChange={(next,meta={})=>{setChosen(next);setMetadata(prev=>({...prev,...meta}));}}/>
+        {needsRoutine&&<div data-testid="sport-activation-routine">
+          <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q2")}</p>
+          <div style={{display:"flex",gap:6}}>{["1-2","3-4","5-6","7"].map(v=><button type="button" key={v} onClick={()=>setDaysBand(v)} style={{flex:1,padding:"12px 4px",borderRadius:12,border:`1.5px solid ${daysBand===v?T.accent:T.border}`,background:daysBand===v?T.sel:T.card,fontSize:14,fontWeight:daysBand===v?600:400,color:T.text,cursor:"pointer",textAlign:"center"}}>{v}</button>)}</div>
+          <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q3")}</p>
+          <OptBtn value={duration} onChange={setDuration} small options={[
+            {id:"<30",label:t("act.dur.short")},{id:"30-45",label:t("act.dur.mid1")},{id:"45-60",label:t("act.dur.mid2")},{id:"60-90",label:t("act.dur.long")},{id:">90",label:t("act.dur.xlong")},
+          ]} />
+          <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("act.q4")}</p>
+          <OptBtn value={intensity} onChange={setIntensity} small options={[
+            {id:"leggera",label:t("act.int.light"),note:t("act.int.light.note")},
+            {id:"moderata",label:t("act.int.moderate"),note:t("act.int.moderate.note")},
+            {id:"alta",label:t("act.int.high"),note:t("act.int.high.note")},
+          ]} />
+        </div>}
         <div style={{display:"flex",gap:8,marginTop:16}}>
-          <button type="button" data-testid="sport-required-confirm" onClick={confirmSports} disabled={busy||!chosen.length||pending.length>0} style={{...btn(true),opacity:(busy||!chosen.length||pending.length>0)?0.5:1}}>{it?"Conferma":"Confirm"}</button>
-          <button type="button" onClick={noSport} disabled={busy} style={btn(false)}>{it?"Non pratico sport":"I don't practise sports"}</button>
+          <button type="button" data-testid="sport-required-confirm" onClick={confirmSports} disabled={busy||!chosen.length||pending.length>0||routineMissing} style={{...btn(true),opacity:(busy||!chosen.length||pending.length>0||routineMissing)?0.5:1}}>{it?"Conferma":"Confirm"}</button>
+          {activate
+            ?<button type="button" onClick={()=>onClose?.()} disabled={busy} style={btn(false)}>{it?"Annulla":"Cancel"}</button>
+            :<button type="button" onClick={noSport} disabled={busy} style={btn(false)}>{it?"Non pratico sport":"I don't practise sports"}</button>}
         </div>
       </div>}
       {message&&<p role="alert" style={{fontSize:12,color:"#9A3D32",marginTop:12}}>{message}</p>}
@@ -16601,6 +16636,13 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
   // D-018 / D-019: card solo per chi fa sport; chi si allena senza sport valido sceglie prima del piano.
   const sportCatalog = useSportCatalog();
   const eligibility = trainingEligibility({ userData, rawSports: normalizeSports(userData?.sports, userData?.sport), catalog: sportCatalog, legacyIds: LEGACY_SPORT_IDS });
+  const [sportActivationOpen, setSportActivationOpen] = useState(false);
+  // D-018: l'assistente apre soltanto la schermata. Chi ha già sport e allenamenti trova la card in cima alla Home;
+  // chi non li ha dichiarati apre la scelta dello sport (sport, giorni, durata, intensità li inserisce l'utente).
+  const openTrainingCardFromAssistant = () => {
+    if (eligibility.status === "no_training") { setSportActivationOpen(true); return; }
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) {}
+  };
   const { t, lang } = useT();
   const { snapshot: wearableSnapshot, refreshSnapshot } = useWearable();
   const adaptationPlanMeta = normalizeIngredientPlanPayload(plan?.ingredientPlan || plan);
@@ -17098,6 +17140,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
       {eligibility.status === "sport_required" && <SportRequiredScreen userData={userData} eligibility={eligibility} setUserData={setUserData} setPlan={setPlan}/>}
+      {sportActivationOpen && eligibility.status === "no_training" && <SportRequiredScreen mode="activate" userData={userData} eligibility={eligibility} setUserData={setUserData} setPlan={setPlan} onClose={()=>setSportActivationOpen(false)}/>}
       {eligibility.status === "eligible" && <TodayWorkoutCard userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan}/>}
       <LegacyMartialArtsPrompt userData={userData} setUserData={setUserData}/>
       {plan?.dailyMealSchedule && onEditDailySchedule && <button type="button" onClick={onEditDailySchedule} style={{margin:'10px 20px 0',padding:'8px 0',border:0,background:'transparent',color:'#315d4b',fontSize:13,fontWeight:700,cursor:'pointer'}}>{lang === 'it' ? 'Modifica gli orari dei pasti di oggi' : 'Edit today’s meal times'}</button>}
@@ -17583,7 +17626,7 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
 
       {wearableModal && <WearableModal type={wearableModal} onClose={()=>setWearableModal(null)}/>}
       {ingModal && <IngredientModal ingredient={ingModal} onClose={()=>setIngModal(null)}/>}
-      {askOpen && <AskDubiModal onClose={()=>setAskOpen(false)} userData={userData} plan={plan} onPlanChange={handlePlanChange} onOpenSettings={onOpenSettings}/>}
+      {askOpen && <AskDubiModal onClose={()=>setAskOpen(false)} userData={userData} plan={plan} onPlanChange={handlePlanChange} onOpenSettings={onOpenSettings} onOpenTrainingCard={openTrainingCardFromAssistant}/>}
     </div>
   );
 };
