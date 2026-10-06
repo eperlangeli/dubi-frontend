@@ -54,3 +54,6 @@ jobs:
 
       - name: Reject frontend ingredient-name substitutions
         run: node scripts/test-no-name-substitution.mjs
+
+      - name: Goal rules match backend values (D-017a, D-033)
+        run: node scripts/test-goal-macro-rules.mjs

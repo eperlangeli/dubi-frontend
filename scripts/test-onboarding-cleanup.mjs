@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fallbackTdee, normalizeLegacyGoal } from '../src/nutritionFallback.mjs';
+import { toAppGoalStrict } from '../src/goalMacroRules.mjs';
 
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const legacyCompetitionPlanGoal = normalizeLegacyGoal('competition');
 assert.equal(legacyCompetitionPlanGoal, 'maintain');
-assert.match(app, /const toAppGoal\s*=\s*\(value\)\s*=>\s*GOAL_APP_MAP\[toCanonicalGoal\(normalizeLegacyGoal\(value\)\)\]\s*\|\|\s*"maintain"/);
-assert.match(app, /const goal = normalizeLegacyGoal\(data\.goal\) \|\| "maintain"/);
+// D-017a (5 ott 2026): un obiettivo mancante o sconosciuto non diventa più "maintain" (errore esplicito).
+// Resta l'invariante di questo test: il vecchio obiettivo "competition" diventa mantenimento valido.
+assert.equal(toAppGoalStrict('competition'), 'maintain');
+assert.equal(toAppGoalStrict(''), null);
+assert.match(app, /const toAppGoal\s*=\s*\(value\)\s*=>\s*toAppGoalStrict\(value\)/);
+assert.match(app, /const goal = requireGoal\(normalizeLegacyGoal\(data\.goal\)\)/);
 assert.match(app, /"goal\.labels\.maintain"/);
 assert.match(app, /competition:\s*\{\s*participates:\s*false,\s*competition_date:\s*null,\s*competition_name:\s*null\s*\}/s);
 

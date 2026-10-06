@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { normalizeSex } from "../src/normalizeSex.mjs";
 import { fallbackTdee, normalizeLegacyGoal } from "../src/nutritionFallback.mjs";
 import { calculateProfileCalorieTarget } from "../src/planEnergy.mjs";
+import { toAppGoalStrict } from "../src/goalMacroRules.mjs";
 
 const maleFloorCheck = calculateProfileCalorieTarget({
   gender: "male", age: 30, height: 175, weight: 80, tdee: 1800, goal: "fatLoss"
@@ -50,7 +51,11 @@ const intensityKcal = {
   high: 650, alta: 650,
   very_high: 850, molto_alta: 850
 };
-const goalAdjustment = { fatLoss: -0.18, maintain: 0, gain: 0.14, definition: -0.14 };
+// D-017a (5 ott 2026) ha cambiato le percentuali per obiettivo: il confronto con la vecchia
+// formula (-18/+14/-14%) non vale più. Invariante: calorie = obiettivo del backend
+// (x0,8 / x0,9 / x1,15 / x1, tetto perdita 1% del peso a settimana), poi pavimento CAL_01.
+const backendGoalMultiplier = { fatLoss: 0.8, definition: 0.9, gain: 1.15, maintain: 1 };
+const backendDeficitGoals = new Set(["fatLoss", "definition"]);
 const frontendOldTdee = (profile, gender) => {
   const male = gender === "M" || String(gender).toLowerCase() === "male";
   const bmr = male
@@ -66,6 +71,7 @@ const frontendOldTdee = (profile, gender) => {
 let backendIndependentFrontendMismatches = 0;
 let calculableProfiles = 0;
 let incompleteProfiles = 0;
+let profilesWithoutGoal = 0;
 for (const profile of profiles) {
   const sex = normalizeSex(profile.gender);
   const oldGender = profile.gender === "female" || profile.gender === "F" ? "F" : "M";
@@ -74,20 +80,42 @@ for (const profile of profiles) {
     gender: sex, age: Number(profile.age), height: Number(profile.height), weight: Number(profile.weight),
     workoutDays: profile.workout_days, workoutIntensity: profile.workout_intensity
   });
-  const goal = normalizeLegacyGoal(profile.goal) || "maintain";
+  const goal = toAppGoalStrict(profile.goal);
+  if (!Object.hasOwn(backendGoalMultiplier, goal || "")) {
+    // Obiettivo mancante o sconosciuto: errore esplicito, nessun obiettivo di ripiego.
+    assert.throws(() => calculateProfileCalorieTarget({
+      gender: sex, age: Number(profile.age), height: Number(profile.height), weight: Number(profile.weight), tdee: tdeeAfter, goal
+    }), (error) => /^PROFILE_(GOAL|WEIGHT|HEIGHT|AGE)_/.test(error.code));
+    profilesWithoutGoal += 1;
+    incompleteProfiles += 1;
+    continue;
+  }
   const beforeBmr = oldGender === "M"
     ? 10 * Number(profile.weight) + 6.25 * Number(profile.height) - 5 * Number(profile.age) + 5
     : 10 * Number(profile.weight) + 6.25 * Number(profile.height) - 5 * Number(profile.age) - 161;
+  const numericComplete = [Number(profile.age), Number(profile.height), Number(profile.weight)].every((value) => Number.isFinite(value) && value > 0);
+  if (!numericComplete) {
+    // Peso, altezza o età mancanti: errore esplicito, nessun 70 kg / 170 cm / 25 anni di ripiego.
+    assert.throws(() => calculateProfileCalorieTarget({
+      gender: sex, age: Number(profile.age), height: Number(profile.height), weight: Number(profile.weight), tdee: tdeeAfter, goal
+    }), (error) => /^PROFILE_(WEIGHT|HEIGHT|AGE|TDEE)_/.test(error.code));
+    incompleteProfiles += 1;
+    continue;
+  }
+  let goalTarget = Math.round(tdeeBefore * backendGoalMultiplier[goal]);
+  if (backendDeficitGoals.has(goal)) {
+    const maxDeficit = (Number(profile.weight) * 0.01 * 7700) / 7;
+    if (tdeeBefore - goalTarget > maxDeficit) goalTarget = Math.round(tdeeBefore - maxDeficit);
+  }
   const beforeCalories = Math.max(
-    Math.round(tdeeBefore * (1 + (goalAdjustment[goal] || 0))),
+    goalTarget,
     Math.round(beforeBmr * 1.0),
     oldGender === "M" ? 1500 : 1200
   );
   const afterCalories = calculateProfileCalorieTarget({
     gender: sex, age: Number(profile.age), height: Number(profile.height), weight: Number(profile.weight), tdee: tdeeAfter, goal
   }).calories;
-  if ([Number(profile.age), Number(profile.height), Number(profile.weight)].every((value) => Number.isFinite(value) && value > 0)) calculableProfiles += 1;
-  else incompleteProfiles += 1;
+  calculableProfiles += 1;
   if (!Object.is(beforeCalories, afterCalories)) backendIndependentFrontendMismatches += 1;
 }
 assert.equal(backendIndependentFrontendMismatches, 0);
@@ -100,5 +128,6 @@ console.log(JSON.stringify({
   real_profiles_checked: profiles.length,
   profiles_with_calculable_calorie_targets: calculableProfiles,
   profiles_without_complete_numeric_inputs: incompleteProfiles,
+  profiles_without_valid_goal: profilesWithoutGoal,
   calorie_mismatches: backendIndependentFrontendMismatches
 }, null, 2));

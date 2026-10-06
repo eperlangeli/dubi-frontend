@@ -16,6 +16,7 @@ import { declaresTraining, trainingEligibility } from "./trainingEligibilityMode
 import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 import { normalizeSex } from "./normalizeSex.mjs";
 import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
+import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoalStrict, toBackendGoalStrict, weeklyLossFromProjection } from "./goalMacroRules.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -240,37 +241,8 @@ const canonicalFromMap = (value, map, fallback = "") => {
   return map[key] || fallback || key;
 };
 
-const GOAL_CANONICAL_MAP = {
-  fatloss: "fat_loss",
-  "fat loss": "fat_loss",
-  "fat loss ": "fat_loss",
-  "fat_loss": "fat_loss",
-  dimagrimento: "fat_loss",
-  "perdita grasso": "fat_loss",
-  "weight loss": "fat_loss",
-  "lose weight": "fat_loss",
-  gain: "muscle_gain",
-  muscle: "muscle_gain",
-  "muscle gain": "muscle_gain",
-  "muscle_gain": "muscle_gain",
-  massa: "muscle_gain",
-  "massa muscolare": "muscle_gain",
-  "aumento muscolare": "muscle_gain",
-  maintain: "maintenance",
-  maintenance: "maintenance",
-  mantenimento: "maintenance",
-  definition: "definition",
-  definizione: "definition",
-
-};
-const GOAL_APP_MAP = {
-  fat_loss: "fatLoss",
-  muscle_gain: "gain",
-  maintenance: "maintain",
-  definition: "definition",
-};
-const toCanonicalGoal = (value) => canonicalFromMap(value, GOAL_CANONICAL_MAP, "maintenance");
-const toAppGoal = (value) => GOAL_APP_MAP[toCanonicalGoal(normalizeLegacyGoal(value))] || "maintain";
+const toCanonicalGoal = (value) => toBackendGoalStrict(value);
+const toAppGoal = (value) => toAppGoalStrict(value);
 
 const DIET_CANONICAL_MAP = {
   onnivoro: "omnivore",
@@ -1082,6 +1054,9 @@ const mapAiPlanToFrontend = (aiPlan, userData) => {
     protein: Number(aiPlan?.proteinTarget || fallbackPlan.protein),
     carbs: Number(aiPlan?.carbsTarget || fallbackPlan.carbs),
     fat: Number(aiPlan?.fatsTarget || fallbackPlan.fat),
+    weeklyLossKg: aiPlan?.tdee && aiPlan?.caloriesTarget
+      ? weeklyLossFromProjection({ expected_weekly_change_kg: (Number(aiPlan.caloriesTarget) - Number(aiPlan.tdee)) * 7 / 7700 })
+      : fallbackPlan.weeklyLossKg,
     mealCount: slots.length || fallbackPlan.mealCount,
     aiGenerated: true,
     aiEnginePlan: aiPlan,
@@ -1221,6 +1196,11 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     protein: Math.round(Number(summary.totalProtein || ingredientPlan?.total_protein || ingredientPlan?.targetProtein || fallbackPlan.protein)),
     carbs: Math.round(Number(summary.totalCarbs || ingredientPlan?.total_carbs || fallbackPlan.carbs)),
     fat: Math.round(Number(summary.totalFat || ingredientPlan?.total_fat || fallbackPlan.fat)),
+    // D-033: ritmo indicativo calcolato dal backend (dopo pavimento e tetto 1%/settimana).
+    goalProjection: ingredientPlan?.goal_projection || null,
+    weeklyLossKg: ingredientPlan?.goal_projection
+      ? weeklyLossFromProjection(ingredientPlan.goal_projection)
+      : fallbackPlan.weeklyLossKg,
     mealCount,
     mealTimes,
     dailyMealSchedule,
@@ -10824,13 +10804,13 @@ function getGreeting(name, isFirstAccess, gender) {
 }
 
 function calcBMI({height, weight}) {
-  const hm = (height||170)/100;
-  return weight / (hm*hm);
+  // D-017a: nessuna altezza di ripiego; dato mancante = errore esplicito.
+  return bodyMassIndex(weight, height);
 }
 function calcBF({gender, age, height, weight}) {
   const sex = normalizeSex(gender);
   const bmi = calcBMI({height, weight});
-  const base = 1.20*bmi + 0.23*(age||30);
+  const base = 1.20*bmi + 0.23*requirePositiveNumber(age, "PROFILE_AGE_MISSING", "age");
   return sex === "male" ? base - 16.2 : base - 5.4;
 }
 function bfCategory(bf, gender) {
@@ -11115,40 +11095,13 @@ function applySafetyOverrides(data, findings) {
 }
 
 function calcPlan(data) {
-  const goal = normalizeLegacyGoal(data.goal) || "maintain";
+  // Anteprima locale: il piano vero (calorie, macro, ritmo) arriva dal backend.
+  // Valori in src/goalMacroRules.mjs, copia di config/goal-macro-rules.js (D-017a, D-033).
+  const goal = requireGoal(normalizeLegacyGoal(data.goal));
   const tdee = calcTDEE(data);
-
-  // ── Aggiustamento calorico per obiettivo ──
-  // ── Deficit per obiettivo ──
-  // fatLoss:   -20%  → ~300–500 kcal/die per la maggior parte degli utenti (ACSM Guidelines 2021)
-  // definition: -15% → deficit moderato ~250–350 kcal/die per recomposizione (Barakat et al., S&C 2020)
-  // gain:      +15%  → surplus minimo per lean bulk (ISSN 2021)
   const energy = calculateProfileCalorieTarget({ ...data, tdee, goal });
-  const { calories: kcal, calorieFloor, minCalories: minCal } = energy;
-
-  // ── Macro ratios per obiettivo ──
-  // ── Fat ratio per obiettivo (% calorie) ──
-  const fatRatio = ({
-    fatLoss:0.25, maintain:0.30, gain:0.28, definition:0.25,
-  }[goal] ?? 0.28);
-
-  // ── Proteina: g/kg peso corporeo (ISSN Position Stand 2017; Morton et al., BJSM 2018) ──
-  // Standard evidence-based: 1.6–2.2g/kg per persone attive.
-  // Valori superiori (>2.2g/kg) non apportano ulteriori benefici per la maggior parte degli utenti.
-  let protein, fat, carbs;
-  {
-    const protPerKg = { fatLoss:2.0, maintain:1.6, gain:2.0, definition:1.8 }[goal] ?? 1.8;
-    protein = Math.round((data.weight || 70) * protPerKg);
-    fat     = Math.round(kcal * fatRatio / 9);
-    // Assicura che proteine + grassi non superino le calorie totali
-    const calFromProtFat = protein*4 + fat*9;
-    if (calFromProtFat >= kcal) {
-      // Riduci proteine al massimo sostenibile
-      protein = Math.round((kcal * 0.30) / 4);
-      fat     = Math.round((kcal * 0.25) / 9);
-    }
-    carbs = Math.max(0, Math.round((kcal - protein*4 - fat*9) / 4));
-  }
+  const { calories: kcal, calorieFloor, minCalories: minCal, rateCapApplied } = energy;
+  const { protein, carbs, fat } = goalMacros({ calories: kcal, goal, weight: data.weight });
 
   const mealCount = calcMealCount({...data, goal, dailyMealSchedule:data.dailyMealSchedule || null});
   const mealTimes = calcMealTimes({dailyMealSchedule:data.dailyMealSchedule || null, meals:mealCount});
@@ -11156,11 +11109,9 @@ function calcPlan(data) {
   const bmi = calcBMI(data);
   const bf  = calcBF(data);
 
-  // ── Tasso di perdita/guadagno atteso ──
-  // Wishnofsky 1958: 1 kg grasso corporeo ≈ 7700 kcal
-  // ACSM: ritmo sicuro 0.25–1.0 kg/settimana (0.5–1% del peso corporeo/settimana)
-  const dailyDelta = tdee - kcal; // positivo = deficit, negativo = surplus
-  const weeklyLossKg = parseFloat((dailyDelta * 7 / 7700).toFixed(2));
+  // Ritmo atteso (positivo = perdita): stessa formula del backend (7700 kcal/kg, dopo il pavimento).
+  // Il valore mostrato dopo la generazione è quello di plan.goal_projection.
+  const weeklyLossKg = weeklyLossFromProjection({ expected_weekly_change_kg: (kcal - tdee) * 7 / 7700 });
 
   return {
     tdee, calories:kcal,
@@ -11169,7 +11120,7 @@ function calcPlan(data) {
     mealCount, mealTimes,
     carbNote: carbNote(data.sport, goal),
     bmi, bf, bfCat: bfCategory(bf, data.gender),
-    calorieFloor, minCal,
+    calorieFloor, minCal, rateCapApplied,
     goal,
     safetyFlag: data._safetyFlag || null,
   };
@@ -18087,8 +18038,15 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
     if (!code) return;
     if (code === myCode) { setStatus("same"); setPreview(null); return; }
     const found = loadDubiProfile(code);
-    if (found) {
-      setPreview({userData: found.userData, plan: calcPlan(found.userData)});
+    let foundPlan = null;
+    try {
+      // D-017a: profilo salvato incompleto (peso, altezza, età, obiettivo) = nessuna anteprima inventata.
+      foundPlan = found ? calcPlan(found.userData) : null;
+    } catch (error) {
+      foundPlan = null;
+    }
+    if (found && foundPlan) {
+      setPreview({userData: found.userData, plan: foundPlan});
       setStatus("found");
     } else {
       setPreview(null);
@@ -18812,14 +18770,16 @@ function getWeightDecisionCopy(lang) {
       anomaly:"Peso salvato, ma DUBI non rigenera: questo salto sembra temporaneo. Controlla sonno, sale, stress, ciclo, caffeina o allenamento intenso e registra il prossimo peso.",
       onTrack:"Peso salvato. Il trend e coerente con il tuo obiettivo: DUBI mantiene il piano attuale.",
       plateau:"Peso salvato. Plateau reale rilevato su piu check-in: DUBI puo aggiornare il piano.",
-      slow:"Peso salvato. Il ritmo e piu lento del previsto, ma non basta ancora per rigenerare: DUBI aspetta un altro check-in."
+      slow:"Peso salvato. Il ritmo e piu lento del previsto, ma non basta ancora per rigenerare: DUBI aspetta un altro check-in.",
+      noTarget:"Peso salvato. Il piano non ha ancora un ritmo previsto: DUBI non valuta l'andamento e mantiene il piano attuale."
     },
     en: {
       early:"Weight saved. DUBI is still observing: at least 3-4 check-ins are needed to separate real trend from noise.",
       anomaly:"Weight saved, but DUBI will not regenerate: this jump looks temporary. Check sleep, salt, stress, cycle, caffeine or intense training and log the next weight.",
       onTrack:"Weight saved. The trend matches your goal: DUBI keeps the current plan.",
       plateau:"Weight saved. Real plateau detected across multiple check-ins: DUBI can update the plan.",
-      slow:"Weight saved. Pace is slower than expected, but not enough to regenerate yet: DUBI waits for another check-in."
+      slow:"Weight saved. Pace is slower than expected, but not enough to regenerate yet: DUBI waits for another check-in.",
+      noTarget:"Weight saved. The plan has no expected pace yet: DUBI does not judge the trend and keeps the current plan."
     }
   };
   return map[lang] || map.en;
@@ -18840,12 +18800,21 @@ function evaluateWeightPlanDecision(weightLog, nextWeight, plan, userData, lang)
   const recent = points.slice(-4);
   const deltas = recent.slice(1).map((v, i) => v - recent[i]);
   const avgDelta = deltas.reduce((a,b)=>a+b,0) / Math.max(1, deltas.length);
-  const expected = Number(plan?.weeklyLossKg || 0);
+  // D-033: il ritmo atteso viene dal piano (goal_projection). Se manca, nessun giudizio inventato.
+  const rawExpected = plan?.weeklyLossKg;
+  const expected = rawExpected === null || rawExpected === undefined || rawExpected === "" ? NaN : Number(rawExpected);
+  if (!Number.isFinite(expected)) return {state:"noTarget", allowRegeneration:false, explanation:copy.noTarget};
   const goal = userData?.goal || plan?.goal || "";
-  const wantsGain = goal === "gain" || expected < 0;
-  const expectedAbs = Math.max(0.15, Math.abs(expected || (wantsGain ? -0.25 : 0.35)));
-  const actualProgress = wantsGain ? avgDelta : -avgDelta;
   const plateau = recent.length >= 4 && deltas.every(d => Math.abs(d) <= 0.15);
+  if (goal === "maintain") {
+    // Mantenimento: peso stabile = obiettivo raggiunto (variazione entro ±0,25%/settimana).
+    const tolerance = current * 0.0025;
+    if (Math.abs(avgDelta) <= tolerance) return {state:"onTrack", allowRegeneration:false, explanation:copy.onTrack};
+    return {state:"slow", allowRegeneration:false, explanation:copy.slow};
+  }
+  const wantsGain = goal === "gain" || expected < 0;
+  const expectedAbs = Math.max(0.15, Math.abs(expected));
+  const actualProgress = wantsGain ? avgDelta : -avgDelta;
   if (plateau) return {state:"plateau", allowRegeneration:true, explanation:copy.plateau};
   if (actualProgress >= expectedAbs * 0.55) return {state:"onTrack", allowRegeneration:false, explanation:copy.onTrack};
   return {state:"slow", allowRegeneration:false, explanation:copy.slow};
@@ -19931,19 +19900,27 @@ const WrapScreen = ({userData, plan, onClose}) => {
     // ── 2: PESO ──
     (() => {
       // Calcola perdita/guadagno atteso in 6 settimane dal piano reale
-      const weeklyRate = plan?.weeklyLossKg ?? 0;
-      const sixWeekChange = parseFloat((weeklyRate * 6).toFixed(1));
-      const isGain = plan?.goal === "gain";
-      const sign = sixWeekChange >= 0 ? (isGain ? "+" : "-") : "+";
-      const displayKg = Math.abs(sixWeekChange).toFixed(1);
-      const weeklyDisplay = Math.abs(weeklyRate).toFixed(2);
-      const inRange = !isGain
-        ? (Math.abs(weeklyRate) >= 0.25 && Math.abs(weeklyRate) <= 1.0)
-        : (Math.abs(weeklyRate) >= 0.1  && Math.abs(weeklyRate) <= 0.5);
+      // D-033: ritmo indicativo dal piano (positivo = perdita). Se manca, nessuna stima.
+      const rawRate = plan?.weeklyLossKg;
+      const hasRate = rawRate !== null && rawRate !== undefined && Number.isFinite(Number(rawRate));
+      const weeklyRate = hasRate ? Number(rawRate) : null;
+      const sixWeekChange = hasRate ? parseFloat((weeklyRate * 6).toFixed(1)) : null;
+      const sign = !hasRate || sixWeekChange === 0 ? "" : (sixWeekChange > 0 ? "-" : "+");
+      const displayKg = hasRate ? Math.abs(sixWeekChange).toFixed(1) : "—";
+      const weeklyDisplay = hasRate ? Math.abs(weeklyRate).toFixed(2) : "—";
+      // Intervalli indicativi in % del peso a settimana (Francesco, 6 ott 2026).
+      const pctRanges = { fatLoss: [0.25, 1.0], definition: [0.25, 0.5], gain: [0.1, 0.5], maintain: [0, 0.25] };
+      const range = pctRanges[plan?.goal] || null;
+      const weightKg = Number(userData?.weight);
+      const ratePct = hasRate && weightKg > 0 ? Math.abs(weeklyRate) / weightKg * 100 : null;
+      const inRange = range && ratePct !== null ? (ratePct >= range[0] - 1e-9 && ratePct <= range[1] + 1e-9) : false;
       const noteColor = inRange ? T.accentD : "#C9A87C";
-      const rateLabel = lang !== "it"
-        ? `~${weeklyDisplay} kg/week · ACSM safe range 0.25–1.0 kg/week (Wishnofsky 1958)`
-        : `~${weeklyDisplay} kg/settimana · range sicuro ACSM 0,25–1,0 kg/settimana (Wishnofsky 1958)`;
+      const rangeText = range ? `${String(range[0]).replace(".", lang !== "it" ? "." : ",")}–${String(range[1]).replace(".", lang !== "it" ? "." : ",")}%` : "";
+      const rateLabel = !hasRate
+        ? (lang !== "it" ? "Expected pace not available yet." : "Ritmo previsto non ancora disponibile.")
+        : lang !== "it"
+          ? `~${weeklyDisplay} kg/week · indicative range ${rangeText} of body weight per week, not a promise`
+          : `~${weeklyDisplay} kg/settimana · intervallo indicativo ${rangeText} del peso a settimana, non una promessa`;
       return (
         <div key="peso" style={{padding:"calc(80px + env(safe-area-inset-top, 0px)) 32px calc(40px + env(safe-area-inset-bottom, 0px))",minHeight:"var(--dubi-viewport-height, 100vh)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
           <p style={{fontSize:11,letterSpacing:2,color:T.accentD,textTransform:"uppercase",marginBottom:16,fontWeight:700}}>{t("wrap.weight.label")}</p>
@@ -20632,10 +20609,10 @@ const handleSaveProfile = async () => {
     ...userData,
     name: pick("name", userData?.name || ""),
     gender: pick("gender", userData?.gender || ""),
-    age: Number(pick("age", userData?.age || 18)),
-    height: Number(pick("height", userData?.height || 170)),
-    weight: Number(pick("weight", userData?.weight || 70)),
-    goal: toAppGoal(pick("goal", userData?.goal || "maintain")),
+    age: Number(pick("age", userData?.age ?? "")),
+    height: Number(pick("height", userData?.height ?? "")),
+    weight: Number(pick("weight", userData?.weight ?? "")),
+    goal: toAppGoal(pick("goal", userData?.goal ?? "")),
     targetWeight: pick("target_weight", userData?.targetWeight || null) ? Number(pick("target_weight", userData?.targetWeight || null)) : null,
     targetBf: pick("target_body_fat", userData?.targetBf || null) ? Number(pick("target_body_fat", userData?.targetBf || null)) : null,
     workoutDays: String(pick("workout_days", userData?.workoutDays || "0")),
@@ -20653,6 +20630,17 @@ const handleSaveProfile = async () => {
     updatedData.gender = normalizeSex(updatedData.gender) === "male" ? "M" : "F";
   } catch (error) {
     setProfileMessage(error.code);
+    return;
+  }
+  // D-017a: nessun 18 anni / 170 cm / 70 kg / mantenimento di ripiego.
+  const missingProfileField = [["age", "PROFILE_AGE_MISSING"], ["height", "PROFILE_HEIGHT_MISSING"], ["weight", "PROFILE_WEIGHT_MISSING"]]
+    .find(([key]) => !(Number.isFinite(updatedData[key]) && updatedData[key] > 0));
+  if (missingProfileField) {
+    setProfileMessage(missingProfileField[1]);
+    return;
+  }
+  if (!updatedData.goal) {
+    setProfileMessage("PROFILE_GOAL_MISSING");
     return;
   }
 
