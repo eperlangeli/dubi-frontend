@@ -19,6 +19,7 @@ import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
 import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoalStrict, toBackendGoalStrict, weeklyLossFromProjection } from "./goalMacroRules.mjs";
 import { HIGH_RISK_ANSWERS, HIGH_RISK_CONDITION_KEYS, getHighRiskCopy, highRiskAnswerBody, planBlockingCode } from "./highRiskScreening.mjs";
 import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails } from "./bodyComposition.mjs";
+import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -1584,7 +1585,9 @@ const saveDailyMealScheduleAnswer = async (answer) => {
     body: JSON.stringify({ ...answer, timezone: getDeviceTimezone() }),
   });
   const payload = await response.json().catch(() => ({}));
+  if (isPlanVersionConflict(response.status, payload)) notifyPlanVersionConflict(payload);
   if (!response.ok) throw Object.assign(new Error(payload.error || 'daily_schedule_save_failed'), { payload, status: response.status });
+  rememberPlanVersion(payload.plan?.date || payload.day, payload.plan?.plan_version);
   return payload;
 };
 
@@ -1603,12 +1606,15 @@ async function generateIngredientPlan(options = {}) {
       date: today,
       timezone: getDeviceTimezone(),
       ...(options.breakfastChoice ? { breakfastChoice: options.breakfastChoice, reason: options.reason || "breakfast_choice" } : {}),
-      ...(options.dailyTrainingOverride ? { daily_training_override: options.dailyTrainingOverride } : {})
+      ...(options.dailyTrainingOverride ? { daily_training_override: options.dailyTrainingOverride } : {}),
+      // D-038 (b): versione su cui si basa la rigenerazione (se l'app ha già letto il piano di quel giorno).
+      ...expectedVersionBody(today)
     })
   });
 
   if (!genRes.ok) {
     const err = await genRes.json().catch(() => ({}));
+    if (isPlanVersionConflict(genRes.status, err)) notifyPlanVersionConflict(err);
     const failure = new Error(err.error || getRuntimeCopy("plan.error.generate"));
     failure.code = err.error || null;
     failure.status = genRes.status;
@@ -1621,7 +1627,9 @@ async function generateIngredientPlan(options = {}) {
   });
 
   if (!fetchRes.ok) throw new Error(getRuntimeCopy("plan.error.fetch"));
-  return normalizeIngredientPlanPayload(await fetchRes.json());
+  const fetched = await fetchRes.json();
+  rememberPlanVersion(fetched?.date || today, fetched?.plan_version);
+  return normalizeIngredientPlanPayload(fetched);
 }
 
 const ENGINE_MEAL_TYPE_BY_UI_SLOT = {
@@ -1645,9 +1653,11 @@ async function replaceIngredientPlanMeal(date, mealId) {
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ date, meal_type: mealType }),
+    body: JSON.stringify({ date, meal_type: mealType, ...expectedVersionBody(date) }),
   });
   const payload = await response.json().catch(() => ({}));
+  if (isPlanVersionConflict(response.status, payload)) notifyPlanVersionConflict(payload);
+  if (response.ok) rememberPlanVersion(payload.date || date, payload.plan_version);
   if (!response.ok) {
     const failure = new Error(payload.error || "RECIPE_ENGINE_V1_CONTROLLED_FAILURE");
     failure.code = payload.error || null;
@@ -1680,9 +1690,11 @@ async function saveTodayTrainingState({ date, state, sessions = [], confirmation
       "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ date, state, sessions, confirmations, timezone: getDeviceTimezone() }),
+    body: JSON.stringify({ date, state, sessions, confirmations, timezone: getDeviceTimezone(), ...(date ? expectedVersionBody(date) : {}) }),
   });
   const payload = await response.json().catch(() => ({}));
+  if (isPlanVersionConflict(response.status, payload)) notifyPlanVersionConflict(payload);
+  if (response.ok) rememberPlanVersion(payload.date || date, payload.plan_version);
   if (!response.ok) {
     const failure = new Error(payload.error || "training_state_save_failed");
     failure.code = payload.error || null;
@@ -1703,7 +1715,9 @@ const fetchCurrentIngredientPlanFromBackend = async () => {
       headers: { "Authorization": `Bearer ${token}` }
     });
     if (!response.ok) return null;
-    return normalizeIngredientPlanPayload(await response.json());
+    const fetched = await response.json();
+    rememberPlanVersion(fetched?.date || today, fetched?.plan_version);
+    return normalizeIngredientPlanPayload(fetched);
   } catch (error) {
     console.error("Current ingredient plan load failed:", error);
     return null;
@@ -1749,7 +1763,10 @@ const fetchIngredientPlanForDate = async (date, options = {}) => {
   });
 
   const payload = await fetchRes.json().catch(() => ({}));
-  if (fetchRes.ok) return normalizeIngredientPlanPayload(payload);
+  if (fetchRes.ok) {
+    rememberPlanVersion(payload?.date || date, payload?.plan_version);
+    return normalizeIngredientPlanPayload(payload);
+  }
   // D-031 / D-033 / D-040: piano non consentito = errore esplicito, mai un piano vuoto o inventato.
   const blockingCode = planBlockingCode(payload);
   if (blockingCode) throw Object.assign(new Error(blockingCode), { code: blockingCode, payload, status: fetchRes.status });
@@ -22464,6 +22481,7 @@ function DUBIApp() {
   useNativeKeyboardInsets();
   const [resetToken, setResetToken] = useState(() => extractResetTokenFromUrl(window.location.href));
   const [phase,setPhase] = useState(() => resetToken ? "reset-password" : "checking");
+  const [planUpdatedElsewhere, setPlanUpdatedElsewhere] = useState(false);
   const [authStartMode, setAuthStartMode] = useState(null);
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
@@ -22779,6 +22797,47 @@ const handleDeleteAccount = async (otp) => {
     };
   }, [phase, refreshSnapshot]);
 
+  // D-038 (b): il piano può cambiare da un altro dispositivo. Controllo leggero delle sole versioni ogni 60 s
+  // (con l'app visibile), al ritorno in primo piano e alla ripresa dell'app nativa; un 409 mostra lo stesso banner.
+  useEffect(() => {
+    if (phase !== "app") return undefined;
+    let cancelled = false;
+    const checkPlanVersions = async () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      const range = knownPlanVersionRange();
+      const token = getAuthToken();
+      if (!range || !token) return;
+      const oldestAllowed = addDaysIso(range.to, -31);
+      const from = range.from < oldestAllowed ? oldestAllowed : range.from;
+      try {
+        const response = await fetch(`${API_BASE_URL}/plan/plan-versions?from=${from}&to=${range.to}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const dates = range.dates.filter((date) => date >= from);
+        if (!cancelled && changedPlanDates(payload.versions || {}, dates).length) setPlanUpdatedElsewhere(true);
+      } catch (error) {
+        console.warn("Plan version check failed:", error?.message || error);
+      }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") checkPlanVersions(); };
+    const timer = setInterval(checkPlanVersions, PLAN_VERSION_POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    let resumeHandle = null;
+    Promise.resolve(CapacitorApp.addListener("resume", checkPlanVersions))
+      .then((handle) => { resumeHandle = handle; if (cancelled) handle?.remove?.(); })
+      .catch(() => {});
+    const offConflict = onPlanVersionConflict(() => setPlanUpdatedElsewhere(true));
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      resumeHandle?.remove?.();
+      offConflict();
+    };
+  }, [phase]);
+
   const handleAiPlanRefreshFromProgress = (aiPlan, weightValue) => {
     const nextUserData = {...userData, weight: weightValue};
     const refreshedPlan = mapAiPlanToFrontend(aiPlan, nextUserData);
@@ -22871,6 +22930,13 @@ await openAppWithDailySchedule(data);
         ::-webkit-scrollbar{display:none;}
       `}</style>
       <div className={`dubi-app-shell ${phase==="app" ? "dubi-app-shell--app" : ""}`} style={{width:"100%",maxWidth:"var(--dubi-shell-max, 430px)",background:T.bg,minHeight:"var(--dubi-viewport-height, 100vh)",position:"relative",overflow:"hidden",boxShadow:"0 0 60px rgba(0,0,0,0.12)"}}>
+        {phase==="app" && planUpdatedElsewhere && (
+          <button type="button" role="alert" data-testid="plan-updated-elsewhere" dir={lang==="ar" ? "rtl" : "ltr"}
+            onClick={() => window.location.reload()}
+            style={{position:"sticky",top:0,zIndex:1000,width:"100%",padding:"12px 16px",border:0,background:"#275b48",color:"#fff",fontSize:14,fontWeight:600,lineHeight:1.4,textAlign:"start",cursor:"pointer"}}>
+            {getPlanUpdatedCopy(lang)}
+          </button>
+        )}
         {phase==="reset-password" && (
           <ResetPasswordScreen
             token={resetToken}
