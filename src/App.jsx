@@ -17,6 +17,8 @@ import { fallbackTdee, normalizeLegacyGoal } from "./nutritionFallback.mjs";
 import { normalizeSex } from "./normalizeSex.mjs";
 import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
 import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoalStrict, toBackendGoalStrict, weeklyLossFromProjection } from "./goalMacroRules.mjs";
+import { HIGH_RISK_ANSWERS, HIGH_RISK_CONDITION_KEYS, getHighRiskCopy, highRiskAnswerBody, planBlockingCode } from "./highRiskScreening.mjs";
+import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails } from "./bodyComposition.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -1198,6 +1200,8 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     fat: Math.round(Number(summary.totalFat || ingredientPlan?.total_fat || fallbackPlan.fat)),
     // D-033: ritmo indicativo calcolato dal backend (dopo pavimento e tetto 1%/settimana).
     goalProjection: ingredientPlan?.goal_projection || null,
+    // D-041 / D-042 / D-043: esito della regola sulla composizione corporea calcolato dal backend.
+    bodyComposition: ingredientPlan?.body_composition || null,
     weeklyLossKg: ingredientPlan?.goal_projection
       ? weeklyLossFromProjection(ingredientPlan.goal_projection)
       : fallbackPlan.weeklyLossKg,
@@ -1532,6 +1536,34 @@ const getDeviceTimezone = () => {
   return timezone;
 };
 
+// D-031 / D-040: stato della domanda sulle condizioni ad alto rischio (REQUIRED / BLOCKED / PASS).
+const fetchHighRiskScreeningStatus = async () => {
+  const token = getAuthToken();
+  if (!token) throw new Error('missing_token');
+  const response = await fetch(`${API_BASE_URL}/api/onboarding/me`, { headers: { Authorization: `Bearer ${token}` } });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.high_risk_screening?.status) {
+    throw Object.assign(new Error(payload.error || 'high_risk_screening_status_failed'), { payload, status: response.status });
+  }
+  return payload.high_risk_screening;
+};
+
+// Al server va solo sì/no + versione della lista (D-040): mai quale condizione.
+const saveHighRiskScreeningAnswer = async (body) => {
+  const token = getAuthToken();
+  if (!token) throw new Error('missing_token');
+  const response = await fetch(`${API_BASE_URL}/api/onboarding/high-risk-screening`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.high_risk_screening?.status) {
+    throw Object.assign(new Error(payload.error || 'high_risk_screening_save_failed'), { payload, status: response.status });
+  }
+  return payload.high_risk_screening;
+};
+
 const fetchDailyMealScheduleQuestion = async () => {
   const token = getAuthToken();
   if (!token) throw new Error('missing_token');
@@ -1718,6 +1750,9 @@ const fetchIngredientPlanForDate = async (date, options = {}) => {
 
   const payload = await fetchRes.json().catch(() => ({}));
   if (fetchRes.ok) return normalizeIngredientPlanPayload(payload);
+  // D-031 / D-033 / D-040: piano non consentito = errore esplicito, mai un piano vuoto o inventato.
+  const blockingCode = planBlockingCode(payload);
+  if (blockingCode) throw Object.assign(new Error(blockingCode), { code: blockingCode, payload, status: fetchRes.status });
   if (fetchRes.status === 409 && (
     String(payload.error || "").startsWith("RECIPE_ENGINE_V1_")
     || payload.generation_status === "NO_SAFE_MATCH"
@@ -10873,59 +10908,9 @@ function runSafetyChecks(data) {
     });
   }
 
-  // ── HARD 2: BF essenziale + cut ──
-  if (bfCat.risk === "low-hard" && (data.goal === "fatLoss" || data.goal === "definition")) {
-    findings.push({
-      level: "hard",
-      rule: "bf_essenziale_cut",
-      icon: "info",
-      title: "La tua percentuale di grasso è già al limite essenziale",
-      titleEN: "Your body fat percentage is already at the essential limit",
-      body: [
-        `La tua massa grassa stimata rientra nella zona essenziale (${sex==="female"?"< 14%":"< 6%"}) secondo ACSM 2021.`,
-        "Un ulteriore deficit calorico può compromettere la funzione ormonale, immunitaria e la performance atletica.",
-        "Devi scegliere un obiettivo adatto alla tua composizione corporea attuale per poter continuare.",
-      ],
-      bodyEN: [
-        `Your estimated body fat falls in the essential zone (${sex==="female"?"< 14%":"< 6%"}) according to ACSM 2021.`,
-        "A further caloric deficit can compromise hormonal function, immunity and athletic performance.",
-        "You need to choose a goal suited to your current body composition to continue.",
-      ],
-      override: { goal: "maintain", workoutIntensity: "moderata", _safetyFlag: "bf-protect" },
-      forceGoalChoice: true,
-      allowedGoals: ["maintain", "gain"],
-      recommendedGoal: "maintain",
-      forceReason: "Il tuo corpo necessita di stabilità energetica prima di qualsiasi altra modifica.",
-      forceReasonEN: "Your body needs energy stability before any other change.",
-    });
-  }
-
-  // ── HARD 3: BF molto alta + gain aggressivo ──
-  if (bfCat.risk === "hard-high" && data.goal === "gain") {
-    findings.push({
-      level: "hard",
-      rule: "bf_alta_gain",
-      icon: "balance",
-      title: "Un surplus calorico ora peggiorerebbe la situazione",
-      titleEN: "A caloric surplus now would worsen the situation",
-      body: [
-        `La tua percentuale di massa grassa è elevata (${sex==="female"?"> 32%":"> 25%"}) secondo le linee guida ACE/ACSM.`,
-        "Aggiungere calorie in surplus in questa condizione incrementa prevalentemente il tessuto adiposo, non la massa muscolare.",
-        "Devi scegliere un obiettivo compatibile con la tua composizione attuale per generare un piano efficace.",
-      ],
-      bodyEN: [
-        `Your body fat percentage is elevated (${sex==="female"?"> 32%":"> 25%"}) according to ACE/ACSM guidelines.`,
-        "Adding surplus calories in this condition increases mostly fat tissue, not muscle mass.",
-        "You need to choose a goal compatible with your current composition to generate an effective plan.",
-      ],
-      override: { goal: "maintain", _safetyFlag: "recomp-first" },
-      forceGoalChoice: true,
-      allowedGoals: ["maintain", "fatLoss", "definition"],
-      recommendedGoal: "fatLoss",
-      forceReason: "Prima si riduce il grasso in eccesso, poi — con il corpo pronto — si costruisce massa muscolare in modo efficace.",
-      forceReasonEN: "First reduce excess fat, then — with the body ready — build muscle mass effectively.",
-    });
-  }
+  // D-041 / D-043: le vecchie regole dell'app sul grasso corporeo (HARD 2 "BF essenziale + cut" e HARD 3
+  // "BF alta + gain", stima Deurenberg con soglie 6/14 e 25/32 %) sono sostituite dalla regola di Francesco nel
+  // backend (config/body-composition-rules.js): la sola stima non blocca mai e non forza mai il dimagrimento.
 
   // ── HARD 3: Allergie dichiarate ──
   // Il piano sarà rigenerato escludendo automaticamente gli allergeni.
@@ -15470,7 +15455,7 @@ const OnboardingScreen = ({ onComplete, initialData = null, isEditing = false, o
   age:null,
   height:null,
   weight:null,
-  goal:"fatLoss",
+  goal:null, // D-039: nessun obiettivo preselezionato
   targetWeight:"",
   workoutDays:"3-4",
   workoutDuration:"45-60",
@@ -15534,7 +15519,7 @@ const normalizeInitialOnboardingData = (source) => {
     age: source.age || defaultOnboardingData.age,
     height: source.height || defaultOnboardingData.height,
     weight: source.weight || defaultOnboardingData.weight,
-    goal: toAppGoal(source.goal || defaultOnboardingData.goal),
+    goal: toAppGoal(source.goal),
     targetWeight: source.target_weight || source.targetWeight || "",
     workoutDays: source.workout_days_band || source.workoutDaysBand || source.workout_days || source.workoutDays || defaultOnboardingData.workoutDays,
     workoutDaysBand: source.workout_days_band || source.workoutDaysBand
@@ -15614,7 +15599,9 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   const workoutScheduleIncomplete = step === 4 && subStep === 1 && selectedWorkoutCount > 0 && (
     exactTrainingSessions.length === 0 || exactTrainingSessions.some(session => !isTrainingSessionComplete(session))
   );
-  const canContinueStep = !healthConsentRequired && !wearableConsentRequired && !physicalIncomplete && !workoutScheduleIncomplete;
+  // D-039: l'obiettivo si sceglie sempre, nessuna scheda preselezionata.
+  const goalIncomplete = step === 2 && subStep === 0 && !toAppGoalStrict(data.goal);
+  const canContinueStep = !healthConsentRequired && !wearableConsentRequired && !physicalIncomplete && !goalIncomplete && !workoutScheduleIncomplete;
 
 
   return (
@@ -16190,6 +16177,126 @@ const ConsentRevokedPlanScreen = ({onOpenConsentSettings}) => {
           {t("consent.revoked.cta")}
         </button>
         <p style={{fontSize:11,color:T.muted,lineHeight:1.55,margin:"18px 4px 0"}}>{t("consent.revoked.note")}</p>
+      </div>
+    </div>
+  );
+};
+
+// D-041 / D-042 / D-043: avviso sulla composizione corporea (testi approvati da Francesco). Si mostra solo se la
+// regola del backend ha qualcosa da dire; valore, origine, data, intervallo e "stima" sono sempre visibili.
+const BODY_COMPOSITION_NOTICE_STATUSES = ["SURPLUS_NOT_RECOMMENDED", "CAUTION", "DATA_CONFLICT", "LOW_BODY_FAT_CAUTION", "LOW_BODY_FAT_BLOCK"];
+const BodyCompositionNotice = ({assessment, lang}) => {
+  if (!assessment || !BODY_COMPOSITION_NOTICE_STATUSES.includes(assessment.status)) return null;
+  // Tutte le lingue dell'app hanno i testi (scripts/test-body-composition-copy.mjs): nessun ripiego.
+  const copy = getBodyCompositionCopy(lang);
+  const message = bodyCompositionMessage(assessment, lang);
+  const details = bodyCompositionDetails(assessment, lang, new Date().toISOString().slice(0, 10));
+  const showTitle = assessment.status === "SURPLUS_NOT_RECOMMENDED" || assessment.status === "CAUTION" || assessment.status === "DATA_CONFLICT";
+  return (
+    <div role="status" style={{margin:'14px 20px 0',padding:'14px 16px',borderRadius:12,background:'#f6f1e8',color:'#3d3427',fontSize:13,lineHeight:1.5}}>
+      {showTitle && <div style={{fontWeight:700,marginBottom:6}}>{copy.title}</div>}
+      {message && <div>{message}</div>}
+      {details.map((row, index) => (
+        <div key={index} style={{marginTop:8,fontSize:12,color:'#6b5d48'}}>
+          <div><strong>{row.value}</strong>{row.range ? ` · ${copy.rangeLabel}: ${row.range}` : ''}</div>
+          <div>{copy.sourceLabel}: {row.source}{row.date ? ` · ${copy.dateLabel}: ${row.date}` : ''}</div>
+          {row.estimateTag && <div style={{fontStyle:'italic'}}>{row.estimateTag}</div>}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// D-031 / D-040 / D-043 (3): domanda sulle condizioni ad alto rischio. Testi approvati da Francesco:
+// la lista si mostra, la risposta è un solo sì/no esplicito; al server arriva solo il booleano.
+const HighRiskScreeningScreen = ({onAnswered}) => {
+  const { lang } = useT();
+  const copy = getHighRiskCopy(lang);
+  const [answer, setAnswer] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const choose = (value) => { setMessage(""); setAnswer(value); };
+  const confirm = async () => {
+    let body;
+    try {
+      body = highRiskAnswerBody(answer);
+    } catch (error) {
+      setMessage(copy.required);
+      return;
+    }
+    setSaving(true);
+    try {
+      const screening = await saveHighRiskScreeningAnswer(body);
+      onAnswered(screening);
+    } catch (error) {
+      setMessage(copy.error);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const answerStyle = (active) => ({display:"flex",alignItems:"center",gap:12,width:"100%",textAlign:"left",padding:"15px 16px",marginBottom:10,
+    borderRadius:16,border:`1.5px solid ${active?T.accentD:T.border}`,background:active?T.sel:T.card,color:T.text,fontSize:15,fontWeight:700,lineHeight:1.4,cursor:"pointer"});
+  const dot = (active) => (
+    <span aria-hidden="true" style={{flexShrink:0,width:20,height:20,borderRadius:"50%",border:`1.5px solid ${active?T.accentD:T.border}`,
+      boxShadow:active?`inset 0 0 0 4px ${T.card}`:"none",background:active?T.accentD:"transparent"}} />
+  );
+  return (
+    <div style={{minHeight:"var(--dubi-viewport-height, 100vh)",padding:"calc(56px + env(safe-area-inset-top, 0px)) 24px calc(40px + env(safe-area-inset-bottom, 0px))",maxWidth:520,margin:"0 auto"}}>
+      <h1 style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:28,fontWeight:800,color:T.text,margin:"0 0 12px",lineHeight:1.2}}>{copy.title}</h1>
+      <p style={{fontSize:16,color:T.text,fontWeight:700,lineHeight:1.5,margin:"0 0 8px"}}>{copy.question}</p>
+      <p style={{fontSize:14,color:T.muted,lineHeight:1.6,margin:"0 0 16px"}}>{copy.subtitle}</p>
+      <ul style={{margin:"0 0 18px",padding:"14px 16px 14px 34px",borderRadius:16,border:`1px solid ${T.border}`,background:T.card,color:T.text,fontSize:14,lineHeight:1.5}}>
+        {HIGH_RISK_CONDITION_KEYS.map(key => <li key={key} style={{marginBottom:6}}>{copy.conditions[key]}</li>)}
+      </ul>
+      <div role="radiogroup" aria-label={copy.question}>
+        {HIGH_RISK_ANSWERS.map(value => (
+          <button key={value} type="button" role="radio" aria-checked={answer === value} onClick={() => choose(value)} style={answerStyle(answer === value)}>
+            {dot(answer === value)}<span>{value === "no" ? copy.answerNo : copy.answerYes}</span>
+          </button>
+        ))}
+      </div>
+      <p style={{fontSize:12,color:T.muted,lineHeight:1.5,margin:"4px 2px 0"}}>{copy.privacy}</p>
+      {message && <p role="alert" style={{fontSize:13,color:"#C47B7B",margin:"10px 2px 0",lineHeight:1.5}}>{message}</p>}
+      <button type="button" onClick={confirm} disabled={saving}
+        style={{width:"100%",marginTop:18,padding:"16px 18px",borderRadius:50,border:"none",background:T.text,color:T.bg,fontSize:15,fontWeight:700,cursor:saving?"default":"pointer",opacity:saving?.7:1}}>
+        {saving ? copy.saving : copy.confirm}
+      </button>
+    </div>
+  );
+};
+
+// D-031: testi di Francesco, unico pulsante "Ho capito", nessun "continua comunque".
+// kind "bmi" = D-033 (GOAL_UNSAFE_FOR_BMI): si può solo cambiare obiettivo.
+const HealthPlanBlockedScreen = ({kind = "condition", onAcknowledge, onSituationChanged, onChangeGoal}) => {
+  const { lang } = useT();
+  const copy = getHighRiskCopy(lang);
+  const isBmi = kind === "bmi";
+  const isBmiLow = kind === "bmi_low";
+  return (
+    <div style={{minHeight:"var(--dubi-viewport-height, 100vh)",padding:"64px 24px 120px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div role="alertdialog" aria-labelledby="dubi-health-block-title" style={{width:"100%",maxWidth:480,padding:"30px 24px",background:T.card,border:`1.5px solid ${T.border}`,borderRadius:24,boxShadow:"0 12px 34px rgba(43,43,43,.08)",textAlign:"center"}}>
+        <h1 id="dubi-health-block-title" style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:24,fontWeight:800,color:T.text,margin:"0 0 14px",lineHeight:1.25}}>
+          {isBmi ? copy.bmiTitle : copy.blockTitle}
+        </h1>
+        <p style={{fontSize:14,color:T.text,lineHeight:1.65,margin:"0 0 12px"}}>{isBmi ? copy.bmiBody : (isBmiLow ? copy.bmiLowBody : copy.blockBody)}</p>
+        {!isBmi && <p style={{fontSize:14,color:T.muted,lineHeight:1.65,margin:"0 0 22px"}}>{copy.blockNext}</p>}
+        {isBmi ? (
+          <button type="button" onClick={onChangeGoal}
+            style={{width:"100%",marginTop:10,padding:"15px 18px",borderRadius:50,border:"none",background:T.accentD,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+            {copy.bmiChange}
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={onAcknowledge}
+              style={{width:"100%",padding:"15px 18px",borderRadius:50,border:"none",background:T.accentD,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+              {copy.blockAck}
+            </button>
+            <button type="button" onClick={isBmiLow ? onChangeGoal : onSituationChanged}
+              style={{width:"100%",marginTop:10,padding:"12px 18px",borderRadius:50,border:`1px solid ${T.border}`,background:"none",color:T.muted,fontSize:13,cursor:"pointer"}}>
+              {copy.blockChange}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -17101,6 +17208,8 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
           {plan?.dailyPlanNotice || plan?.dailyMealSchedule?.notice || plan?.ingredientPlan?.daily_meal_schedule?.notice || (lang === 'it' ? 'Piano per il resto della giornata' : 'Plan for the rest of today')}
         </div>
       )}
+
+      <BodyCompositionNotice assessment={plan?.bodyComposition} lang={lang}/>
 
       {/* ── Daily research invitation ── */}
       {!(activeNotif && !notifDismissed) && <ResearchInviteCard userData={userData} setUserData={setUserData}/>}
@@ -18747,8 +18856,11 @@ const MOTIVATIONAL = {
   ],
 };
 
+// D-039: il riepilogo "Wrap" mostra ancora numeri di esempio (pasti, giorni, passi, HRV, sonno, traguardi):
+// resta nascosto finché ogni valore non viene dai dati dell'utente. Il grafico del peso usa già solo i pesi registrati.
+const WRAP_USES_ONLY_USER_DATA = false;
+
 const MOCK_METRIC_DATA = {
-  peso:    [{w:"S.1",v:78.5},{w:"S.2",v:78.1},{w:"S.3",v:77.8},{w:"S.4",v:77.4},{w:"S.5",v:77.2},{w:"S.6",v:76.9}],
   hrv:     [{w:"S.1",v:42},{w:"S.2",v:44},{w:"S.3",v:47},{w:"S.4",v:45},{w:"S.5",v:50},{w:"S.6",v:52}],
   sonno:   [{w:"S.1",v:68},{w:"S.2",v:70},{w:"S.3",v:72},{w:"S.4",v:74},{w:"S.5",v:73},{w:"S.6",v:76}],
   passi:   [{w:"S.1",v:6200},{w:"S.2",v:7100},{w:"S.3",v:7400},{w:"S.4",v:7800},{w:"S.5",v:8100},{w:"S.6",v:8234}],
@@ -19750,8 +19862,8 @@ const handleManualTdeeUpdate = async () => {
         <p style={{fontSize:11,color:T.muted,marginTop:12}}>{t("prog.basis")}</p>
       </div>
 
-      {/* ── DUBI WRAP BANNER ── */}
-      <div style={{margin:"0 24px 32px"}}>
+      {/* ── DUBI WRAP BANNER ── (nascosto finché il riepilogo non usa solo dati dell'utente, D-039) */}
+      <div style={{margin:"0 24px 32px",display:onOpenWrap?undefined:"none"}}>
         <button onClick={onOpenWrap}
           style={{width:"100%",padding:"0",borderRadius:24,border:"none",cursor:"pointer",overflow:"hidden",
             background:"linear-gradient(135deg,#1a0a2e 0%,#0d1a2e 40%,#0a2010 100%)",
@@ -19802,6 +19914,25 @@ const handleManualTdeeUpdate = async () => {
 const WrapScreen = ({userData, plan, onClose}) => {
   const { t, lang } = useT();
   const [slide, setSlide] = useState(0);
+  // D-039: grafico del peso solo con i pesi registrati dall'utente (ultime 6 settimane).
+  const [userWeightPoints, setUserWeightPoints] = useState([]);
+  useEffect(() => {
+    let active = true;
+    fetchWeightHistoryFromBackend().then((rows) => {
+      if (!active) return;
+      const sixWeeksAgo = Date.now() - 42 * 86400000;
+      const points = (rows || [])
+        .map((row) => ({ time: new Date(row.logged_at || row.date || row.created_at).getTime(), v: Number(row.weight) }))
+        .filter((row) => Number.isFinite(row.time) && row.time >= sixWeeksAgo && Number.isFinite(row.v) && row.v > 0)
+        .sort((a, b) => a.time - b.time)
+        .map((row) => {
+          const d = new Date(row.time);
+          return { w: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`, v: row.v };
+        });
+      setUserWeightPoints(points);
+    });
+    return () => { active = false; };
+  }, []);
   const [counter, setCounter] = useState({meals:0,days:0,steps:0});
   const TOTAL = 6;
 
@@ -19934,7 +20065,13 @@ const WrapScreen = ({userData, plan, onClose}) => {
               : `Stimato in 6 settimane al ritmo attuale del piano.`}
           </p>
           <div style={{background:T.card,borderRadius:20,padding:"16px 12px 8px",border:`1px solid ${T.border}`,marginBottom:16}}>
-            <LineMini data={MOCK_METRIC_DATA.peso} color={T.accentD} height={110}/>
+            {userWeightPoints.length >= 2
+              ? <LineMini data={userWeightPoints} color={T.accentD} height={110}/>
+              : <p style={{fontSize:13,color:T.muted,margin:"8px 4px",lineHeight:1.6}}>
+                  {lang !== "it"
+                    ? "The chart appears once you have logged at least two weights."
+                    : "Il grafico compare quando hai registrato almeno due pesi."}
+                </p>}
           </div>
           <div style={{padding:"14px 16px",background:T.sel,borderRadius:14,border:`1px solid ${noteColor}33`,display:"flex",gap:10,alignItems:"flex-start"}}>
             <Ico n="leaf2" size={15} c={noteColor}/>
@@ -20126,7 +20263,7 @@ const HealthRevokeModal = ({revokeStep, consentBusy, consentMessage, onNext, onB
   ), document.body);
 };
 
-const SettingsScreen = ({userData, setUserData, plan, setPlan, planningDay, setPlanningDay, onLogout, onDeleteAccount, onEditOnboarding, onHealthConsentReactivated}) => {
+const SettingsScreen = ({userData, setUserData, plan, setPlan, planningDay, setPlanningDay, onLogout, onDeleteAccount, onEditOnboarding, onHealthConsentReactivated, onOpenHighRiskScreening}) => {
   const { t, lang, setLang } = useT();
   const { snapshot: wearableSnapshot, connection: wearableStatus, refreshSnapshot, clearSnapshot } = useWearable();
   const sx = getSettingsScreenCopy(lang);
@@ -21154,6 +21291,15 @@ const requestDeletionOtp = async () => {
           onToggle={handleResearchConsentToggle}
         />
       </div>
+      {onOpenHighRiskScreening && (
+        <div style={{borderTop:`1px solid ${T.border}`,padding:"14px 16px"}}>
+          <button type="button" onClick={onOpenHighRiskScreening}
+            style={{display:"block",width:"100%",textAlign:"left",background:"none",border:"none",padding:0,cursor:"pointer"}}>
+            <span style={{display:"block",margin:"0 0 3px",fontSize:13,fontWeight:700,color:T.text}}>{getHighRiskCopy(lang).settingsLabel}</span>
+            <span style={{display:"block",fontSize:12,color:T.muted,lineHeight:1.5}}>{getHighRiskCopy(lang).settingsSub}</span>
+          </button>
+        </div>
+      )}
       {/* Export dati — GDPR Art. 20 (portabilità) */}
       <div style={{borderTop:`1px solid ${T.border}`,padding:"14px 16px"}}>
         <p style={{margin:"0 0 3px",fontSize:13,fontWeight:700,color:T.text}}>
@@ -22516,6 +22662,8 @@ function DUBIApp() {
   checkUserSession();
 }, [resetToken]);
   const [showWrap,setShowWrap] = useState(false);
+  // null = piano consentito; 'condition' (D-031) o 'bmi' (D-033) = nessun piano, schermata dedicata.
+  const [healthBlockKind,setHealthBlockKind] = useState(null);
   const [isFirstAccess,setIsFirstAccess] = useState(true);
   const [safetyReview,setSafetyReview] = useState(null);
 const handleLogout = async () => {
@@ -22537,6 +22685,21 @@ const handleDeleteAccount = async (otp) => {
   const [consentData, setConsentData] = useState(null);
   const [pendingPlanData, setPendingPlanData] = useState(null);
 
+  // D-031 / D-033 / D-040: un piano non consentito apre la schermata dedicata, mai un piano.
+  const showPlanBlockingScreen = (code, reason = null) => {
+    if (!code) return false;
+    setPlan(null);
+    setWeeklyPlans([]);
+    if (code === 'HIGH_RISK_SCREENING_REQUIRED') { setPhase('high-risk-screening'); return true; }
+    if (code === 'HEALTH_PLAN_BLOCKED') {
+      setHealthBlockKind(reason === 'BMI_BELOW_17' ? 'bmi_low' : 'condition');
+      setPhase('health-blocked');
+      return true;
+    }
+    if (code === 'GOAL_UNSAFE_FOR_BMI') { setHealthBlockKind('bmi'); setPhase('health-blocked'); return true; }
+    return false;
+  };
+
   const openAppWithDailySchedule = async (profile) => {
     setUserData(profile);
     if (!Boolean(profile?.health_data_consent ?? profile?.healthDataConsent)) {
@@ -22546,6 +22709,10 @@ const handleDeleteAccount = async (otp) => {
       return;
     }
     try {
+      const screening = await fetchHighRiskScreeningStatus();
+      if (screening.status === 'REQUIRED') { showPlanBlockingScreen('HIGH_RISK_SCREENING_REQUIRED'); return; }
+      if (screening.status === 'BLOCKED') { showPlanBlockingScreen('HEALTH_PLAN_BLOCKED'); return; }
+      setHealthBlockKind(null);
       const question = await fetchDailyMealScheduleQuestion();
       if (question.should_ask) {
         setDailyQuestion(question);
@@ -22561,6 +22728,7 @@ const handleDeleteAccount = async (otp) => {
       setActiveTab('today');
       setPhase('app');
     } catch (error) {
+      if (showPlanBlockingScreen(error?.code || planBlockingCode(error?.payload), error?.payload?.reason || null)) return;
       console.error('Daily meal schedule bootstrap failed:', error);
       setDailyQuestion({ error: error?.message || 'daily_meal_schedule_unavailable' });
       setPhase('daily-meal-question');
@@ -22829,6 +22997,20 @@ await openAppWithDailySchedule(data);
             }}
           />
         )}
+        {phase==="high-risk-screening" && (
+          <HighRiskScreeningScreen onAnswered={async (screening) => {
+            if (screening.status === 'BLOCKED') { showPlanBlockingScreen('HEALTH_PLAN_BLOCKED'); return; }
+            if (userData) await openAppWithDailySchedule(userData);
+          }} />
+        )}
+        {phase==="health-blocked" && (
+          <HealthPlanBlockedScreen
+            kind={healthBlockKind || 'condition'}
+            onAcknowledge={() => { setPlan(null); setActiveTab('settings'); setPhase('app'); }}
+            onSituationChanged={() => setPhase('high-risk-screening')}
+            onChangeGoal={() => { setActiveTab('today'); setPhase('onboarding'); }}
+          />
+        )}
         {phase==="minor" && (
           <MinorScreen
             userData={userData}
@@ -22848,14 +23030,22 @@ await openAppWithDailySchedule(data);
           <>
             <DesktopSidebar active={activeTab} onChange={setActiveTab} userData={userData} plan={plan} />
             <div className="dubi-screen-motion" style={{height:"var(--dubi-viewport-height, 100vh)",overflowY:"auto",position:"relative"}}>
-              {activeTab==="today"    && (healthDataConsentGranted
+              {healthBlockKind && (activeTab==="today" || activeTab==="weekly") && (
+                <HealthPlanBlockedScreen
+                  kind={healthBlockKind}
+                  onAcknowledge={() => setActiveTab('settings')}
+                  onSituationChanged={() => setPhase('high-risk-screening')}
+                  onChangeGoal={() => { setActiveTab('today'); setPhase('onboarding'); }}
+                />
+              )}
+              {!healthBlockKind && activeTab==="today"    && (healthDataConsentGranted
                 ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
-              {activeTab==="weekly"   && (healthDataConsentGranted
+              {!healthBlockKind && activeTab==="weekly"   && (healthDataConsentGranted
                 ? <WeeklyScreen userData={userData} plan={plan} setPlan={setPlan} weeklyPlans={weeklyPlans} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
-              {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={()=>setShowWrap(true)} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
+              {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={WRAP_USES_ONLY_USER_DATA ? ()=>setShowWrap(true) : undefined} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}
               {activeTab==="settings" && (
   <SettingsScreen
     userData={userData}
@@ -22867,6 +23057,7 @@ await openAppWithDailySchedule(data);
     onLogout={handleLogout}
     onDeleteAccount={handleDeleteAccount}
     onHealthConsentReactivated={handleHealthConsentReactivated}
+    onOpenHighRiskScreening={() => setPhase('high-risk-screening')}
     onEditOnboarding={() => {
   setActiveTab("today");
   setPhase("onboarding");

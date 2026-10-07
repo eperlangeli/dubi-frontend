@@ -57,3 +57,11 @@ jobs:
 
       - name: Goal rules match backend values (D-017a, D-033)
         run: node scripts/test-goal-macro-rules.mjs
+
+      - name: High-risk screening (D-031, D-040, D-043)
+        run: node scripts/test-high-risk-screening.mjs
+
+      - name: Body composition texts and wiring (D-041, D-042, D-043)
+        run: |
+          node scripts/test-body-composition-copy.mjs
+          node scripts/test-body-composition-wiring.mjs
