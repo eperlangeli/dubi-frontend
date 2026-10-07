@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
-  PLAN_VERSION_COPY_LANGUAGES, changedPlanDates, expectedVersionBody, getPlanUpdatedCopy, isPlanVersionConflict,
+  PLAN_STALE_COPY_LANGUAGES, PLAN_VERSION_COPY_LANGUAGES, changedPlanDates, getPlanStaleCopy, expectedVersionBody, getPlanUpdatedCopy, isPlanVersionConflict,
   knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion, resetPlanVersionsForTest,
 } from "../src/planVersion.mjs";
 
@@ -45,4 +45,22 @@ assert.match(app, /\/plan\/plan-versions\?from=/);
 assert.match(app, /setInterval\(checkPlanVersions, PLAN_VERSION_POLL_MS\)/);
 assert.match(app, /CapacitorApp\.addListener\("resume", checkPlanVersions\)/);
 assert.match(app, /data-testid="plan-updated-elsewhere"/);
+// D-038 (d): piano non allineato segnalato dal backend; l'app non lo rigenera aprendolo, lo aggiorna su tocco;
+// dopo il cambio dell'allenamento usa il piano già rigenerato dal backend (nessuna seconda rigenerazione).
+assert.deepEqual([...PLAN_STALE_COPY_LANGUAGES].sort(), [...appLanguages].sort(), "stale notice in every app language");
+for (const lang of PLAN_STALE_COPY_LANGUAGES) {
+  const copy = getPlanStaleCopy(lang);
+  assert.ok(copy.text && copy.action && copy.failed, `stale copy complete for ${lang}`);
+}
+assert.match(app, /planStale: ingredientPlan\?\.plan_stale === true,/);
+assert.match(app, /<PlanStaleNotice plan=\{plan\} userData=\{userData\} setPlan=\{setPlan\} lang=\{lang\}\/>/);
+const staleNotice = section("const PlanStaleNotice", "const TodayScreen");
+assert.match(staleNotice, /onClick=\{refresh\}/);
+assert.match(staleNotice, /generateIngredientPlan\(\{ date, reason: "plan_stale_refresh" \}\)/);
+const applyState = section("const applyState = async", "const persistState = async");
+assert.match(applyState, /planAfterServerRefresh\(savedState, todayIso, persistedOverride\)/);
+assert.ok(!/generateAiPlanFromBackend\(/.test(applyState), "training change does not regenerate twice");
+const refreshHelper = section("async function planAfterServerRefresh", "const fetchCurrentIngredientPlanFromBackend");
+for (const status of ["REGENERATED", "STALE_DOUBLE_SESSION", "FAILED", "NO_PLAN"]) assert.match(refreshHelper, new RegExp(status));
+assert.match(section("const confirmScheduledTraining = async", "const updateDraft"), /plan_refresh/);
 console.log(JSON.stringify({ test: "frontend-plan-version", failures_total: 0 }, null, 2));

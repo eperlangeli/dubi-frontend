@@ -19,7 +19,8 @@ import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
 import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoalStrict, toBackendGoalStrict, weeklyLossFromProjection } from "./goalMacroRules.mjs";
 import { HIGH_RISK_ANSWERS, HIGH_RISK_CONDITION_KEYS, getHighRiskCopy, highRiskAnswerBody, planBlockingCode } from "./highRiskScreening.mjs";
 import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails } from "./bodyComposition.mjs";
-import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
+import { LANG_STATE_KEY, MARTIAL_ARTS_PROMPT_SEEN_KEY, PLANNING_DAY_KEY, SHOPPING_CHECKED_KEY, cleanBooleanMap, cleanMealStatus, mapPatch, mealTrackingKey, mealTrackingPatch, patchAppState, readAppState } from "./serverState.mjs";
+import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanStaleCopy, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
 
 const { useState, useEffect, useCallback } = React;
@@ -1203,6 +1204,9 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
     goalProjection: ingredientPlan?.goal_projection || null,
     // D-041 / D-042 / D-043: esito della regola sulla composizione corporea calcolato dal backend.
     bodyComposition: ingredientPlan?.body_composition || null,
+    // D-038 (d): il backend segnala un piano non allineato all'allenamento; aprirlo non lo rigenera.
+    planStale: ingredientPlan?.plan_stale === true,
+    planStaleReason: ingredientPlan?.plan_stale_reason || null,
     weeklyLossKg: ingredientPlan?.goal_projection
       ? weeklyLossFromProjection(ingredientPlan.goal_projection)
       : fallbackPlan.weeklyLossKg,
@@ -1573,6 +1577,16 @@ const fetchDailyMealScheduleQuestion = async () => {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(payload.error || 'daily_schedule_load_failed'), { payload, status: response.status });
+  // D-038 (d): il GET non scrive; se il fuso del dispositivo è cambiato si aggiorna l'orario di oggi con una scrittura esplicita.
+  const deviceTimezone = getDeviceTimezone();
+  if (payload.existing && payload.existing.timezone && payload.existing.timezone !== deviceTimezone) {
+    const tzResponse = await fetch(`${API_BASE_URL}/plan/ingredient-plan/daily-schedule/timezone`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timezone: deviceTimezone }),
+    });
+    if (!tzResponse.ok) console.warn('Daily schedule timezone update failed:', tzResponse.status);
+  }
   return payload;
 };
 
@@ -1703,6 +1717,28 @@ async function saveTodayTrainingState({ date, state, sessions = [], confirmation
     throw failure;
   }
   return payload;
+}
+
+// D-038 (d): dopo PUT training-state il backend ha già rigenerato il piano (plan_refresh). Qui si usa quel
+// piano; nessuna seconda rigenerazione dall'app. Esito esplicito in ogni caso, mai un piano inventato.
+async function planAfterServerRefresh(savedState, date, dailyTrainingOverride) {
+  const refresh = savedState?.plan_refresh || null;
+  if (refresh?.status === "REGENERATED" && savedState.plan) {
+    rememberPlanVersion(savedState.plan.date || date, savedState.plan.plan_version);
+    return normalizeIngredientPlanPayload(savedState.plan);
+  }
+  if (refresh?.status === "STALE_DOUBLE_SESSION") {
+    throw Object.assign(new Error("RECIPE_ENGINE_V1_DOUBLE_SESSION_RULE_NOT_IMPLEMENTED"), { code: "RECIPE_ENGINE_V1_DOUBLE_SESSION_RULE_NOT_IMPLEMENTED" });
+  }
+  if (refresh?.status === "FAILED") {
+    throw Object.assign(new Error(refresh.error || "plan_refresh_failed"), { code: refresh.error || null, payload: refresh.payload || refresh });
+  }
+  if (refresh?.status === "NO_PLAN") {
+    return generateIngredientPlan({ date, reason: "today_training_state_updated", dailyTrainingOverride });
+  }
+  const fetched = await fetchIngredientPlanForDate(date, { generateIfMissing: false });
+  if (!fetched) throw new Error(getRuntimeCopy("plan.error.fetch"));
+  return fetched;
 }
 
 const fetchCurrentIngredientPlanFromBackend = async () => {
@@ -14609,8 +14645,7 @@ const SportRequiredScreen = ({ userData, eligibility, setUserData, setPlan, mode
     try{
       const saved=await saveOnboardingToBackend(updated);
       if(!saved||saved.error)throw new Error(saved?.error||"sport_save_failed");
-      setUserData(updated);saveDubiProfile(updated);
-      const {plan:nextPlan}=await generateAiPlanFromBackend(updated,{date:getTodayIsoDate(),force:true,reason,throwOnFailure:true});
+      setUserData(updated);      const {plan:nextPlan}=await generateAiPlanFromBackend(updated,{date:getTodayIsoDate(),force:true,reason,throwOnFailure:true});
       if(nextPlan)setPlan(nextPlan);
       onClose?.();
     }catch(error){
@@ -14912,10 +14947,27 @@ const LegacyMartialArtsPrompt = ({userData,setUserData}) => {
   const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(storageKey)==="1";}catch(_){return false;}});
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
-  useEffect(()=>{try{setDismissed(localStorage.getItem(storageKey)==="1");}catch(_){}},[storageKey]);
+  // D-038 (c): "già vista" vive sul server (altrimenti la domanda riappare su ogni dispositivo); locale = copia.
+  useEffect(()=>{
+    let alive=true;
+    readAppState({apiBaseUrl:API_BASE_URL,token:getAuthToken(),keys:[MARTIAL_ARTS_PROMPT_SEEN_KEY]})
+      .then(values=>{
+        if(!alive)return;
+        const seen=values[MARTIAL_ARTS_PROMPT_SEEN_KEY]===true;
+        setDismissed(seen);
+        try{seen?localStorage.setItem(storageKey,"1"):localStorage.removeItem(storageKey);}catch(_){}
+      })
+      .catch(error=>console.warn("Martial arts prompt state load failed:",error?.message||error));
+    return()=>{alive=false;};
+  },[storageKey]);
   if(dismissed||!sports.includes("martial_arts"))return null;
   const disciplines=["boxing","mma","judo","wrestling","muay_thai","karate","taekwondo","bjj"];
-  const finish=()=>{try{localStorage.setItem(storageKey,"1");}catch(_){}setDismissed(true);};
+  const finish=()=>{
+    setDismissed(true);
+    patchAppState({apiBaseUrl:API_BASE_URL,token:getAuthToken(),key:MARTIAL_ARTS_PROMPT_SEEN_KEY,body:{value:true}})
+      .then(()=>{try{localStorage.setItem(storageKey,"1");}catch(_){}})
+      .catch(error=>{console.warn("Martial arts prompt state save failed:",error?.message||error);setDismissed(false);});
+  };
   const choose=async id=>{
     const nextSports=sports.map(sport=>sport==="martial_arts"?id:sport);
     const updated={...userData,sports:nextSports,sport:nextSports[0]||""};
@@ -14923,7 +14975,7 @@ const LegacyMartialArtsPrompt = ({userData,setUserData}) => {
     const saved=await saveOnboardingToBackend(updated);
     setBusy(false);
     if(saved?.error){setMessage(lang==="it"?"Non sono riuscito a salvare la scelta. Il profilo attuale continua a funzionare.":"Could not save your choice. Your current profile remains active.");return;}
-    setUserData(updated);saveDubiProfile(updated);finish();
+    setUserData(updated);finish();
   };
   return <div data-testid="legacy-martial-arts-prompt" style={{margin:"0 0 14px",padding:14,borderRadius:14,border:`1px solid ${T.border}`,background:T.card}}>
     <strong style={{fontSize:13,color:T.text}}>{lang==="it"?"Specifica il tuo sport":"Specify your sport"}</strong>
@@ -14959,13 +15011,10 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
   const todayDay = ((new Date(`${todayIso}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
   const sportIds = normalizeSports(userData?.sports, userData?.sport);
   const sportLabels = Object.fromEntries(sportIds.map(sport => [sport, getSportLabel(sport,t,lang)]));
-  const overrideStorageKey = `dubi_today_training_override_${userData?.dubiCode || getAuthEmail() || "guest"}_${todayIso}`;
   const planOverride = plan?.ingredientPlan?.daily_training_override || plan?.daily_training_override || null;
   const planConfirmationStatus = plan?.ingredientPlan?.training_confirmation_status || plan?.training_confirmation_status || "unconfirmed";
-  const readStoredOverride = () => {
-    try { return JSON.parse(localStorage.getItem(overrideStorageKey) || "null"); } catch (_) { return null; }
-  };
-  const [dailyOverride,setDailyOverride] = useState(() => planOverride || readStoredOverride());
+  // D-038 (c): l'allenamento di oggi modificato vive nel piano sul server (daily_training_override); nessuna copia locale.
+  const [dailyOverride,setDailyOverride] = useState(() => planOverride || null);
   const [localConfirmationStatus,setLocalConfirmationStatus] = useState(planConfirmationStatus);
   const model = buildTodayWorkoutCardState({sessions,isoDate:todayIso,sportLabels,dailyOverride,confirmationStatus:localConfirmationStatus});
   const [editing, setEditing] = useState(false);
@@ -14992,11 +15041,8 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
   const [draftSessions,setDraftSessions] = useState(defaultSessions);
 
   useEffect(() => {
-    if (planOverride) {
-      setDailyOverride(planOverride);
-      try { localStorage.setItem(overrideStorageKey,JSON.stringify(planOverride)); } catch (_) {}
-    }
-  }, [overrideStorageKey,JSON.stringify(planOverride)]);
+    setDailyOverride(planOverride || null);
+  }, [todayIso,JSON.stringify(planOverride)]);
 
   useEffect(() => {
     setLocalConfirmationStatus(planConfirmationStatus);
@@ -15023,7 +15069,6 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
       const savedState = await saveTodayTrainingState({...normalizedOverride,confirmations});
       const persistedOverride = savedState.daily_training_override || normalizedOverride;
       setDailyOverride(persistedOverride);
-      try { localStorage.setItem(overrideStorageKey,JSON.stringify(persistedOverride)); } catch (_) {}
       setPlan?.(current=>({
         ...current,
         ingredientPlan:{...(current?.ingredientPlan || {}),daily_training_override:persistedOverride,nutrition_context_stale:true},
@@ -15039,13 +15084,12 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
         const saved = await saveOnboardingToBackend(updatedData);
         if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
         setUserData?.(updatedData);
-        saveDubiProfile(updatedData);
       }
 
-      const {plan:updatedPlan} = await generateAiPlanFromBackend(updatedData, {
-        date: todayIso, force: true, reason: "today_training_state_updated",
-        dailyTrainingOverride:persistedOverride, throwOnFailure:true,
-      });
+      const updatedPlan = mapIngredientPlanToFrontend(
+        await planAfterServerRefresh(savedState, todayIso, persistedOverride),
+        updatedData
+      );
       migrateTodayStatus(plan, updatedPlan, updatedData);
       setPlan?.(updatedPlan);
       const unallocated = Number(updatedPlan?.ingredientPlan?.remaining_energy_unallocated_kcal || updatedPlan?.remaining_energy_unallocated_kcal || 0);
@@ -15128,12 +15172,21 @@ const TodayWorkoutCard = ({ userData, plan, setUserData, setPlan }) => {
     setSaving(true);
     setMessage("");
     try {
-      await postScheduledTrainingConfirmation({date:todayIso,apiBaseUrl:API_BASE_URL,token:getAuthToken()});
+      const confirmation = await postScheduledTrainingConfirmation({date:todayIso,apiBaseUrl:API_BASE_URL,token:getAuthToken()});
       setLocalConfirmationStatus("confirmed_training");
-      setPlan?.(current => current?.ingredientPlan
-        ? {...current,ingredientPlan:{...current.ingredientPlan,training_confirmation_status:"confirmed_training"}}
-        : {...current,training_confirmation_status:"confirmed_training"});
-      setMessage(lang === "it" ? "Allenamento confermato. Il piano non è stato rigenerato." : "Training confirmed. The plan was not regenerated.");
+      // D-038 (d): se il backend ha rigenerato il piano del giorno nella stessa richiesta, lo si rilegge dal server.
+      const regenerated = (confirmation?.plan_refresh?.dates || []).some(item=>item.date === todayIso && item.status === "REGENERATED");
+      if (regenerated) {
+        const fresh = await fetchIngredientPlanForDate(todayIso, { generateIfMissing: false });
+        if (fresh) setPlan?.(mapIngredientPlanToFrontend(fresh, userData));
+      } else {
+        setPlan?.(current => current?.ingredientPlan
+          ? {...current,ingredientPlan:{...current.ingredientPlan,training_confirmation_status:"confirmed_training"}}
+          : {...current,training_confirmation_status:"confirmed_training"});
+      }
+      setMessage(regenerated
+        ? (lang === "it" ? "Allenamento confermato. Piano aggiornato." : "Training confirmed. Plan updated.")
+        : (lang === "it" ? "Allenamento confermato. Il piano non è stato rigenerato." : "Training confirmed. The plan was not regenerated."));
     } catch (error) {
       console.error("Training confirmation failed:",error);
       setMessage(lang === "it" ? "Non riesco a confermare l'allenamento." : "Could not confirm training.");
@@ -16672,7 +16725,6 @@ const ResearchInviteCard = ({userData, setUserData}) => {
     if (!result || !result.success) return;
     const updated = {...userData, research_consent:true, researchConsent:true};
     setUserData(updated);
-    saveDubiProfile(updated);
     setHidden(true);
   };
   const it = lang === "it";
@@ -16703,6 +16755,40 @@ const ResearchInviteCard = ({userData, setUserData}) => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// D-038 (d): piano non allineato ai dati di allenamento. Aprire l'app non lo cambia: l'utente lo aggiorna con
+// un tocco (rigenerazione esplicita con la versione su cui si basa).
+const PlanStaleNotice = ({ plan, userData, setPlan, lang }) => {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  if (!plan?.planStale) return null;
+  const copy = getPlanStaleCopy(lang);
+  const date = plan?.ingredientPlan?.date || plan?.ingredientPlanDate || getTodayIsoDate();
+  const refresh = async () => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      const fresh = await generateIngredientPlan({ date, reason: "plan_stale_refresh" });
+      setPlan?.(mapIngredientPlanToFrontend(fresh, userData));
+    } catch (error) {
+      console.error("Stale plan refresh failed:", error);
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div role="status" data-testid="plan-stale-notice" dir={lang === "ar" ? "rtl" : "ltr"}
+      style={{margin:'14px 20px 0',padding:'12px 14px',borderRadius:8,background:'#fff6e5',color:'#5c4313',fontSize:13,lineHeight:1.45}}>
+      <div>{copy.text}</div>
+      <button type="button" onClick={refresh} disabled={busy}
+        style={{marginTop:8,padding:'8px 12px',border:0,borderRadius:8,background:'#275b48',color:'#fff',fontWeight:600,fontSize:13,cursor:'pointer'}}>
+        {copy.action}
+      </button>
+      {failed && <div role="alert" style={{marginTop:6,color:'#a5342b'}}>{copy.failed}</div>}
     </div>
   );
 };
@@ -16771,6 +16857,59 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
     } catch(e) {}
   }, [todayIngredientStatusStorageKey, ingChecked]);
 
+  // D-038 (c): pasti fatti/saltati e ingredienti spuntati vivono sul server (uguali su ogni dispositivo).
+  // All'apertura si legge il server (la copia locale serve solo da cache); ogni modifica si invia come differenza.
+  // Se l'invio non riesce si ricarica lo stato del server. Una sola volta, se il server non ha nulla per oggi e il
+  // telefono sì (dati di prima di D-038), i dati locali dell'utente vengono portati sul server.
+  const mealTrackingServerRef = React.useRef(null);
+  const [mealTrackingReload, setMealTrackingReload] = useState(0);
+  React.useEffect(() => {
+    let alive = true;
+    mealTrackingServerRef.current = null;
+    const key = mealTrackingKey(todayDateKey);
+    (async () => {
+      try {
+        const values = await readAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), keys: [key] });
+        let server = values[key];
+        if (!server) {
+          const migration = mealTrackingPatch({}, readDateCompletionState(todayMealStatusStorageKey), readDateCompletionState(todayIngredientStatusStorageKey));
+          if (migration) {
+            const saved = await patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key, body: migration });
+            rememberPlanVersion(saved.plan_date || todayDateKey, saved.plan_version);
+            server = saved.value;
+          }
+        }
+        if (!alive) return;
+        const value = server || { meal_status: {}, ingredient_checks: {} };
+        mealTrackingServerRef.current = value;
+        setStatus(cleanMealStatus(value.meal_status));
+        setIngChecked(cleanBooleanMap(value.ingredient_checks));
+      } catch (error) {
+        console.warn("Meal tracking load failed:", error?.message || error);
+      }
+    })();
+    return () => { alive = false; };
+  }, [todayDateKey, mealTrackingReload]);
+
+  React.useEffect(() => {
+    const server = mealTrackingServerRef.current;
+    if (!server) return undefined;
+    const body = mealTrackingPatch(server, status, ingChecked);
+    if (!body) return undefined;
+    const key = mealTrackingKey(todayDateKey);
+    const timer = setTimeout(async () => {
+      try {
+        const saved = await patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key, body });
+        mealTrackingServerRef.current = saved.value;
+        rememberPlanVersion(saved.plan_date || todayDateKey, saved.plan_version);
+      } catch (error) {
+        console.warn("Meal tracking save failed, reloading from server:", error?.message || error);
+        setMealTrackingReload((n) => n + 1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [status, ingChecked, todayDateKey]);
+
   React.useEffect(() => {
     refreshSnapshot({ forceSync: true });
   }, [refreshSnapshot]);
@@ -16786,10 +16925,10 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
       const stored = JSON.parse(sessionStorage.getItem("dubi_anomaly")||"{}");
       if (stored.date === today) return; // già mostrata oggi
     } catch(e) {}
-    // Simulazione: ogni 3 giorni circa si rileva un'anomalia (giorno del mese divisibile per 3)
-    // In produzione: confronto HRV/sleep odierni vs media 7gg dal wearable reale
-    const d = new Date().getDate();
-    if (d % 3 !== 0) return;
+    // Nessun dato inventato: tolta la simulazione che mostrava un'anomalia ogni 3 giorni (giorno del mese
+    // divisibile per 3) a chi ha un wearable. L'avviso tornerà solo con il confronto reale HRV/sonno di oggi
+    // contro la media di 7 giorni, con una regola approvata.
+    if (true) return;
     const timer = setTimeout(() => {
       setAnomalyState("pending");
       try { sessionStorage.setItem("dubi_anomaly", JSON.stringify({date: today})); } catch(e) {}
@@ -16943,7 +17082,6 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
       const saved = await saveOnboardingToBackend(updatedData);
       if (saved?.error) throw new Error(saved.error);
       setUserData?.(updatedData);
-      saveDubiProfile(updatedData);
       const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
         force: true,
         reason: `home_training_time_${nextTrainingTime}`
@@ -17227,6 +17365,8 @@ const TodayScreen = ({userData,plan,setUserData,setPlan,isFirstAccess,planningDa
       )}
 
       <BodyCompositionNotice assessment={plan?.bodyComposition} lang={lang}/>
+
+      <PlanStaleNotice plan={plan} userData={userData} setPlan={setPlan} lang={lang}/>
 
       {/* ── Daily research invitation ── */}
       {!(activeNotif && !notifDismissed) && <ResearchInviteCard userData={userData} setUserData={setUserData}/>}
@@ -18163,7 +18303,9 @@ const PartnerCodeModal = ({onClose, onSave, myUserData}) => {
     const code = inputCode.trim().toUpperCase().replace(/\s/g,"");
     if (!code) return;
     if (code === myCode) { setStatus("same"); setPreview(null); return; }
-    const found = loadDubiProfile(code);
+    // D-038 (c): il profilo del partner era cercato solo nella memoria locale del telefono (funzione rimossa il
+    // 23 set, 66d5bf4): nessuna ricerca locale. Il collegamento tornerà con una ricerca sul server.
+    const found = null;
     let foundPlan = null;
     try {
       // D-017a: profilo salvato incompleto (peso, altezza, età, obiettivo) = nessuna anteprima inventata.
@@ -18357,6 +18499,48 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLin
     try { localStorage.setItem(shoppingStorageKey(userData), JSON.stringify(checked)); } catch(e) {}
   }, [checked, userData?.dubiCode]);
 
+  // D-038 (c): la spesa spuntata vive sul server (uguale su ogni dispositivo); la copia locale è solo una cache.
+  const shoppingServerRef = React.useRef(null);
+  const [shoppingReload, setShoppingReload] = useState(0);
+  React.useEffect(() => {
+    let alive = true;
+    shoppingServerRef.current = null;
+    (async () => {
+      try {
+        const values = await readAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), keys: [SHOPPING_CHECKED_KEY] });
+        let server = values[SHOPPING_CHECKED_KEY];
+        if (!server) {
+          let local = {};
+          try { local = JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}"); } catch (_) { local = {}; }
+          const migration = mapPatch({}, local);
+          if (migration) server = (await patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key: SHOPPING_CHECKED_KEY, body: migration })).value;
+        }
+        if (!alive) return;
+        shoppingServerRef.current = server || {};
+        setChecked(cleanBooleanMap(server));
+      } catch (error) {
+        console.warn("Shopping state load failed:", error?.message || error);
+      }
+    })();
+    return () => { alive = false; };
+  }, [userData?.dubiCode, shoppingReload]);
+
+  React.useEffect(() => {
+    const server = shoppingServerRef.current;
+    if (!server) return undefined;
+    const body = mapPatch(server, checked);
+    if (!body) return undefined;
+    const timer = setTimeout(async () => {
+      try {
+        shoppingServerRef.current = (await patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key: SHOPPING_CHECKED_KEY, body })).value;
+      } catch (error) {
+        console.warn("Shopping state save failed, reloading from server:", error?.message || error);
+        setShoppingReload((n) => n + 1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [checked]);
+
   // ── Lista personalizzata per l'utente corrente ──
   const myShop = React.useMemo(()=>getPersonalizedShopping(userData, plan, weeklyPlans), [userData, plan, weeklyPlans]);
   const shopByDay = React.useMemo(()=>getShoppingByDay(userData, plan, weeklyPlans), [userData, plan, weeklyPlans]);
@@ -18378,17 +18562,8 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLin
     return wrapped;
   }, [myShop, partnerMode, partnerProfile]);
 
-  React.useEffect(() => {
-    try {
-      const owned = JSON.parse(localStorage.getItem(ownedShoppingKey(userData)) || "[]");
-      if (!owned.length) return;
-      const allItems = Object.values(activeShop).flat().map(e => e.item);
-      const toMark = allItems.filter(item => owned.includes(shoppingItemBase(item)) && !checked[item]);
-      if (toMark.length) {
-        setChecked(c => toMark.reduce((acc, item) => ({...acc, [item]: true}), c));
-      }
-    } catch(e) {}
-  }, [activeShop, userData?.dubiCode]);
+  // D-038 (c): rimosso l'effetto "cose che ho già in casa": leggeva una chiave locale mai scritta, con funzioni
+  // rimosse il 23 set (ownedShoppingKey, shoppingItemBase non definite: errore sempre assorbito). Nessun effetto reale.
 
   const allEntries = Object.values(activeShop).flat();
   const total = allEntries.length;
@@ -18425,7 +18600,8 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLin
         </div>
 
         {/* Partner card — compact */}
-        {!partnerProfile ? (
+        {/* D-038 (c): collegamento partner nascosto finché non esiste la ricerca sul server (era solo locale). */}
+        {!partnerProfile ? null && (
           <button onClick={()=>setShowPartnerModal(true)}
             style={{marginTop:10,padding:"8px 0",background:"transparent",border:"none",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:6}}>
             <Ico n="users" size={14} c={T.muted}/>
@@ -18727,7 +18903,7 @@ const SourcesScreen = ({userData, lang: langProp}) => {
   const sectionTitleStyle = {fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:17,fontWeight:800,color:T.text,margin:"0 0 14px"};
   const selectedSports = normalizeSports(userData?.sports, userData?.sport);
   const selectedSportsText = selectedSports.length
-    ? selectedSports.map(sport => formatSportLabel(sport, t)).join(" · ")
+    ? selectedSports.map(sport => getSportLabel(sport, t, lang)).join(" · ")
     : "";
   const sportSourceCopy = sportScienceSourceCopy(lang, selectedSportsText);
 
@@ -20505,7 +20681,6 @@ const handleDisconnectWearable = async () => {
     clearSnapshot();
     const updatedData = {...userData, wearable:"none", wearable_provider:"none", wearableConsent:false};
     setUserData(updatedData);
-    saveDubiProfile(updatedData);
     const aiResult = await generateAiPlanFromBackend(updatedData, { force: true, reason: "wearable_disconnected" });
     if (aiResult?.plan) setPlan(aiResult.plan);
     setWearableMessage(sx.disconnectSuccess);
@@ -20538,7 +20713,6 @@ const updateLocalConsent = (field, value) => {
     : "researchConsent";
   const updatedData = {...userData, [field]: Boolean(value), [camelField]: Boolean(value)};
   setUserData(updatedData);
-  saveDubiProfile(updatedData);
   return updatedData;
 };
 
@@ -20640,7 +20814,6 @@ const handleConfirmHealthRevocation = async () => {
   };
   setUserData(updatedData);
   setPlan(null);
-  saveDubiProfile(updatedData);
   closeHealthRevokeModal();
   setConsentMessage(t("set.edit.success"));
 };
@@ -20810,7 +20983,6 @@ const handleSaveProfile = async () => {
     }
 
     setUserData(updatedData);
-    saveDubiProfile(updatedData);
     if (selectedProfileImpactsDiet) {
       const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
         force: true,
@@ -20870,7 +21042,6 @@ const handleSaveWorkoutSchedule = async () => {
     const saved = await saveOnboardingToBackend(updatedData);
     if (!saved || saved.error) throw new Error(saved?.error || "schedule_save_failed");
     setUserData(updatedData);
-    saveDubiProfile(updatedData);
     if (todayChanged) {
       const { plan: updatedPlan } = await generateAiPlanFromBackend(updatedData, {
         date: todayIso,
@@ -21481,7 +21652,6 @@ const requestDeletionOtp = async () => {
               {(lang==="it"?["Lun","Mar","Mer","Gio","Ven","Sab","Dom"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]).map((d,i)=>(
                 <button key={i} onClick={()=>{
                   setPlanningDay(i===6?0:i+1);
-                  localStorage.setItem("dubi_planning_day", String(i===6?0:i+1));
                 }}
                   style={{padding:"9px 4px",borderRadius:10,fontSize:11,fontWeight:700,cursor:"pointer",
                     border:`1.5px solid ${planningDay===(i===6?0:i+1)?T.accentD:T.border}`,
@@ -22476,12 +22646,13 @@ const DailyMealScheduleScreen = ({ question, onSubmit }) => {
 };
 
 function DUBIApp() {
-  const { lang } = useT();
+  const { lang, setLang } = useT();
   const { refreshSnapshot, clearSnapshot } = useWearable();
   useNativeKeyboardInsets();
   const [resetToken, setResetToken] = useState(() => extractResetTokenFromUrl(window.location.href));
   const [phase,setPhase] = useState(() => resetToken ? "reset-password" : "checking");
   const [planUpdatedElsewhere, setPlanUpdatedElsewhere] = useState(false);
+  const [onboardingSaveError, setOnboardingSaveError] = useState(null);
   const [authStartMode, setAuthStartMode] = useState(null);
   const [authError, setAuthError] = useState("");
   const [userData,setUserData] = useState(null);
@@ -22489,9 +22660,17 @@ function DUBIApp() {
   const [weeklyPlans,setWeeklyPlans] = useState([]);
   const [dailyQuestion,setDailyQuestion] = useState(null);
   const [activeTab,setActiveTab] = useState("today");
-  const [planningDay, setPlanningDay] = useState(() => {
+  const [planningDay, setPlanningDayState] = useState(() => {
     try { return parseInt(localStorage.getItem("dubi_planning_day") ?? "0", 10); } catch(e) { return 0; }
   });
+  // D-038 (c): giorno di pianificazione e lingua vivono sul server; la memoria locale è solo una copia.
+  const setPlanningDay = (value) => {
+    setPlanningDayState(value);
+    safeLocalStorageSet("dubi_planning_day", String(value));
+    patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key: PLANNING_DAY_KEY, body: { value } })
+      .catch(error => console.warn("Planning day save failed:", error?.message || error));
+  };
+  const serverLangReadyRef = React.useRef(false);
   // Tracking sessione + sezioni visitate (per il timing dell'invito ricerca)
   useEffect(() => {
     const openResetPassword = async (url) => {
@@ -22838,12 +23017,39 @@ const handleDeleteAccount = async (otp) => {
     };
   }, [phase]);
 
+  useEffect(() => {
+    if (phase !== "app") return undefined;
+    let alive = true;
+    readAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), keys: [PLANNING_DAY_KEY, LANG_STATE_KEY] })
+      .then(values => {
+        if (!alive) return;
+        if (Number.isInteger(values[PLANNING_DAY_KEY])) {
+          setPlanningDayState(values[PLANNING_DAY_KEY]);
+          safeLocalStorageSet("dubi_planning_day", String(values[PLANNING_DAY_KEY]));
+        }
+        const serverLang = values[LANG_STATE_KEY];
+        if (serverLang && serverLang !== lang) setLang(serverLang);
+        if (!serverLang) {
+          patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key: LANG_STATE_KEY, body: { value: lang } })
+            .catch(error => console.warn("Language save failed:", error?.message || error));
+        }
+        serverLangReadyRef.current = true;
+      })
+      .catch(error => console.warn("App state load failed:", error?.message || error));
+    return () => { alive = false; };
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "app" || !serverLangReadyRef.current) return;
+    patchAppState({ apiBaseUrl: API_BASE_URL, token: getAuthToken(), key: LANG_STATE_KEY, body: { value: lang } })
+      .catch(error => console.warn("Language save failed:", error?.message || error));
+  }, [lang]);
+
   const handleAiPlanRefreshFromProgress = (aiPlan, weightValue) => {
     const nextUserData = {...userData, weight: weightValue};
     const refreshedPlan = mapAiPlanToFrontend(aiPlan, nextUserData);
     setUserData(nextUserData);
     setPlan(refreshedPlan);
-    saveDubiProfile(nextUserData);
   };
 
   const handleManualActivityUpdate = async (updatedData) => {
@@ -22858,13 +23064,10 @@ const handleDeleteAccount = async (otp) => {
 
     setUserData(updatedData);
     setPlan(updatedPlan);
-    saveDubiProfile(updatedData);
     return updatedPlan;
   };
 
   const requestConsentBeforePlan = data => {
-    if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
-    saveDubiProfile(data);
     setUserData(data);
 
     const consentStatus = data.parentalConsentStatus || data.parental_consent_status || userData?.parentalConsentStatus || userData?.parental_consent_status || "not_required";
@@ -22899,9 +23102,7 @@ const handleDeleteAccount = async (otp) => {
   const finalizeData = async data => {
 
     // Genera codice DUBI univoco se non esiste già
-    if (!data.dubiCode) data = {...data, dubiCode: generateDubiCode()};
     // Salva profilo in localStorage per il collegamento con altri profili
-    saveDubiProfile(data);
     setUserData(data);
 
 const isEditingOnboarding = localStorage.getItem("dubi_edit_onboarding") === "true";
@@ -23037,9 +23238,10 @@ await openAppWithDailySchedule(data);
                 legalAcceptedAt: c?.legalAcceptedAt || c?.privacyAcceptedAt || new Date().toISOString(),
                 healthDataConsentAt: c?.healthDataConsentAt || c?.privacyAcceptedAt || new Date().toISOString()
               };
+              setOnboardingSaveError(null);
               const saved = await saveOnboardingToBackend(dataToGenerate);
-              if (saved?.error) {
-                setBetaAccessMessage(saved.error);
+              if (!saved || saved.error) {
+                setOnboardingSaveError(saved?.error || "onboarding_save_failed");
                 return;
               }
               if (getOAuthWearableProvider(dataToGenerate) && dataToGenerate?.wearableConsent) {
@@ -23052,6 +23254,11 @@ await openAppWithDailySchedule(data);
             }}
             onDecline={()=>setPhase("welcome")}
           />
+        )}
+        {phase==="consent" && onboardingSaveError && (
+          <p role="alert" data-testid="onboarding-save-error" dir={lang==="ar" ? "rtl" : "ltr"} style={{margin:"0 20px 20px",padding:"12px 14px",borderRadius:8,background:"#fbeaea",color:"#a5342b",fontSize:13,lineHeight:1.45}}>
+            {getRuntimeCopy("onb.save.error", null, lang)} ({onboardingSaveError})
+          </p>
         )}
         {phase==="wearable-connect" && (
           <WearableConnectScreen

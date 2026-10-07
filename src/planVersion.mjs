@@ -20,6 +20,29 @@ const COPY = {
 
 export const PLAN_VERSION_COPY_LANGUAGES = Object.freeze(Object.keys(COPY));
 
+// D-038 (d): piano non allineato ai dati di allenamento (plan_stale dal backend). Aprire l'app non lo
+// rigenera: l'utente lo aggiorna con un tocco. Testi della Regia (IT/EN), altre lingue in attesa di QA linguistico.
+const STALE_COPY = {
+  it: { text: "Questo piano non tiene conto delle ultime modifiche all'allenamento.", action: "Aggiorna il piano", failed: "Non riesco ad aggiornare il piano. Riprova tra poco." },
+  en: { text: "This plan does not reflect your latest training changes.", action: "Update plan", failed: "Could not update the plan. Please try again shortly." },
+  fr: { text: "Ce plan ne tient pas compte de vos dernières modifications d'entraînement.", action: "Mettre à jour le plan", failed: "Impossible de mettre à jour le plan. Réessayez dans un instant." },
+  es: { text: "Este plan no tiene en cuenta tus últimos cambios de entrenamiento.", action: "Actualizar el plan", failed: "No se pudo actualizar el plan. Inténtalo de nuevo en un momento." },
+  de: { text: "Dieser Plan berücksichtigt deine letzten Trainingsänderungen nicht.", action: "Plan aktualisieren", failed: "Der Plan konnte nicht aktualisiert werden. Bitte versuche es gleich noch einmal." },
+  ar: { text: "لا تأخذ هذه الخطة في الاعتبار آخر تغييرات تمارينك.", action: "تحديث الخطة", failed: "تعذّر تحديث الخطة. حاول مرة أخرى بعد قليل." },
+  pt: { text: "Este plano não tem em conta as suas últimas alterações de treino.", action: "Atualizar o plano", failed: "Não foi possível atualizar o plano. Tente novamente daqui a pouco." },
+  zh: { text: "此计划未包含你最近的训练更改。", action: "更新计划", failed: "无法更新计划。请稍后再试。" },
+  ja: { text: "このプランには最新のトレーニング変更が反映されていません。", action: "プランを更新", failed: "プランを更新できませんでした。しばらくしてからもう一度お試しください。" },
+  ru: { text: "Этот план не учитывает ваши последние изменения тренировок.", action: "Обновить план", failed: "Не удалось обновить план. Попробуйте ещё раз чуть позже." },
+};
+
+export const PLAN_STALE_COPY_LANGUAGES = Object.freeze(Object.keys(STALE_COPY));
+
+export function getPlanStaleCopy(lang) {
+  const copy = STALE_COPY[lang];
+  if (!copy) throw new Error(`PLAN_STALE_COPY_MISSING:${lang}`);
+  return copy;
+}
+
 export function getPlanUpdatedCopy(lang) {
   const text = COPY[lang];
   if (!text) throw new Error(`PLAN_VERSION_COPY_MISSING:${lang}`);

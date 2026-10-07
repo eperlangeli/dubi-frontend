@@ -66,5 +66,7 @@ jobs:
           node scripts/test-body-composition-copy.mjs
           node scripts/test-body-composition-wiring.mjs
 
-      - name: Plan version banner (D-038 b)
-        run: node scripts/test-plan-version.mjs
+      - name: Plan version banner, stale plan, state on server (D-038)
+        run: |
+          node scripts/test-plan-version.mjs
+          node scripts/test-server-state.mjs
