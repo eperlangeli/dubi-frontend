@@ -22,10 +22,13 @@ export const HIGH_RISK_CONDITION_KEYS = Object.freeze([
 ]);
 
 // Codici del backend che impediscono il piano: l'app mostra una schermata dedicata, mai un piano.
+// D-032 / D-058 (Francesco, 9 ott 2026): per i 14–17 anni nessun piano automatico (MINOR_CLINICAL_PLAN_REQUIRED).
+// Testi del blocco minorenni: della Regia (IT/EN), da far rivedere alla sezione 5; altre 8 lingue da QA linguistico.
 export const PLAN_BLOCKING_CODES = Object.freeze([
   "HIGH_RISK_SCREENING_REQUIRED",
   "HEALTH_PLAN_BLOCKED",
   "GOAL_UNSAFE_FOR_BMI",
+  "MINOR_CLINICAL_PLAN_REQUIRED",
 ]);
 
 export function planBlockingCode(payload) {
@@ -76,6 +79,9 @@ const IT = {
   bmiTitle: "Con il tuo peso attuale DUBI non può creare un piano per questo obiettivo.",
   bmiBody: "Con il BMI che risulta dai tuoi dati, un deficit calorico non è indicato. Puoi scegliere mantenimento o aumento di massa; ti consigliamo una valutazione con un medico o un dietista.",
   bmiLowBody: "Con il peso e l'altezza che hai indicato il BMI risulta sotto 17. In questa situazione serve una valutazione individuale da parte di un medico o dietista prima di qualsiasi piano alimentare.",
+  minorTitle: "Per ora DUBI non crea un piano alimentare automatico per chi ha meno di 18 anni.",
+  minorBody: "Alla tua età il corpo è ancora in crescita e calorie e porzioni vanno valutate in modo diverso rispetto agli adulti. Stiamo preparando una versione pensata per i ragazzi: fino ad allora DUBI non calcola calorie, macro né un piano.",
+  minorNext: "Se vuoi un piano alimentare adesso, parlane con il pediatra o con un nutrizionista.",
   bmiChange: "Cambia obiettivo",
 };
 
@@ -113,6 +119,9 @@ const EN = {
   bmiTitle: "At your current weight DUBI cannot create a plan for this goal.",
   bmiBody: "With the BMI from your details, a calorie deficit is not appropriate. You can choose maintenance or muscle gain; we recommend an assessment with a doctor or registered dietitian.",
   bmiLowBody: "With the weight and height you entered, your BMI is below 17. In this situation an individual assessment by a doctor or registered dietitian is needed before any meal plan.",
+  minorTitle: "For now, DUBI does not create an automatic meal plan for anyone under 18.",
+  minorBody: "At your age your body is still growing, so calories and portions need to be assessed differently from adults. We are preparing a version designed for teenagers: until then DUBI does not calculate calories, macros or a plan.",
+  minorNext: "If you want a meal plan now, talk to your paediatrician or a nutrition professional.",
   bmiChange: "Change goal",
 };
 
@@ -150,6 +159,9 @@ const FR = {
   bmiTitle: "Avec ton poids actuel, DUBI ne peut pas créer de plan pour cet objectif.",
   bmiBody: "Avec l'IMC calculé à partir de tes données, un déficit calorique n'est pas indiqué. Tu peux choisir maintien ou prise de masse ; nous te conseillons un avis médical ou diététique.",
   bmiLowBody: "Avec le poids et la taille indiqués, ton IMC est inférieur à 17. Dans ce cas, une évaluation individuelle par un médecin ou un diététicien est nécessaire avant tout plan alimentaire.",
+  minorTitle: "Pour l'instant, DUBI ne crée pas de plan alimentaire automatique pour les moins de 18 ans.",
+  minorBody: "À ton âge, ton corps est encore en croissance : les calories et les portions doivent être évaluées différemment de celles des adultes. Nous préparons une version pensée pour les adolescents ; d'ici là, DUBI ne calcule ni calories, ni macros, ni plan.",
+  minorNext: "Si tu veux un plan alimentaire maintenant, parles-en à ton pédiatre ou à un professionnel de la nutrition.",
   bmiChange: "Changer d'objectif",
 };
 
@@ -187,6 +199,9 @@ const ES = {
   bmiTitle: "Con tu peso actual, DUBI no puede crear un plan para este objetivo.",
   bmiBody: "Con el IMC que resulta de tus datos, un déficit calórico no está indicado. Puedes elegir mantenimiento o ganancia muscular; te recomendamos una valoración con un médico o dietista.",
   bmiLowBody: "Con el peso y la altura que has indicado, tu IMC es inferior a 17. En esta situación se necesita una valoración individual de un médico o dietista antes de cualquier plan de alimentación.",
+  minorTitle: "Por ahora, DUBI no crea un plan de alimentación automático para menores de 18 años.",
+  minorBody: "A tu edad tu cuerpo todavía está creciendo: las calorías y las porciones deben valorarse de forma distinta a las de los adultos. Estamos preparando una versión pensada para adolescentes; hasta entonces, DUBI no calcula calorías, macros ni un plan.",
+  minorNext: "Si quieres un plan de alimentación ahora, habla con tu pediatra o con un profesional de la nutrición.",
   bmiChange: "Cambiar objetivo",
 };
 
@@ -224,6 +239,9 @@ const DE = {
   bmiTitle: "Mit deinem aktuellen Gewicht kann DUBI für dieses Ziel keinen Plan erstellen.",
   bmiBody: "Bei dem BMI aus deinen Angaben ist ein Kaloriendefizit nicht angezeigt. Du kannst Gewicht halten oder Muskelaufbau wählen; wir empfehlen eine ärztliche oder diätetische Beurteilung.",
   bmiLowBody: "Mit dem angegebenen Gewicht und der Größe liegt dein BMI unter 17. In dieser Situation ist vor jedem Ernährungsplan eine individuelle Beurteilung durch Arzt oder Diätassistenz nötig.",
+  minorTitle: "DUBI erstellt derzeit keinen automatischen Ernährungsplan für Personen unter 18 Jahren.",
+  minorBody: "In deinem Alter wächst dein Körper noch: Kalorien und Portionen müssen anders beurteilt werden als bei Erwachsenen. Wir bereiten eine Version für Jugendliche vor; bis dahin berechnet DUBI keine Kalorien, Makros und keinen Plan.",
+  minorNext: "Wenn du jetzt einen Ernährungsplan möchtest, sprich mit deiner Kinderärztin, deinem Kinderarzt oder einer Ernährungsfachkraft.",
   bmiChange: "Ziel ändern",
 };
 
@@ -261,6 +279,9 @@ const AR = {
   bmiTitle: "بوزنك الحالي لا يمكن لـ DUBI إنشاء خطة لهذا الهدف.",
   bmiBody: "مع مؤشر كتلة الجسم الناتج عن بياناتك، لا يُنصح بعجز في السعرات. يمكنك اختيار الحفاظ على الوزن أو زيادة الكتلة العضلية، وننصح بتقييم من طبيب أو أخصائي تغذية.",
   bmiLowBody: "وفقًا للوزن والطول اللذين أدخلتهما، فإن مؤشر كتلة جسمك أقل من 17. في هذه الحالة يلزم تقييم فردي من طبيب أو أخصائي تغذية قبل أي خطة غذائية.",
+  minorTitle: "حاليًا، لا ينشئ DUBI خطة غذائية تلقائية لمن هم دون 18 عامًا.",
+  minorBody: "في عمرك لا يزال جسمك في طور النمو، لذلك يجب تقييم السعرات الحرارية والحصص بطريقة مختلفة عن البالغين. نعمل على إعداد نسخة مخصصة للمراهقين؛ وحتى ذلك الحين لا يحسب DUBI السعرات الحرارية أو العناصر الغذائية الكبرى ولا ينشئ خطة.",
+  minorNext: "إذا كنت تريد خطة غذائية الآن، فتحدث مع طبيب الأطفال أو مع أخصائي تغذية.",
   bmiChange: "تغيير الهدف",
 };
 
@@ -298,6 +319,9 @@ const PT = {
   bmiTitle: "Com o teu peso atual, a DUBI não pode criar um plano para este objetivo.",
   bmiBody: "Com o IMC que resulta dos teus dados, um défice calórico não é indicado. Podes escolher manutenção ou ganho muscular; recomendamos uma avaliação com um médico ou nutricionista.",
   bmiLowBody: "Com o peso e a altura que indicaste, o teu IMC é inferior a 17. Nesta situação é necessária uma avaliação individual por um médico ou nutricionista antes de qualquer plano alimentar.",
+  minorTitle: "Por agora, a DUBI não cria um plano alimentar automático para menores de 18 anos.",
+  minorBody: "Na tua idade o teu corpo ainda está a crescer: as calorias e as porções têm de ser avaliadas de forma diferente das dos adultos. Estamos a preparar uma versão pensada para adolescentes; até lá, a DUBI não calcula calorias, macros nem um plano.",
+  minorNext: "Se quiseres um plano alimentar agora, fala com o teu pediatra ou com um profissional de nutrição.",
   bmiChange: "Mudar objetivo",
 };
 
@@ -335,6 +359,9 @@ const ZH = {
   bmiTitle: "以你目前的体重，DUBI 无法为这个目标生成计划。",
   bmiBody: "根据你的数据计算出的 BMI，不适合热量缺口。你可以选择保持体重或增肌；建议咨询医生或注册营养师。",
   bmiLowBody: "根据你填写的体重和身高，你的 BMI 低于 17。在这种情况下，任何饮食计划之前都需要由医生或注册营养师进行个体评估。",
+  minorTitle: "目前，DUBI 不为未满 18 岁的用户自动生成饮食计划。",
+  minorBody: "在你这个年龄，身体仍在生长，热量和份量需要以不同于成年人的方式评估。我们正在准备专为青少年设计的版本；在此之前，DUBI 不计算热量、宏量营养素，也不生成计划。",
+  minorNext: "如果你现在需要饮食计划，请咨询儿科医生或营养专业人士。",
   bmiChange: "更改目标",
 };
 
@@ -372,6 +399,9 @@ const JA = {
   bmiTitle: "現在の体重では、DUBIはこの目標のプランを作成できません。",
   bmiBody: "入力データから算出したBMIでは、カロリー不足は適していません。体重維持または筋肉増量を選べます。医師または管理栄養士による評価をおすすめします。",
   bmiLowBody: "入力された体重と身長では、BMIが17未満です。この場合、食事プランの前に医師または管理栄養士による個別の評価が必要です。",
+  minorTitle: "現在、DUBIは18歳未満の方向けに自動で食事プランを作成しません。",
+  minorBody: "あなたの年齢では体はまだ成長中のため、カロリーや量は大人とは異なる方法で評価する必要があります。10代向けのバージョンを準備中です。それまでDUBIはカロリー、栄養素の配分、プランを計算しません。",
+  minorNext: "今すぐ食事プランが必要な場合は、小児科医または栄養の専門家に相談してください。",
   bmiChange: "目標を変更",
 };
 
@@ -409,6 +439,9 @@ const RU = {
   bmiTitle: "При вашем текущем весе DUBI не может составить план для этой цели.",
   bmiBody: "При ИМТ, рассчитанном по вашим данным, дефицит калорий не показан. Вы можете выбрать поддержание веса или набор мышечной массы; рекомендуем консультацию врача или диетолога.",
   bmiLowBody: "По указанным весу и росту ваш ИМТ ниже 17. В этой ситуации перед любым планом питания нужна индивидуальная оценка врача или диетолога.",
+  minorTitle: "Пока DUBI не составляет автоматический план питания для пользователей младше 18 лет.",
+  minorBody: "В вашем возрасте организм ещё растёт, поэтому калории и порции нужно оценивать иначе, чем у взрослых. Мы готовим версию для подростков; до тех пор DUBI не рассчитывает калории, макронутриенты и не составляет план.",
+  minorNext: "Если вам нужен план питания сейчас, обратитесь к педиатру или специалисту по питанию.",
   bmiChange: "Изменить цель",
 };
 

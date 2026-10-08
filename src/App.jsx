@@ -1861,6 +1861,8 @@ const generateAiPlanFromBackend = async (userData, options = {}) => {
   } catch (error) {
     console.error("Ingredient plan request failed:", error);
     if (error?.code === 'DAILY_MEAL_SCHEDULE_REQUIRED') throw error;
+    // D-031 / D-033 / D-040 / D-058: piano non consentito = mai il calcolo locale di riserva (es. 14–17 anni).
+    if (planBlockingCode(error?.payload) || planBlockingCode({ error: error?.code })) throw error;
     if (options.throwOnFailure) throw error;
     if (String(error?.code || "").startsWith("RECIPE_ENGINE_V1_") || error?.payload?.generation_status === "NO_SAFE_MATCH") {
       return {
@@ -16342,15 +16344,22 @@ const HealthPlanBlockedScreen = ({kind = "condition", onAcknowledge, onSituation
   const copy = getHighRiskCopy(lang);
   const isBmi = kind === "bmi";
   const isBmiLow = kind === "bmi_low";
+  // D-032 / D-058: 14–17 anni, nessun piano automatico; un solo pulsante.
+  const isMinor = kind === "minor";
   return (
     <div style={{minHeight:"var(--dubi-viewport-height, 100vh)",padding:"64px 24px 120px",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div role="alertdialog" aria-labelledby="dubi-health-block-title" style={{width:"100%",maxWidth:480,padding:"30px 24px",background:T.card,border:`1.5px solid ${T.border}`,borderRadius:24,boxShadow:"0 12px 34px rgba(43,43,43,.08)",textAlign:"center"}}>
         <h1 id="dubi-health-block-title" style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:24,fontWeight:800,color:T.text,margin:"0 0 14px",lineHeight:1.25}}>
-          {isBmi ? copy.bmiTitle : copy.blockTitle}
+          {isMinor ? copy.minorTitle : (isBmi ? copy.bmiTitle : copy.blockTitle)}
         </h1>
-        <p style={{fontSize:14,color:T.text,lineHeight:1.65,margin:"0 0 12px"}}>{isBmi ? copy.bmiBody : (isBmiLow ? copy.bmiLowBody : copy.blockBody)}</p>
-        {!isBmi && <p style={{fontSize:14,color:T.muted,lineHeight:1.65,margin:"0 0 22px"}}>{copy.blockNext}</p>}
-        {isBmi ? (
+        <p style={{fontSize:14,color:T.text,lineHeight:1.65,margin:"0 0 12px"}}>{isMinor ? copy.minorBody : (isBmi ? copy.bmiBody : (isBmiLow ? copy.bmiLowBody : copy.blockBody))}</p>
+        {!isBmi && <p style={{fontSize:14,color:T.muted,lineHeight:1.65,margin:"0 0 22px"}}>{isMinor ? copy.minorNext : copy.blockNext}</p>}
+        {isMinor ? (
+          <button type="button" onClick={onAcknowledge}
+            style={{width:"100%",padding:"15px 18px",borderRadius:50,border:"none",background:T.accentD,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
+            {copy.blockAck}
+          </button>
+        ) : isBmi ? (
           <button type="button" onClick={onChangeGoal}
             style={{width:"100%",marginTop:10,padding:"15px 18px",borderRadius:50,border:"none",background:T.accentD,color:T.white,fontSize:14,fontWeight:800,cursor:"pointer"}}>
             {copy.bmiChange}
@@ -22894,6 +22903,7 @@ const handleDeleteAccount = async (otp) => {
       return true;
     }
     if (code === 'GOAL_UNSAFE_FOR_BMI') { setHealthBlockKind('bmi'); setPhase('health-blocked'); return true; }
+    if (code === 'MINOR_CLINICAL_PLAN_REQUIRED') { setHealthBlockKind('minor'); setPhase('health-blocked'); return true; }
     return false;
   };
 
