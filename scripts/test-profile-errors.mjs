@@ -2,7 +2,7 @@
 // porta alle Impostazioni, mai il codice tecnico e mai un valore stimato. Testi in 10 lingue.
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { PROFILE_DATA_CODES, PROFILE_ERROR_LANGS, noPlanCopy, profileDataCode, profileErrorCopy } from "../src/profileErrors.mjs";
+import { PROFILE_DATA_CODES, PROFILE_ERROR_LANGS, noPlanCopy, planErrorCopy, profileDataCode, profileErrorCopy } from "../src/profileErrors.mjs";
 
 // Stessi codici del backend (config/goal-macro-rules.js, routes/plan.js).
 assert.deepEqual([...PROFILE_DATA_CODES].sort(), ["PROFILE_AGE_MISSING", "PROFILE_GOAL_MISSING", "PROFILE_GOAL_UNKNOWN", "PROFILE_HEIGHT_MISSING", "PROFILE_WEIGHT_MISSING"]);
@@ -30,6 +30,11 @@ for (const lang of PROFILE_ERROR_LANGS) {
   for (const key of ["title", "body", "retry"]) assert.ok(typeof copy[key] === "string" && copy[key].trim().length > 1, `${lang}.noPlan.${key}`);
 }
 assert.equal(noPlanCopy("xx").title, noPlanCopy("it").title);
+// D-064: altri errori del piano: frase chiara in 10 lingue; il codice solo come riferimento piccolo.
+for (const lang of PROFILE_ERROR_LANGS) {
+  const copy = planErrorCopy(lang);
+  for (const key of ["title", "body", "ref"]) assert.ok(typeof copy[key] === "string" && copy[key].trim().length > 3 && !/_/.test(copy[key]), `${lang}.planError.${key}`);
+}
 
 // Forme in cui arriva il codice: stringa, Error con message, errore con payload del backend.
 assert.equal(profileDataCode(new Error("PROFILE_WEIGHT_MISSING")), "PROFILE_WEIGHT_MISSING");
@@ -42,7 +47,11 @@ for (const other of ["HEALTH_PLAN_BLOCKED", "MINOR_CLINICAL_PLAN_REQUIRED", "NO_
 
 // Collegamento nell'app: schermata dell'orario, errore all'avvio, messaggio nelle Impostazioni.
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
-assert.match(app, /import \{ noPlanCopy, profileErrorCopy \} from "\.\/profileErrors\.mjs";/);
+assert.match(app, /import \{ noPlanCopy, planErrorCopy, profileErrorCopy \} from "\.\/profileErrors\.mjs";/);
+// Nessun errore del piano mostrato come testo principale: titolo e spiegazione tradotti, codice solo come riferimento.
+assert.doesNotMatch(app, /<p role="alert" style=\{\{fontSize:13,color:'#a5342b',marginTop:12\}\}>\{error\}<\/p>/);
+assert.doesNotMatch(app, /<p role="alert">\{dailyQuestion\.error\}<\/p>/);
+assert.equal((app.match(/\{planErrorCopy\(lang\)\.ref\}: \{(error|dailyQuestion\.error)\}/g) || []).length, 2);
 assert.match(app, /const profileCopy = profileErrorCopy\(err, lang\);\n\s+if \(profileCopy\) \{ setProfileIssue\(profileCopy\); setBusy\(false\); return; \}/, "schermata dell'orario");
 assert.match(app, /const profileCopy = profileErrorCopy\(dailyQuestion\.error, lang\);/, "errore all'avvio");
 assert.match(app, /<DailyMealScheduleScreen question=\{dailyQuestion\} onSubmit=\{handleDailyScheduleSubmit\} onOpenProfile=\{openProfileFromPlanError\} \/>/);

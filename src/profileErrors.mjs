@@ -139,3 +139,22 @@ const NO_PLAN_COPY = Object.freeze({
 export function noPlanCopy(lang) {
   return NO_PLAN_COPY[lang] || NO_PLAN_COPY.it;
 }
+
+// D-064: qualsiasi altro errore nel preparare il piano del giorno: frase chiara; il codice resta solo come riferimento
+// piccolo per l'assistenza, mai come messaggio.
+const PLAN_ERROR_COPY = Object.freeze({
+  it: { title: "Non riesco a preparare il piano adesso.", body: "Riprova tra poco. Se succede ancora, scegli un altro orario.", ref: "Riferimento per l'assistenza" },
+  en: { title: "I can’t prepare your plan right now.", body: "Try again shortly. If it happens again, choose a different time.", ref: "Support reference" },
+  fr: { title: "Je ne peux pas préparer ton plan pour le moment.", body: "Réessaie dans un instant. Si cela se reproduit, choisis un autre horaire.", ref: "Référence pour l'assistance" },
+  es: { title: "Ahora no puedo preparar tu plan.", body: "Inténtalo de nuevo en un momento. Si vuelve a pasar, elige otra hora.", ref: "Referencia para soporte" },
+  de: { title: "Ich kann deinen Plan gerade nicht erstellen.", body: "Versuche es gleich noch einmal. Wenn es wieder passiert, wähle eine andere Uhrzeit.", ref: "Referenz für den Support" },
+  ar: { title: "لا أستطيع إعداد خطتك الآن.", body: "حاول مرة أخرى بعد قليل. إذا تكرر ذلك، اختر وقتًا آخر.", ref: "مرجع للدعم" },
+  pt: { title: "Não consigo preparar o teu plano agora.", body: "Tenta novamente daqui a pouco. Se voltar a acontecer, escolhe outra hora.", ref: "Referência para o suporte" },
+  zh: { title: "现在无法生成你的计划。", body: "请稍后重试。如果再次出现，请选择其他时间。", ref: "支持参考" },
+  ja: { title: "今はプランを作成できません。", body: "少し待ってからもう一度お試しください。再び起きる場合は、別の時間を選んでください。", ref: "サポート用の参照" },
+  ru: { title: "Сейчас не удаётся подготовить план.", body: "Попробуйте ещё раз чуть позже. Если это повторится, выберите другое время.", ref: "Код для поддержки" },
+});
+
+export function planErrorCopy(lang) {
+  return PLAN_ERROR_COPY[lang] || PLAN_ERROR_COPY.it;
+}

@@ -19,7 +19,7 @@ import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
 import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoalStrict, toBackendGoalStrict, weeklyLossFromProjection } from "./goalMacroRules.mjs";
 import { HIGH_RISK_ANSWERS, HIGH_RISK_CONDITION_KEYS, getHighRiskCopy, highRiskAnswerBody, planBlockingCode } from "./highRiskScreening.mjs";
 import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails } from "./bodyComposition.mjs";
-import { noPlanCopy, profileErrorCopy } from "./profileErrors.mjs";
+import { noPlanCopy, planErrorCopy, profileErrorCopy } from "./profileErrors.mjs";
 import { LANG_STATE_KEY, MARTIAL_ARTS_PROMPT_SEEN_KEY, PLANNING_DAY_KEY, SHOPPING_CHECKED_KEY, cleanBooleanMap, cleanMealStatus, mapPatch, mealTrackingKey, mealTrackingPatch, patchAppState, readAppState } from "./serverState.mjs";
 import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanStaleCopy, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
@@ -22671,7 +22671,8 @@ const DailyMealScheduleScreen = ({ question, onSubmit, onOpenProfile }) => {
     } catch (err) {
       const profileCopy = profileErrorCopy(err, lang);
       if (profileCopy) { setProfileIssue(profileCopy); setBusy(false); return; }
-      setError(err?.message || (it ? 'Non siamo riusciti a salvare la risposta.' : 'We could not save your answer.'));
+      // D-064: mai il codice tecnico come messaggio; resta solo come riferimento piccolo per l'assistenza.
+      setError(err?.message || 'daily_schedule_save_failed');
       setBusy(false);
     }
   };
@@ -22694,7 +22695,13 @@ const DailyMealScheduleScreen = ({ question, onSubmit, onOpenProfile }) => {
         </label>
         {suggestionUsable && !edited && !skipBreakfast && <button type="button" disabled={busy} onClick={()=>submit('prefilled_confirmed')} style={{width:'100%',height:46,border:0,borderRadius:8,background:'#275b48',color:'#fff',fontWeight:700,marginBottom:9}}>{it?`Conferma orario abituale · ${question.suggestion.time}`:`Confirm usual time · ${question.suggestion.time}`}</button>}
         <button type="button" disabled={busy} onClick={()=>submit('user_confirmed')} style={{width:'100%',height:46,border:'1px solid #275b48',borderRadius:8,background:suggestionUsable&&!edited?'#fff':'#275b48',color:suggestionUsable&&!edited?'#275b48':'#fff',fontWeight:700}}>{busy?(it?'Preparazione del piano…':'Preparing your plan…'):(it?'Continua':'Continue')}</button>
-        {error && <p role="alert" style={{fontSize:13,color:'#a5342b',marginTop:12}}>{error}</p>}
+        {error && (
+          <div role="alert" style={{marginTop:12}}>
+            <p style={{fontSize:14,fontWeight:700,color:'#7f2a22',margin:'0 0 4px'}}>{planErrorCopy(lang).title}</p>
+            <p style={{fontSize:13,lineHeight:1.5,color:'#5c3a35',margin:'0 0 6px'}}>{planErrorCopy(lang).body}</p>
+            <p style={{fontSize:11,color:'#8a8f8c',margin:0}}>{planErrorCopy(lang).ref}: {error}</p>
+          </div>
+        )}
         {profileIssue && (
           <div role="alert" style={{marginTop:14,padding:14,borderRadius:8,background:'#fbf1ef',border:'1px solid #ecc9c3'}}>
             <p style={{fontSize:14,fontWeight:700,color:'#7f2a22',margin:'0 0 6px'}}>{profileIssue.title}</p>
@@ -23237,7 +23244,7 @@ await openAppWithDailySchedule(data);
                 const profileCopy = profileErrorCopy(dailyQuestion.error, lang);
                 return profileCopy
                   ? <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section style={{maxWidth:390}}><p role="alert" style={{fontWeight:700,margin:'0 0 6px'}}>{profileCopy.title}</p><p style={{margin:'0 0 12px',lineHeight:1.5}}>{profileCopy.body}</p><button onClick={openProfileFromPlanError} style={{padding:'12px 18px'}}>{profileCopy.action}</button></section></main>
-                  : <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section><p role="alert">{dailyQuestion.error}</p><button onClick={()=>openAppWithDailySchedule(userData)} style={{marginTop:12,padding:'12px 18px'}}>Riprova</button></section></main>;
+                  : <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section style={{maxWidth:390}}><p role="alert" style={{fontWeight:700,margin:'0 0 6px'}}>{planErrorCopy(lang).title}</p><p style={{margin:'0 0 6px',lineHeight:1.5}}>{planErrorCopy(lang).body}</p><p style={{fontSize:11,color:'#8a8f8c',margin:'0 0 12px'}}>{planErrorCopy(lang).ref}: {dailyQuestion.error}</p><button onClick={()=>openAppWithDailySchedule(userData)} style={{padding:'12px 18px'}}>{noPlanCopy(lang).retry}</button></section></main>;
               })()
             : <DailyMealScheduleScreen question={dailyQuestion} onSubmit={handleDailyScheduleSubmit} onOpenProfile={openProfileFromPlanError} />
         )}
