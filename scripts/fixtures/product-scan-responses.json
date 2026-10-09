@@ -1,0 +1,840 @@
+{
+ "note": "Risposte reali di services/product-scan/analyze.js del backend (D-057), generate dalla Regia il 9 ott 2026. Servono al test di parità dei testi italiani.",
+ "cases": {
+  "gluten_vegan": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "NOT_SUITABLE",
+   "verdict_label_it": "Non adatto a te",
+   "color": "red",
+   "reasons": [
+    {
+     "code": "CONTAINS_RESTRICTED",
+     "ingredients": [
+      "farina di frumento"
+     ],
+     "restriction": [
+      "gluten_free"
+     ],
+     "text_it": "Contiene farina di frumento (glutine). L'hai indicato tra le cose da evitare."
+    },
+    {
+     "code": "CONTAINS_RESTRICTED",
+     "ingredients": [
+      "burro",
+      "uova"
+     ],
+     "restriction": [
+      "diet_vegan"
+     ],
+     "text_it": "Contiene burro, uova. Il tuo piano è vegano."
+    },
+    {
+     "code": "DECLARED_ALLERGEN",
+     "restriction": [
+      "soy_free"
+     ],
+     "text_it": "Il produttore dichiara soia. L'hai indicato tra le cose da evitare."
+    },
+    {
+     "code": "TO_VERIFY",
+     "ingredient": "aromi",
+     "why": [
+      "diet_vegan_maybe"
+     ],
+     "text_it": "aromi: potrebbe essere di origine animale."
+    },
+    {
+     "code": "TO_VERIFY",
+     "ingredient": "amido",
+     "why": [
+      "ambiguous_origin"
+     ],
+     "text_it": "amido: l'origine non è indicata. Controlla l'etichetta."
+    },
+    {
+     "code": "TO_VERIFY",
+     "ingredient": "ingrediente strano",
+     "why": [
+      "not_recognized"
+     ],
+     "text_it": "ingrediente strano: ingrediente che non riesco a riconoscere."
+    },
+    {
+     "code": "PROFILE_RESTRICTION_NOT_RECOGNIZED",
+     "values": [
+      "kiwi"
+     ],
+     "text_it": "Non riesco a controllare: kiwi. Leggi l'etichetta."
+    }
+   ],
+   "suggestion_it": "Prova un prodotto simile (biscotti) senza glutine, soia, vegano.",
+   "suggestion": {
+    "category": "biscotti",
+    "without_routes": [
+     "gluten_free",
+     "soy_free"
+    ],
+    "diet": "vegan"
+   },
+   "groups": [
+    {
+     "key": "AVOID",
+     "label_it": "Da evitare per te",
+     "items": [
+      {
+       "order": 1,
+       "text": "farina di frumento",
+       "id": "en:wheat-flour",
+       "depth": 0,
+       "percent_declared": 55,
+       "group": "AVOID",
+       "why": [
+        "gluten_free"
+       ]
+      },
+      {
+       "order": 4,
+       "text": "burro",
+       "id": "en:butter",
+       "depth": 0,
+       "percent_declared": 8,
+       "group": "AVOID",
+       "why": [
+        "diet_vegan"
+       ]
+      },
+      {
+       "order": 5,
+       "text": "uova",
+       "id": "en:egg",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "AVOID",
+       "why": [
+        "diet_vegan"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "TO_VERIFY",
+     "label_it": "Da verificare",
+     "items": [
+      {
+       "order": 6,
+       "text": "aromi",
+       "id": "en:flavouring",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "TO_VERIFY",
+       "why": [
+        "diet_vegan_maybe"
+       ]
+      },
+      {
+       "order": 7,
+       "text": "amido",
+       "id": "en:starch",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "TO_VERIFY",
+       "why": [
+        "ambiguous_origin"
+       ]
+      },
+      {
+       "order": 9,
+       "text": "ingrediente strano",
+       "id": "it:ingrediente-strano",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "TO_VERIFY",
+       "why": [
+        "not_recognized"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OUTSIDE_YOUR_DIET",
+     "label_it": "Fuori dalla tua dieta",
+     "items": [
+      {
+       "order": 3,
+       "text": "olio di girasole",
+       "id": "en:sunflower-oil",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OUTSIDE_YOUR_DIET",
+       "why": [
+        "seed_oil_rule"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OTHER",
+     "label_it": "Altri ingredienti",
+     "items": [
+      {
+       "order": 2,
+       "text": "zucchero",
+       "id": "en:sugar",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      }
+     ]
+    },
+    {
+     "key": "ADDITIVES_FLAVOURINGS",
+     "label_it": "Additivi e aromi",
+     "items": [
+      {
+       "order": 8,
+       "text": "E500",
+       "id": "en:e500",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      }
+     ]
+    }
+   ],
+   "traces": [
+    {
+     "tag": "en:nuts",
+     "route": "nut_free",
+     "label_it": "frutta a guscio e arachidi"
+    }
+   ],
+   "product": {
+    "code": "8000000000002",
+    "name": "Frollini",
+    "brands": null,
+    "category": "biscotti"
+   }
+  },
+  "nuts_traces": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "NOT_SUITABLE",
+   "verdict_label_it": "Non adatto a te",
+   "color": "red",
+   "reasons": [
+    {
+     "code": "MAY_CONTAIN",
+     "restriction": [
+      "nut_free"
+     ],
+     "text_it": "Può contenere tracce di frutta a guscio e arachidi. L'hai indicato tra le cose da evitare."
+    },
+    {
+     "code": "TO_VERIFY",
+     "ingredient": "ingrediente strano",
+     "why": [
+      "not_recognized"
+     ],
+     "text_it": "ingrediente strano: ingrediente che non riesco a riconoscere."
+    }
+   ],
+   "suggestion_it": "Prova un prodotto simile (biscotti) senza frutta a guscio e arachidi.",
+   "suggestion": {
+    "category": "biscotti",
+    "without_routes": [
+     "nut_free"
+    ],
+    "diet": null
+   },
+   "groups": [
+    {
+     "key": "TO_VERIFY",
+     "label_it": "Da verificare",
+     "items": [
+      {
+       "order": 9,
+       "text": "ingrediente strano",
+       "id": "it:ingrediente-strano",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "TO_VERIFY",
+       "why": [
+        "not_recognized"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OUTSIDE_YOUR_DIET",
+     "label_it": "Fuori dalla tua dieta",
+     "items": [
+      {
+       "order": 3,
+       "text": "olio di girasole",
+       "id": "en:sunflower-oil",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OUTSIDE_YOUR_DIET",
+       "why": [
+        "seed_oil_rule"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OTHER",
+     "label_it": "Altri ingredienti",
+     "items": [
+      {
+       "order": 1,
+       "text": "farina di frumento",
+       "id": "en:wheat-flour",
+       "depth": 0,
+       "percent_declared": 55,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 2,
+       "text": "zucchero",
+       "id": "en:sugar",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 4,
+       "text": "burro",
+       "id": "en:butter",
+       "depth": 0,
+       "percent_declared": 8,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 5,
+       "text": "uova",
+       "id": "en:egg",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 7,
+       "text": "amido",
+       "id": "en:starch",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      }
+     ]
+    },
+    {
+     "key": "ADDITIVES_FLAVOURINGS",
+     "label_it": "Additivi e aromi",
+     "items": [
+      {
+       "order": 6,
+       "text": "aromi",
+       "id": "en:flavouring",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      },
+      {
+       "order": 8,
+       "text": "E500",
+       "id": "en:e500",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      }
+     ]
+    }
+   ],
+   "traces": [
+    {
+     "tag": "en:nuts",
+     "route": "nut_free",
+     "label_it": "frutta a guscio e arachidi"
+    }
+   ],
+   "product": {
+    "code": "8000000000002",
+    "name": "Frollini",
+    "brands": null,
+    "category": "biscotti"
+   }
+  },
+  "none": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "NO_ISSUE_FOUND",
+   "verdict_label_it": "Nessun ingrediente da evitare trovato",
+   "color": "green",
+   "reasons": [],
+   "suggestion_it": null,
+   "suggestion": null,
+   "groups": [
+    {
+     "key": "OUTSIDE_YOUR_DIET",
+     "label_it": "Fuori dalla tua dieta",
+     "items": [
+      {
+       "order": 3,
+       "text": "olio di girasole",
+       "id": "en:sunflower-oil",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OUTSIDE_YOUR_DIET",
+       "why": [
+        "seed_oil_rule"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OTHER",
+     "label_it": "Altri ingredienti",
+     "items": [
+      {
+       "order": 1,
+       "text": "farina di frumento",
+       "id": "en:wheat-flour",
+       "depth": 0,
+       "percent_declared": 55,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 2,
+       "text": "zucchero",
+       "id": "en:sugar",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 4,
+       "text": "burro",
+       "id": "en:butter",
+       "depth": 0,
+       "percent_declared": 8,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 5,
+       "text": "uova",
+       "id": "en:egg",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 7,
+       "text": "amido",
+       "id": "en:starch",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 9,
+       "text": "ingrediente strano",
+       "id": "it:ingrediente-strano",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      }
+     ]
+    },
+    {
+     "key": "ADDITIVES_FLAVOURINGS",
+     "label_it": "Additivi e aromi",
+     "items": [
+      {
+       "order": 6,
+       "text": "aromi",
+       "id": "en:flavouring",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      },
+      {
+       "order": 8,
+       "text": "E500",
+       "id": "en:e500",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      }
+     ]
+    }
+   ],
+   "traces": [
+    {
+     "tag": "en:nuts",
+     "route": "nut_free",
+     "label_it": "frutta a guscio e arachidi"
+    }
+   ],
+   "product": {
+    "code": "8000000000002",
+    "name": "Frollini",
+    "brands": null,
+    "category": "biscotti"
+   }
+  },
+  "pescetarian": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "NOT_SUITABLE",
+   "verdict_label_it": "Non adatto a te",
+   "color": "red",
+   "reasons": [
+    {
+     "code": "CONTAINS_RESTRICTED",
+     "ingredients": [
+      "pollo"
+     ],
+     "restriction": [
+      "diet_pescetarian"
+     ],
+     "text_it": "Contiene pollo. Il tuo piano è pescetariano."
+    },
+    {
+     "code": "TO_VERIFY",
+     "ingredient": "ingrediente strano",
+     "why": [
+      "not_recognized"
+     ],
+     "text_it": "ingrediente strano: ingrediente che non riesco a riconoscere."
+    }
+   ],
+   "suggestion_it": "Prova un prodotto simile (biscotti) adatto alla tua dieta.",
+   "suggestion": {
+    "category": "biscotti",
+    "without_routes": [],
+    "diet": "pescetarian"
+   },
+   "groups": [
+    {
+     "key": "AVOID",
+     "label_it": "Da evitare per te",
+     "items": [
+      {
+       "order": 10,
+       "text": "pollo",
+       "id": "en:chicken",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "AVOID",
+       "why": [
+        "diet_pescetarian"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "TO_VERIFY",
+     "label_it": "Da verificare",
+     "items": [
+      {
+       "order": 9,
+       "text": "ingrediente strano",
+       "id": "it:ingrediente-strano",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "TO_VERIFY",
+       "why": [
+        "not_recognized"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OUTSIDE_YOUR_DIET",
+     "label_it": "Fuori dalla tua dieta",
+     "items": [
+      {
+       "order": 3,
+       "text": "olio di girasole",
+       "id": "en:sunflower-oil",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OUTSIDE_YOUR_DIET",
+       "why": [
+        "seed_oil_rule"
+       ]
+      }
+     ]
+    },
+    {
+     "key": "OTHER",
+     "label_it": "Altri ingredienti",
+     "items": [
+      {
+       "order": 1,
+       "text": "farina di frumento",
+       "id": "en:wheat-flour",
+       "depth": 0,
+       "percent_declared": 55,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 2,
+       "text": "zucchero",
+       "id": "en:sugar",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 4,
+       "text": "burro",
+       "id": "en:butter",
+       "depth": 0,
+       "percent_declared": 8,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 5,
+       "text": "uova",
+       "id": "en:egg",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      },
+      {
+       "order": 7,
+       "text": "amido",
+       "id": "en:starch",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "OTHER",
+       "why": null
+      }
+     ]
+    },
+    {
+     "key": "ADDITIVES_FLAVOURINGS",
+     "label_it": "Additivi e aromi",
+     "items": [
+      {
+       "order": 6,
+       "text": "aromi",
+       "id": "en:flavouring",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      },
+      {
+       "order": 8,
+       "text": "E500",
+       "id": "en:e500",
+       "depth": 0,
+       "percent_declared": null,
+       "group": "ADDITIVES_FLAVOURINGS",
+       "why": null
+      }
+     ]
+    }
+   ],
+   "traces": [
+    {
+     "tag": "en:nuts",
+     "route": "nut_free",
+     "label_it": "frutta a guscio e arachidi"
+    }
+   ],
+   "product": {
+    "code": "8000000000002",
+    "name": "Frollini",
+    "brands": null,
+    "category": "biscotti"
+   }
+  },
+  "oats_in_diet": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "NO_ISSUE_FOUND",
+   "verdict_label_it": "Nessun ingrediente da evitare trovato",
+   "color": "green",
+   "reasons": [],
+   "suggestion_it": null,
+   "suggestion": null,
+   "groups": [
+    {
+     "key": "IN_YOUR_DIET",
+     "label_it": "Nella tua dieta",
+     "items": [
+      {
+       "order": 1,
+       "text": "oat flakes",
+       "id": "en:oat-flakes",
+       "depth": 0,
+       "percent_declared": 100,
+       "group": "IN_YOUR_DIET",
+       "why": null
+      }
+     ]
+    }
+   ],
+   "traces": [],
+   "product": {
+    "code": "8000000000004",
+    "name": "Fiocchi",
+    "brands": null,
+    "category": null
+   }
+  },
+  "oats_gluten_no_category": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "NOT_SUITABLE",
+   "verdict_label_it": "Non adatto a te",
+   "color": "red",
+   "reasons": [
+    {
+     "code": "CONTAINS_RESTRICTED",
+     "ingredients": [
+      "oat flakes"
+     ],
+     "restriction": [
+      "gluten_free"
+     ],
+     "text_it": "Contiene oat flakes (glutine). L'hai indicato tra le cose da evitare."
+    }
+   ],
+   "suggestion_it": "Prova un prodotto simile senza glutine.",
+   "suggestion": {
+    "category": null,
+    "without_routes": [
+     "gluten_free"
+    ],
+    "diet": null
+   },
+   "groups": [
+    {
+     "key": "AVOID",
+     "label_it": "Da evitare per te",
+     "items": [
+      {
+       "order": 1,
+       "text": "oat flakes",
+       "id": "en:oat-flakes",
+       "depth": 0,
+       "percent_declared": 100,
+       "group": "AVOID",
+       "why": [
+        "gluten_free"
+       ]
+      }
+     ]
+    }
+   ],
+   "traces": [],
+   "product": {
+    "code": "8000000000004",
+    "name": "Fiocchi",
+    "brands": null,
+    "category": null
+   }
+  },
+  "not_found": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "INSUFFICIENT_DATA",
+   "verdict_label_it": "Dati insufficienti",
+   "reasons": [
+    {
+     "code": "PRODUCT_NOT_FOUND",
+     "text_it": "Non ho dati sufficienti per valutare questo prodotto. Leggi l'etichetta."
+    }
+   ],
+   "groups": [],
+   "traces": [],
+   "product": null
+  },
+  "no_ingredients": {
+   "scan_version": "PRODUCT_SCAN_01",
+   "source": {
+    "name": "Open Food Facts",
+    "attribution_it": "Dati prodotto: Open Food Facts (openfoodfacts.org), licenza ODbL.",
+    "fetched_at": null
+   },
+   "notice_it": "Controlla sempre l'etichetta sulla confezione.",
+   "verdict": "INSUFFICIENT_DATA",
+   "verdict_label_it": "Dati insufficienti",
+   "reasons": [
+    {
+     "code": "INGREDIENTS_MISSING",
+     "text_it": "Non ho dati sufficienti per valutare questo prodotto. Leggi l'etichetta."
+    }
+   ],
+   "groups": [],
+   "traces": [],
+   "product": {
+    "code": "8000000000004",
+    "name": "Fiocchi",
+    "brands": null,
+    "category": null
+   }
+  }
+ }
+}

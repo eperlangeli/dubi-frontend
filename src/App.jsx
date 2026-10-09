@@ -22,6 +22,8 @@ import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails 
 import { LANG_STATE_KEY, MARTIAL_ARTS_PROMPT_SEEN_KEY, PLANNING_DAY_KEY, SHOPPING_CHECKED_KEY, cleanBooleanMap, cleanMealStatus, mapPatch, mealTrackingKey, mealTrackingPatch, patchAppState, readAppState } from "./serverState.mjs";
 import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanStaleCopy, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
+import { fetchProductScanStatus, productScanTexts } from "./productScan.mjs";
+import ProductScanScreen from "./ProductScanScreen.jsx";
 
 const { useState, useEffect, useCallback } = React;
 const KEYBOARD_SCROLL_SELECTOR = "input, textarea, select, [contenteditable='true']";
@@ -18487,6 +18489,17 @@ const shoppingStorageKey = (userData) => `dubi_shopping_checked_${userData?.dubi
 const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLinkPartner, onUnlinkPartner}) => {
   const { t, lang } = useT();
 
+  // D-057: scanner del codice a barre. Il pulsante compare solo se il backend dice che è attivo (firme di Francesco).
+  const scanTx = productScanTexts(lang);
+  const [scanActive, setScanActive] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  React.useEffect(() => {
+    let alive = true;
+    fetchProductScanStatus({ apiBaseUrl: API_BASE_URL, token: getAuthToken() }).then((status) => { if (alive) setScanActive(status.active === true); });
+    return () => { alive = false; };
+  }, []);
+  const scanPlatform = (() => { try { return Capacitor.getPlatform(); } catch (error) { return "web"; } })();
+
   const [checked, setChecked] = useState(() => {
     try { return JSON.parse(localStorage.getItem(shoppingStorageKey(userData)) || "{}"); } catch(e) { return {}; }
   });
@@ -18588,6 +18601,8 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLin
   return (
     <div style={{paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px))"}}>
 
+      {showScanner && createPortal(<ProductScanScreen lang={lang} theme={T} apiBaseUrl={API_BASE_URL} getToken={getAuthToken} platform={scanPlatform} onClose={()=>setShowScanner(false)} />, document.body)}
+
       {/* Header */}
       <div style={{padding:"56px 24px 16px"}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
@@ -18607,6 +18622,15 @@ const ShoppingScreen = ({userData, plan, weeklyPlans = [], partnerProfile, onLin
             </button>
           )}
         </div>
+
+        {scanActive && (
+          <button type="button" onClick={()=>{ dubiHaptic("soft"); setShowScanner(true); }} data-testid="open-product-scan"
+            style={{marginTop:14,width:"100%",display:"flex",flexDirection:"column",alignItems:"flex-start",gap:4,padding:"14px 16px",borderRadius:16,
+              border:`1.5px solid ${T.border}`,background:T.card,cursor:"pointer",textAlign:"start",fontFamily:"inherit",color:T.text}}>
+            <span style={{fontFamily:"'Barlow Condensed','Barlow',sans-serif",fontSize:18,fontWeight:700}}>{scanTx.open}</span>
+            <span style={{fontSize:13,color:T.muted,lineHeight:1.4}}>{scanTx.openHint}</span>
+          </button>
+        )}
 
         {/* Partner card — compact */}
         {/* D-038 (c): collegamento partner nascosto finché non esiste la ricerca sul server (era solo locale). */}

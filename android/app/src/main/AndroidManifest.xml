@@ -9,6 +9,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- D-057: scanner del codice a barre con l'interfaccia di Google Play Services (nessun permesso fotocamera all'app). -->
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"
