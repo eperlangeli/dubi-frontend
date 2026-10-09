@@ -19,6 +19,7 @@ import { calculateProfileCalorieTarget } from "./planEnergy.mjs";
 import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoalStrict, toBackendGoalStrict, weeklyLossFromProjection } from "./goalMacroRules.mjs";
 import { HIGH_RISK_ANSWERS, HIGH_RISK_CONDITION_KEYS, getHighRiskCopy, highRiskAnswerBody, planBlockingCode } from "./highRiskScreening.mjs";
 import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails } from "./bodyComposition.mjs";
+import { noPlanCopy, profileErrorCopy } from "./profileErrors.mjs";
 import { LANG_STATE_KEY, MARTIAL_ARTS_PROMPT_SEEN_KEY, PLANNING_DAY_KEY, SHOPPING_CHECKED_KEY, cleanBooleanMap, cleanMealStatus, mapPatch, mealTrackingKey, mealTrackingPatch, patchAppState, readAppState } from "./serverState.mjs";
 import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanStaleCopy, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
@@ -21246,8 +21247,9 @@ const requestDeletionOtp = async () => {
       {editingProfile ? t("set.edit.close") : t("set.edit.open")}
     </button>
     {profileMessage && (
-      <p style={{margin:"10px 0 0",fontSize:11,fontWeight:700,color:profileMessage.includes("Could not")?"#B91C1C":T.accentD}}>
-        {profileMessage}
+      <p style={{margin:"10px 0 0",fontSize:11,fontWeight:700,color:(profileMessage.includes("Could not") || profileErrorCopy(profileMessage, lang))?"#B91C1C":T.accentD}}>
+        {/* D-063: mai il codice tecnico del profilo. */}
+        {profileErrorCopy(profileMessage, lang)?.title || profileMessage}
       </p>
     )}
   </div>
@@ -22620,12 +22622,30 @@ const ResetPasswordScreen = ({ token, onComplete }) => {
   );
 };
 
-const DailyMealScheduleScreen = ({ question, onSubmit }) => {
+// D-063: Oggi e Piano senza piano (es. dato del profilo mancante): messaggio e due azioni, mai una schermata vuota.
+const NoPlanNotice = ({ onRetry, onOpenSettings }) => {
+  const { t, lang } = useT();
+  const copy = noPlanCopy(lang);
+  return (
+    <main style={{minHeight:'70vh',display:'grid',placeItems:'center',padding:24}}>
+      <section role="status" style={{maxWidth:390,width:'100%'}}>
+        <p style={{fontSize:18,fontWeight:700,margin:'0 0 8px'}}>{copy.title}</p>
+        <p style={{fontSize:14,lineHeight:1.5,margin:'0 0 16px'}}>{copy.body}</p>
+        <button type="button" onClick={onOpenSettings} style={{width:'100%',height:44,border:0,borderRadius:8,background:'#275b48',color:'#fff',fontWeight:700,marginBottom:8}}>{t("nav.settings")}</button>
+        <button type="button" onClick={onRetry} style={{width:'100%',height:44,border:'1px solid #275b48',borderRadius:8,background:'#fff',color:'#275b48',fontWeight:700}}>{copy.retry}</button>
+      </section>
+    </main>
+  );
+};
+
+const DailyMealScheduleScreen = ({ question, onSubmit, onOpenProfile }) => {
   const [firstType, setFirstType] = useState(question.existing?.first_meal_type || (question.prompt_kind === 'breakfast' ? 'breakfast' : 'snack'));
   const [skipBreakfast, setSkipBreakfast] = useState(Boolean(question.existing?.breakfast_skipped));
   const [edited, setEdited] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // D-063: dato del profilo mancante = spiegazione e link alle Impostazioni, mai il codice tecnico.
+  const [profileIssue, setProfileIssue] = useState(null);
   const roundForward = (hhmm) => {
     const [h, m] = String(hhmm || '08:00').split(':').map(Number);
     const total = Math.min(23 * 60 + 59, Math.ceil((h * 60 + m) / 15) * 15);
@@ -22639,7 +22659,7 @@ const DailyMealScheduleScreen = ({ question, onSubmit }) => {
   const effectiveType = skipBreakfast && !late ? 'lunch' : firstType;
   const effectiveTime = time;
   const submit = async (source = 'user_confirmed') => {
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setProfileIssue(null);
     try {
       await onSubmit({
         first_meal_type: effectiveType,
@@ -22649,6 +22669,8 @@ const DailyMealScheduleScreen = ({ question, onSubmit }) => {
         replace_existing: Boolean(question.existing),
       });
     } catch (err) {
+      const profileCopy = profileErrorCopy(err, lang);
+      if (profileCopy) { setProfileIssue(profileCopy); setBusy(false); return; }
       setError(err?.message || (it ? 'Non siamo riusciti a salvare la risposta.' : 'We could not save your answer.'));
       setBusy(false);
     }
@@ -22673,6 +22695,13 @@ const DailyMealScheduleScreen = ({ question, onSubmit }) => {
         {suggestionUsable && !edited && !skipBreakfast && <button type="button" disabled={busy} onClick={()=>submit('prefilled_confirmed')} style={{width:'100%',height:46,border:0,borderRadius:8,background:'#275b48',color:'#fff',fontWeight:700,marginBottom:9}}>{it?`Conferma orario abituale · ${question.suggestion.time}`:`Confirm usual time · ${question.suggestion.time}`}</button>}
         <button type="button" disabled={busy} onClick={()=>submit('user_confirmed')} style={{width:'100%',height:46,border:'1px solid #275b48',borderRadius:8,background:suggestionUsable&&!edited?'#fff':'#275b48',color:suggestionUsable&&!edited?'#275b48':'#fff',fontWeight:700}}>{busy?(it?'Preparazione del piano…':'Preparing your plan…'):(it?'Continua':'Continue')}</button>
         {error && <p role="alert" style={{fontSize:13,color:'#a5342b',marginTop:12}}>{error}</p>}
+        {profileIssue && (
+          <div role="alert" style={{marginTop:14,padding:14,borderRadius:8,background:'#fbf1ef',border:'1px solid #ecc9c3'}}>
+            <p style={{fontSize:14,fontWeight:700,color:'#7f2a22',margin:'0 0 6px'}}>{profileIssue.title}</p>
+            <p style={{fontSize:13,lineHeight:1.5,color:'#5c3a35',margin:'0 0 12px'}}>{profileIssue.body}</p>
+            {onOpenProfile && <button type="button" onClick={onOpenProfile} style={{width:'100%',height:44,border:0,borderRadius:8,background:'#275b48',color:'#fff',fontWeight:700}}>{profileIssue.action}</button>}
+          </div>
+        )}
       </section>
     </main>
   );
@@ -22790,9 +22819,12 @@ function DUBIApp() {
       }
     }
   }, [resetToken]);
+  // D-063: chi entra nell'app da un messaggio (es. dato del profilo mancante) arriva sulla scheda indicata.
+  const pendingTabRef = React.useRef(null);
   useEffect(() => {
   if (phase === "app") {
-    setActiveTab("today");
+    setActiveTab(pendingTabRef.current || "today");
+    pendingTabRef.current = null;
   }
 }, [phase]);
   useEffect(() => {
@@ -22977,6 +23009,15 @@ const handleDeleteAccount = async (otp) => {
     setDailyQuestion(null);
     setWeeklyPlans([]);
     setActiveTab('today');
+    setPhase('app');
+  };
+
+  // D-063: dal messaggio "manca un dato del profilo" alle Impostazioni, senza piano finché il dato non c'è.
+  const openProfileFromPlanError = () => {
+    setDailyQuestion(null);
+    setPlan(null);
+    pendingTabRef.current = 'settings';
+    setActiveTab('settings');
     setPhase('app');
   };
 
@@ -23191,8 +23232,14 @@ await openAppWithDailySchedule(data);
 )}
         {phase==="daily-meal-question" && dailyQuestion && (
           dailyQuestion.error
-            ? <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section><p role="alert">{dailyQuestion.error}</p><button onClick={()=>openAppWithDailySchedule(userData)} style={{marginTop:12,padding:'12px 18px'}}>Riprova</button></section></main>
-            : <DailyMealScheduleScreen question={dailyQuestion} onSubmit={handleDailyScheduleSubmit} />
+            ? (() => {
+                // D-063: un dato del profilo mancante porta alle Impostazioni; gli altri errori restano con "Riprova".
+                const profileCopy = profileErrorCopy(dailyQuestion.error, lang);
+                return profileCopy
+                  ? <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section style={{maxWidth:390}}><p role="alert" style={{fontWeight:700,margin:'0 0 6px'}}>{profileCopy.title}</p><p style={{margin:'0 0 12px',lineHeight:1.5}}>{profileCopy.body}</p><button onClick={openProfileFromPlanError} style={{padding:'12px 18px'}}>{profileCopy.action}</button></section></main>
+                  : <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section><p role="alert">{dailyQuestion.error}</p><button onClick={()=>openAppWithDailySchedule(userData)} style={{marginTop:12,padding:'12px 18px'}}>Riprova</button></section></main>;
+              })()
+            : <DailyMealScheduleScreen question={dailyQuestion} onSubmit={handleDailyScheduleSubmit} onOpenProfile={openProfileFromPlanError} />
         )}
         {phase==="terms" && <WelcomeTermsScreen onAccept={() => setPhase("welcome")} />}
 {phase==="welcome" && <WelcomeScreen onStart={() => { setAuthStartMode(null); setPhase("auth"); }} />}
@@ -23346,10 +23393,14 @@ await openAppWithDailySchedule(data);
                 />
               )}
               {!healthBlockKind && activeTab==="today"    && (healthDataConsentGranted
-                ? <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
+                ? !plan
+                  ? <NoPlanNotice onRetry={()=>openAppWithDailySchedule(userData)} onOpenSettings={()=>setActiveTab("settings")} />
+                  : <TodayScreen userData={userData} plan={plan} setUserData={setUserData} setPlan={setPlan} isFirstAccess={isFirstAccess} planningDay={planningDay} onOpenSettings={()=>setActiveTab("settings")} onEditDailySchedule={handleEditDailySchedule} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {!healthBlockKind && activeTab==="weekly"   && (healthDataConsentGranted
-                ? <WeeklyScreen userData={userData} plan={plan} setPlan={setPlan} weeklyPlans={weeklyPlans} />
+                ? !plan
+                  ? <NoPlanNotice onRetry={()=>openAppWithDailySchedule(userData)} onOpenSettings={()=>setActiveTab("settings")} />
+                  : <WeeklyScreen userData={userData} plan={plan} setPlan={setPlan} weeklyPlans={weeklyPlans} />
                 : <ConsentRevokedPlanScreen onOpenConsentSettings={openConsentSettings} />)}
               {activeTab==="shopping" && <ShoppingScreen userData={userData} plan={plan} weeklyPlans={weeklyPlans} partnerProfile={partnerProfile} onLinkPartner={setPartnerProfile} onUnlinkPartner={()=>setPartnerProfile(null)}/>}
               {activeTab==="progress" && <TrendScreen userData={userData} plan={plan} lang={lang} onOpenWrap={WRAP_USES_ONLY_USER_DATA ? ()=>setShowWrap(true) : undefined} onAiPlanRefresh={handleAiPlanRefreshFromProgress} onManualActivityUpdate={handleManualActivityUpdate} />}

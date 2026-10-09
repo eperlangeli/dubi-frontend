@@ -64,6 +64,9 @@ jobs:
       - name: Minors 14-17 plan block (D-032, D-058)
         run: node scripts/test-minor-plan-block.mjs
 
+      - name: Missing profile data explained, never the technical code (D-063)
+        run: node scripts/test-profile-errors.mjs
+
       - name: Barcode scanner screen and texts (D-057)
         run: node scripts/test-product-scan.mjs
 
