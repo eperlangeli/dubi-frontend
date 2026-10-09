@@ -67,6 +67,9 @@ jobs:
       - name: Missing profile data explained, never the technical code (D-063)
         run: node scripts/test-profile-errors.mjs
 
+      - name: Meal times from the server, onboarding without training, minors goals (D-066)
+        run: node scripts/test-day-display-onboarding.mjs
+
       - name: Barcode scanner screen and texts (D-057)
         run: node scripts/test-product-scan.mjs
 

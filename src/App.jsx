@@ -20,6 +20,7 @@ import { bodyMassIndex, goalMacros, requireGoal, requirePositiveNumber, toAppGoa
 import { HIGH_RISK_ANSWERS, HIGH_RISK_CONDITION_KEYS, getHighRiskCopy, highRiskAnswerBody, planBlockingCode } from "./highRiskScreening.mjs";
 import { getBodyCompositionCopy, bodyCompositionMessage, bodyCompositionDetails } from "./bodyComposition.mjs";
 import { noPlanCopy, planErrorCopy, profileErrorCopy } from "./profileErrors.mjs";
+import { isMinorAge, minorGoalCopy } from "./minorGoals.mjs";
 import { LANG_STATE_KEY, MARTIAL_ARTS_PROMPT_SEEN_KEY, PLANNING_DAY_KEY, SHOPPING_CHECKED_KEY, cleanBooleanMap, cleanMealStatus, mapPatch, mealTrackingKey, mealTrackingPatch, patchAppState, readAppState } from "./serverState.mjs";
 import { PLAN_VERSION_POLL_MS, changedPlanDates, expectedVersionBody, getPlanStaleCopy, getPlanUpdatedCopy, isPlanVersionConflict, knownPlanVersionRange, notifyPlanVersionConflict, onPlanVersionConflict, rememberPlanVersion } from "./planVersion.mjs";
 import { getMealReplacementErrorKey, isSupportedPlanChange, replaceMealAndCommit } from "./meal-replacement.mjs";
@@ -1102,8 +1103,14 @@ const INGREDIENT_MEAL_META = {
   post_workout: { id:"post_workout", labelKey:"today.postWorkout", label:"Post-allenamento", icon:"refresh" }
 };
 
+// D-066: pasti in ordine di orario (HH:MM); senza orario restano nell'ordine ricevuto.
+const sortMealsByTime = (meals) => meals
+  .map((meal, index) => ({ meal, index, time: String(meal?.scheduled_time || meal?.scheduledTime || "") }))
+  .sort((a, b) => (a.time && b.time ? a.time.localeCompare(b.time) : 0) || a.index - b.index)
+  .map((entry) => entry.meal);
+
 const ingredientMealsToArray = (plan = {}) => {
-  if (Array.isArray(plan.meals)) return plan.meals;
+  if (Array.isArray(plan.meals)) return sortMealsByTime(plan.meals);
   if (plan.meals && typeof plan.meals === "object") {
     return Object.entries(plan.meals).map(([mealType, meal]) => ({
       mealType,
@@ -1150,7 +1157,8 @@ const mapIngredientMealToUi = (meal, index, times, planEngineVersion = null) => 
 
   return {
     ...meta,
-    time: times[index] || "--:--",
+    // D-066: l'orario è quello del pasto calcolato dal server, mai una serie di orari fissi.
+    time: meal.scheduled_time || meal.scheduledTime || times[index] || "--:--",
     data: {
       engineVersion,
       engine_version: engineVersion,
@@ -1193,9 +1201,11 @@ const mapIngredientPlanToFrontend = (ingredientPlanRaw, userData) => {
   const meals = ingredientMealsToArray(ingredientPlan);
   const mealCount = meals.length || fallbackPlan.mealCount;
   const dailyMealSchedule = ingredientPlan?.daily_meal_schedule || ingredientPlan?.dailyMealSchedule || userData?.dailyMealSchedule || null;
-  const mealTimes = dailyMealSchedule
-    ? calcMealTimes({ dailyMealSchedule, meals: mealCount })
-    : meals.map((meal) => meal.scheduled_time || meal.scheduledTime).filter(Boolean);
+  // D-066: gli orari vengono dai pasti del server; la serie fissa di calcMealTimes resta solo per piani senza orari.
+  const mealTimesFromMeals = meals.map((meal) => meal.scheduled_time || meal.scheduledTime).filter(Boolean);
+  const mealTimes = mealTimesFromMeals.length === meals.length && meals.length
+    ? mealTimesFromMeals
+    : (dailyMealSchedule ? calcMealTimes({ dailyMealSchedule, meals: mealCount }) : mealTimesFromMeals);
 
   return {
     ...fallbackPlan,
@@ -14400,8 +14410,10 @@ const minBf = normalizeSex(d.gender) === "female" ? 14 : 6; // ACSM: grasso esse
   return (
     <div>
       {page === 0 ? (<>
-      {GOALS.map(g=>{
+      {(isMinorAge(d.age) ? GOALS.filter(g=>minorGoalCopy(g.id, lang)) : GOALS).map(g=>{
         const sel    = d.goal===g.id;
+        // D-059 / D-060: nomi degli obiettivi per i 14–17 anni; "Definizione" non c'è.
+        const minorCopy = isMinorAge(d.age) ? minorGoalCopy(g.id, lang) : null;
         return (
           <button key={g.id} onClick={()=>handleGoalTap(g.id)}
             style={{width:"100%",display:"flex",alignItems:"flex-start",gap:14,padding:16,marginBottom:10,borderRadius:16,
@@ -14416,9 +14428,9 @@ const minBf = normalizeSex(d.gender) === "female" ? 14 : 6; // ACSM: grasso esse
             </div>
             <div style={{flex:1}}>
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                <span style={{fontSize:15,fontWeight:600,color:T.text}}>{t(g.tk)}</span>
+                <span style={{fontSize:15,fontWeight:600,color:T.text}}>{minorCopy ? minorCopy.t : t(g.tk)}</span>
               </div>
-              <div style={{fontSize:13,color:T.muted,marginTop:2}}>{t(g.dk)}</div>
+              <div style={{fontSize:13,color:T.muted,marginTop:2}}>{minorCopy ? minorCopy.d : t(g.dk)}</div>
             </div>
             {sel && (
               <div style={{width:22,height:22,borderRadius:"50%",
@@ -15327,6 +15339,8 @@ const PreferencesStep = ({d, u, page}) => {
 
       </>) : (<>
 
+      {/* D-066: con 0 allenamenti a settimana non si chiedono sport e programma. */}
+      {String(d.workoutDays || "0") !== "0" && (<>
       {/* Sport */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>{t("pref.sport")}</p>
       <SportSearchPicker
@@ -15356,6 +15370,7 @@ const PreferencesStep = ({d, u, page}) => {
             .some(day=>sessions.filter(session=>session.day_of_week===day).length > 1));
         }}
       />
+      </>)}
 
       {/* Colazione — Q1: abitudine */}
       <p style={{fontSize:12,color:T.muted,letterSpacing:0.5,margin:"20px 0 8px"}}>
@@ -15739,7 +15754,9 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
             } else {
               const prev=step-1;
               setStep(prev);
-              setSubStep(PAGES_PER_STEP[prev]-1);
+              // D-066: con 0 allenamenti la pagina di durata e intensità non esiste; D-060: per i 14–17 anni nemmeno gli obiettivi di peso.
+              const skippedPage = (prev===3 && String(data.workoutDays)==='0') || (prev===2 && isMinorAge(data.age));
+              setSubStep(skippedPage ? 0 : PAGES_PER_STEP[prev]-1);
             }
           }} style={{width:44,height:44,background:T.card,color:T.text,border:`1px solid ${T.border}`,borderRadius:50,fontSize:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>}
           <button disabled={!canContinueStep || savingOnboarding} onClick={async () => {
@@ -15748,6 +15765,20 @@ const [connectableWearables, setConnectableWearables] = useState(() => new Set(V
   const isLastSubStep = subStep >= PAGES_PER_STEP[step] - 1;
 
   if (!isLastSubStep) {
+    // D-066: con 0 allenamenti a settimana niente durata e intensità.
+    if (step === 3 && subStep === 0 && String(data.workoutDays) === '0') {
+      setSlideDir('right');
+      setStep(4);
+      setSubStep(0);
+      return;
+    }
+    // D-060: per i 14–17 anni nessun peso o grasso obiettivo.
+    if (step === 2 && subStep === 0 && isMinorAge(data.age)) {
+      setSlideDir('right');
+      setStep(3);
+      setSubStep(0);
+      return;
+    }
     if (step === 2 && subStep === 0 && data.goal === 'maintain') {
       setSlideDir('right');
       setStep(3);
@@ -23079,7 +23110,7 @@ const handleDeleteAccount = async (otp) => {
     };
   }, [phase, refreshSnapshot]);
 
-  // D-038 (b): il piano può cambiare da un altro dispositivo. Controllo leggero delle sole versioni ogni 60 s
+  // D-038 (b): il piano può cambiare da un altro dispositivo. Controllo leggero delle sole versioni ogni 15 s (D-066)
   // (con l'app visibile), al ritorno in primo piano e alla ripresa dell'app nativa; un 409 mostra lo stesso banner.
   useEffect(() => {
     if (phase !== "app") return undefined;

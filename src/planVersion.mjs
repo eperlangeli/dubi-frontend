@@ -3,7 +3,8 @@
 // Testo IT dalla decisione D-038 (Enrico, 7 ottobre 2026). Altre lingue: tradotte dalla Regia, in attesa di QA linguistico.
 
 export const PLAN_VERSION_CONFLICT = "PLAN_VERSION_CONFLICT";
-export const PLAN_VERSION_POLL_MS = 60000;
+// D-066: 15 s (prima 60 s): l'avviso sull'altro dispositivo arriva presto. Solo le versioni, una richiesta leggera.
+export const PLAN_VERSION_POLL_MS = 15000;
 
 const COPY = {
   it: "Il tuo piano è stato aggiornato da un altro dispositivo. Tocca per aggiornare.",
