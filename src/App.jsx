@@ -22638,7 +22638,7 @@ const NoPlanNotice = ({ onRetry, onOpenSettings }) => {
   );
 };
 
-const DailyMealScheduleScreen = ({ question, onSubmit, onOpenProfile }) => {
+const DailyMealScheduleScreen = ({ question, onSubmit, onOpenProfile, onAlreadyAnswered }) => {
   const [firstType, setFirstType] = useState(question.existing?.first_meal_type || (question.prompt_kind === 'breakfast' ? 'breakfast' : 'snack'));
   const [skipBreakfast, setSkipBreakfast] = useState(Boolean(question.existing?.breakfast_skipped));
   const [edited, setEdited] = useState(false);
@@ -22671,6 +22671,8 @@ const DailyMealScheduleScreen = ({ question, onSubmit, onOpenProfile }) => {
     } catch (err) {
       const profileCopy = profileErrorCopy(err, lang);
       if (profileCopy) { setProfileIssue(profileCopy); setBusy(false); return; }
+      // D-065: oggi l'orario è già stato dato (altra scheda o altro dispositivo): si entra nel piano salvato, nessun errore.
+      if (err?.message === 'daily_meal_schedule_not_requested' && onAlreadyAnswered) { onAlreadyAnswered(); return; }
       // D-064: mai il codice tecnico come messaggio; resta solo come riferimento piccolo per l'assistenza.
       setError(err?.message || 'daily_schedule_save_failed');
       setBusy(false);
@@ -23028,6 +23030,25 @@ const handleDeleteAccount = async (otp) => {
     setPhase('app');
   };
 
+  // D-065: se la domanda è aperta e l'orario di oggi viene dato altrove (altra scheda o dispositivo), tornando
+  // sull'app si entra direttamente nel piano. Non vale per "Modifica orari" (domanda con existing).
+  useEffect(() => {
+    if (phase !== 'daily-meal-question' || !userData || dailyQuestion?.existing) return undefined;
+    const recheck = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const question = await fetchDailyMealScheduleQuestion();
+        if (!question.should_ask && !question.before_daily_start) await openAppWithDailySchedule(userData);
+      } catch (_) {}
+    };
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+    return () => {
+      document.removeEventListener('visibilitychange', recheck);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [phase, userData, dailyQuestion]);
+
   const handleEditDailySchedule = async () => {
     if (!window.confirm(lang === 'it'
       ? 'Aggiornare gli orari di oggi e rigenerare solo il piano di oggi? I pasti già registrati saranno mantenuti.'
@@ -23246,7 +23267,7 @@ await openAppWithDailySchedule(data);
                   ? <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section style={{maxWidth:390}}><p role="alert" style={{fontWeight:700,margin:'0 0 6px'}}>{profileCopy.title}</p><p style={{margin:'0 0 12px',lineHeight:1.5}}>{profileCopy.body}</p><button onClick={openProfileFromPlanError} style={{padding:'12px 18px'}}>{profileCopy.action}</button></section></main>
                   : <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24}}><section style={{maxWidth:390}}><p role="alert" style={{fontWeight:700,margin:'0 0 6px'}}>{planErrorCopy(lang).title}</p><p style={{margin:'0 0 6px',lineHeight:1.5}}>{planErrorCopy(lang).body}</p><p style={{fontSize:11,color:'#8a8f8c',margin:'0 0 12px'}}>{planErrorCopy(lang).ref}: {dailyQuestion.error}</p><button onClick={()=>openAppWithDailySchedule(userData)} style={{padding:'12px 18px'}}>{noPlanCopy(lang).retry}</button></section></main>;
               })()
-            : <DailyMealScheduleScreen question={dailyQuestion} onSubmit={handleDailyScheduleSubmit} onOpenProfile={openProfileFromPlanError} />
+            : <DailyMealScheduleScreen question={dailyQuestion} onSubmit={handleDailyScheduleSubmit} onOpenProfile={openProfileFromPlanError} onAlreadyAnswered={()=>openAppWithDailySchedule(userData)} />
         )}
         {phase==="terms" && <WelcomeTermsScreen onAccept={() => setPhase("welcome")} />}
 {phase==="welcome" && <WelcomeScreen onStart={() => { setAuthStartMode(null); setPhase("auth"); }} />}

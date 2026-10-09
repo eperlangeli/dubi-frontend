@@ -54,7 +54,8 @@ assert.doesNotMatch(app, /<p role="alert">\{dailyQuestion\.error\}<\/p>/);
 assert.equal((app.match(/\{planErrorCopy\(lang\)\.ref\}: \{(error|dailyQuestion\.error)\}/g) || []).length, 2);
 assert.match(app, /const profileCopy = profileErrorCopy\(err, lang\);\n\s+if \(profileCopy\) \{ setProfileIssue\(profileCopy\); setBusy\(false\); return; \}/, "schermata dell'orario");
 assert.match(app, /const profileCopy = profileErrorCopy\(dailyQuestion\.error, lang\);/, "errore all'avvio");
-assert.match(app, /<DailyMealScheduleScreen question=\{dailyQuestion\} onSubmit=\{handleDailyScheduleSubmit\} onOpenProfile=\{openProfileFromPlanError\} \/>/);
+// Riscritto come invariante (D-065, fatto cambiato: la schermata riceve anche onAlreadyAnswered).
+assert.match(app, /<DailyMealScheduleScreen question=\{dailyQuestion\} onSubmit=\{handleDailyScheduleSubmit\} onOpenProfile=\{openProfileFromPlanError\}.* \/>/);
 assert.match(app, /const openProfileFromPlanError = \(\) => \{\n\s+setDailyQuestion\(null\);\n\s+setPlan\(null\);\n\s+pendingTabRef\.current = 'settings';\n\s+setActiveTab\('settings'\);\n\s+setPhase\('app'\);/, "porta alle Impostazioni senza piano");
 // L'effetto che all'ingresso nell'app riporta su Oggi rispetta la scheda richiesta.
 assert.match(app, /setActiveTab\(pendingTabRef\.current \|\| "today"\);\n\s+pendingTabRef\.current = null;/);
@@ -62,4 +63,9 @@ assert.match(app, /setActiveTab\(pendingTabRef\.current \|\| "today"\);\n\s+pend
 assert.match(app, /\? !plan\n\s+\? <NoPlanNotice onRetry=\{\(\)=>openAppWithDailySchedule\(userData\)\} onOpenSettings=\{\(\)=>setActiveTab\("settings"\)\} \/>\n\s+: <WeeklyScreen/);
 assert.match(app, /\? !plan\n\s+\? <NoPlanNotice onRetry=\{\(\)=>openAppWithDailySchedule\(userData\)\} onOpenSettings=\{\(\)=>setActiveTab\("settings"\)\} \/>\n\s+: <TodayScreen/);
 assert.match(app, /\{profileErrorCopy\(profileMessage, lang\)\?\.title \|\| profileMessage\}/, "Impostazioni");
+// D-065: orario già dato altrove → si entra nel piano salvato, mai l'errore; la domanda aperta si ricontrolla al ritorno.
+assert.match(app, /if \(err\?\.message === 'daily_meal_schedule_not_requested' && onAlreadyAnswered\) \{ onAlreadyAnswered\(\); return; \}/);
+assert.match(app, /onAlreadyAnswered=\{\(\)=>openAppWithDailySchedule\(userData\)\}/);
+assert.match(app, /if \(phase !== 'daily-meal-question' \|\| !userData \|\| dailyQuestion\?\.existing\) return undefined;/);
+assert.match(app, /if \(!question\.should_ask && !question\.before_daily_start\) await openAppWithDailySchedule\(userData\);/);
 console.log(JSON.stringify({ test: "test-profile-errors", result: "PASS" }));
