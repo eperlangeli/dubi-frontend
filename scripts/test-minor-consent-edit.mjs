@@ -16,7 +16,8 @@ for (const key of ["changeEmail", "changeEmailHint"]) {
 
 const screen = app.slice(app.indexOf("const MinorScreen ="), app.indexOf("const ResetPasswordScreen"));
 // In attesa con un'email già inviata: si apre la schermata di attesa, con il pulsante per correggere l'email.
-assert.match(screen, /useState\(consentStatus === "pending" && Boolean\(userData\?\.guardian_email \|\| userData\?\.guardianEmail\)\)/);
+// D-073 (fatto cambiato): la stessa schermata si apre anche quando il link è scaduto ("expired"), per reinviarlo.
+assert.match(screen, /useState\(\(consentStatus === "pending" \|\| consentStatus === "expired"\) && Boolean\(userData\?\.guardian_email \|\| userData\?\.guardianEmail\)\)/);
 assert.match(screen, /onClick=\{\(\) => \{ setSubmitted\(false\); setEditingEmail\(true\); setError\(""\); \}\}/);
 assert.match(screen, /\{copy\.changeEmail\}/);
 assert.match(screen, /editingEmail && <p[^>]*>\{copy\.changeEmailHint\}<\/p>/);

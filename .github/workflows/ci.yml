@@ -67,6 +67,9 @@ jobs:
       - name: Parent email can be corrected and the consent link resent (D-072)
         run: node scripts/test-minor-consent-edit.mjs
 
+      - name: Consent link stays valid for 10 minutes and the wait screen survives a reload (D-073)
+        run: node scripts/test-minor-consent-wait.mjs
+
       - name: Missing profile data explained, never the technical code (D-063)
         run: node scripts/test-profile-errors.mjs
 

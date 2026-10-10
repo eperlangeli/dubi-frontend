@@ -624,7 +624,9 @@ const normalizeOnboarding = (data) => {
     guardianName: data.guardian_name ?? data.guardianName ?? null,
     guardianEmail: data.guardian_email ?? data.guardianEmail ?? null,
     parentalConsentStatus: data.parental_consent_status ?? data.parentalConsentStatus ?? "not_required",
-    parentalConsentVerifiedAt: data.parental_consent_verified_at ?? data.parentalConsentVerifiedAt ?? null
+    parentalConsentVerifiedAt: data.parental_consent_verified_at ?? data.parentalConsentVerifiedAt ?? null,
+    // D-073: fino a quando vale il link inviato al genitore (10 minuti); mai il link.
+    parentalConsentExpiresAt: data.parental_consent_expires_at ?? data.parentalConsentExpiresAt ?? null
   };
 };
 const AUTH_TOKEN_KEY = "dubi_auth_token";
@@ -13704,10 +13706,13 @@ const MINOR_COPY = {
     guardianEmail:"Email del genitore/tutore",
     send:"Invia richiesta",
     sending:"Invio in corso...",
-    sent:email=>`Email inviata a ${email}. Chiedi al tuo genitore di controllare la posta e cliccare il link. Il link scade tra 7 giorni.`,
+    sent:email=>`Email inviata a ${email}. Chiedi al tuo genitore di controllare la posta e cliccare il link.`,
     resend:"Reinvia email",
     changeEmail:"Email sbagliata? Correggila",
     changeEmailHint:"Correggi l'email del genitore e premi Invia: il link inviato prima non varrà più.",
+    reviewing:"In attesa della conferma del genitore",
+    validUntil:t=>`Il link vale 10 minuti, fino alle ${t}. Questa schermata si aggiorna da sola quando il genitore conferma.`,
+    expiredNote:"Il link è scaduto (vale 10 minuti). Reinvia l'email per mandarne uno nuovo.",
     wait:"Potrai reinviare tra",
     approved:"Il tuo genitore ha autorizzato il tuo account. Puoi continuare!",
     missing:"Inserisci nome ed email del genitore/tutore.",
@@ -13730,10 +13735,13 @@ const MINOR_COPY = {
     guardianEmail:"Parent/guardian email",
     send:"Send request",
     sending:"Sending...",
-    sent:email=>`Email sent to ${email}. Ask your parent to check their inbox and click the link. The link expires in 7 days.`,
+    sent:email=>`Email sent to ${email}. Ask your parent to check their inbox and click the link.`,
     resend:"Resend email",
     changeEmail:"Wrong email? Fix it",
     changeEmailHint:"Fix your parent's email and tap Send: the link sent before will stop working.",
+    reviewing:"Waiting for your parent to confirm",
+    validUntil:t=>`The link is valid for 10 minutes, until ${t}. This screen updates on its own when your parent confirms.`,
+    expiredNote:"The link has expired (it is valid for 10 minutes). Resend the email to get a new one.",
     wait:"You can resend in",
     approved:"Your parent has authorised your account. You can continue!",
     missing:"Please enter parent/guardian name and email.",
@@ -13758,10 +13766,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"Courriel du parent/tuteur",
     "send":"Envoyer la demande",
     "sending":"Envoi...",
-    "sent":(email)=>`E-mail envoyé à ${email}. Demandez à vos parents de vérifier leur boîte de réception et de cliquer sur le lien. Le lien expire dans 7 jours.`,
+    "sent":(email)=>`E-mail envoyé à ${email}. Demandez à vos parents de vérifier leur boîte de réception et de cliquer sur le lien.`,
     "resend":"Renvoyer l'e-mail",
     "changeEmail":"E-mail erronée ? Corrige-la",
     "changeEmailHint":"Corrige l'e-mail de ton parent et appuie sur Envoyer : le lien envoyé avant ne fonctionnera plus.",
+    "reviewing":"En attente de la confirmation de ton parent",
+    "validUntil":(t)=>`Le lien est valable 10 minutes, jusqu'à ${t}. Cet écran se met à jour tout seul quand ton parent confirme.`,
+    "expiredNote":"Le lien a expiré (il est valable 10 minutes). Renvoie l'e-mail pour en recevoir un nouveau.",
     "wait":"Vous pouvez renvoyer",
     "approved":"Votre parent a autorisé votre compte. Vous pouvez continuer !",
     "missing":"Veuillez saisir le nom et l'adresse e-mail du parent/tuteur.",
@@ -13784,10 +13795,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"Correo electrónico de padres/tutores",
     "send":"Enviar solicitud",
     "sending":"Envío...",
-    "sent":(email)=>`Correo electrónico enviado a ${email}. Pídele a tus padres que revisen su bandeja de entrada y hagan clic en el enlace. El enlace caduca en 7 días.`,
+    "sent":(email)=>`Correo electrónico enviado a ${email}. Pídele a tus padres que revisen su bandeja de entrada y hagan clic en el enlace.`,
     "resend":"Reenviar correo electrónico",
     "changeEmail":"¿Correo equivocado? Corrígelo",
     "changeEmailHint":"Corrige el correo de tu padre o madre y pulsa Enviar: el enlace enviado antes dejará de funcionar.",
+    "reviewing":"Esperando la confirmación de tu padre o madre",
+    "validUntil":(t)=>`El enlace es válido durante 10 minutos, hasta las ${t}. Esta pantalla se actualiza sola cuando tu padre o madre confirme.`,
+    "expiredNote":"El enlace ha caducado (es válido durante 10 minutos). Reenvía el correo para recibir uno nuevo.",
     "wait":"Puedes reenviar en",
     "approved":"Tu padre ha autorizado tu cuenta. ¡Puedes continuar!",
     "missing":"Por favor ingrese el nombre y correo electrónico del padre/tutor.",
@@ -13810,10 +13824,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"E-Mail der Eltern/Erziehungsberechtigten",
     "send":"Anfrage senden",
     "sending":"Senden...",
-    "sent":(email)=>`E-Mail an ${email} gesendet. Bitten Sie Ihre Eltern, ihren Posteingang zu überprüfen und auf den Link zu klicken. Der Link läuft in 7 Tagen ab.`,
+    "sent":(email)=>`E-Mail an ${email} gesendet. Bitten Sie Ihre Eltern, ihren Posteingang zu überprüfen und auf den Link zu klicken.`,
     "resend":"E-Mail erneut senden",
     "changeEmail":"Falsche E-Mail? Korrigieren",
     "changeEmailHint":"Korrigiere die E-Mail deiner Eltern und tippe auf Senden: Der zuvor gesendete Link funktioniert dann nicht mehr.",
+    "reviewing":"Warten auf die Bestätigung deiner Eltern",
+    "validUntil":(t)=>`Der Link ist 10 Minuten gültig, bis ${t}. Diese Seite aktualisiert sich von selbst, sobald deine Eltern bestätigen.`,
+    "expiredNote":"Der Link ist abgelaufen (er ist 10 Minuten gültig). Sende die E-Mail erneut, um einen neuen zu erhalten.",
     "wait":"Sie können es erneut einsenden",
     "approved":"Dein Elternteil hat dein Konto autorisiert. Sie können fortfahren!",
     "missing":"Bitte geben Sie den Namen und die E-Mail-Adresse des Elternteils/Erziehungsberechtigten ein.",
@@ -13836,10 +13853,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"البريد الإلكتروني للوالد/الوصي",
     "send":"إرسال الطلب",
     "sending":"إرسال...",
-    "sent":(email)=>`تم إرسال البريد الإلكتروني إلى ${email}. اطلب من والديك التحقق من البريد الوارد الخاص به والنقر على الرابط. تنتهي صلاحية الرابط خلال 7 أيام.`,
+    "sent":(email)=>`تم إرسال البريد الإلكتروني إلى ${email}. اطلب من والديك التحقق من البريد الوارد الخاص به والنقر على الرابط.`,
     "resend":"إعادة إرسال البريد الإلكتروني",
     "changeEmail":"بريد إلكتروني خاطئ؟ صحّحه",
     "changeEmailHint":"صحّح البريد الإلكتروني لوالدك واضغط إرسال: الرابط المرسل سابقًا لن يعمل بعد الآن.",
+    "reviewing":"بانتظار تأكيد والدك",
+    "validUntil":(t)=>`الرابط صالح لمدة 10 دقائق، حتى ${t}. تتحدّث هذه الشاشة تلقائيًا عندما يؤكد والدك.`,
+    "expiredNote":"انتهت صلاحية الرابط (صالح لمدة 10 دقائق). أعد إرسال البريد الإلكتروني للحصول على رابط جديد.",
     "wait":"يمكنك إعادة الإرسال",
     "approved":"لقد سمح والدك بحسابك. يمكنك الاستمرار!",
     "missing":"الرجاء إدخال اسم ولي الأمر/الوصي والبريد الإلكتروني.",
@@ -13862,10 +13882,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"E-mail dos pais/responsáveis",
     "send":"Enviar solicitação",
     "sending":"Enviando...",
-    "sent":(email)=>`E-mail enviado para ${email}. Peça aos seus pais para verificar a caixa de entrada e clicar no link. O link expira em 7 dias.`,
+    "sent":(email)=>`E-mail enviado para ${email}. Peça aos seus pais para verificar a caixa de entrada e clicar no link.`,
     "resend":"Reenviar e-mail",
     "changeEmail":"E-mail errado? Corrige",
     "changeEmailHint":"Corrige o e-mail do teu pai ou mãe e toca em Enviar: o link enviado antes deixará de funcionar.",
+    "reviewing":"À espera da confirmação do teu pai ou mãe",
+    "validUntil":(t)=>`O link é válido durante 10 minutos, até às ${t}. Este ecrã atualiza-se sozinho quando o teu pai ou mãe confirmar.`,
+    "expiredNote":"O link expirou (é válido durante 10 minutos). Reenvia o e-mail para receberes um novo.",
     "wait":"Você pode reenviar em",
     "approved":"Seus pais autorizaram sua conta. Você pode continuar!",
     "missing":"Por favor, insira o nome e e-mail dos pais/responsáveis.",
@@ -13888,10 +13911,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"家长/监护人电子邮件",
     "send":"发送请求",
     "sending":"正在发送...",
-    "sent":(email)=>`电子邮件已发送至 ${email}。请您的家长检查他们的收件箱并单击链接。该链接将在 7 天后过期。`,
+    "sent":(email)=>`电子邮件已发送至 ${email}。请您的家长检查他们的收件箱并单击链接。`,
     "resend":"重新发送电子邮件",
     "changeEmail":"邮箱填错了？修改",
     "changeEmailHint":"修改家长的电子邮件并点击发送：之前发送的链接将失效。",
+    "reviewing":"正在等待家长确认",
+    "validUntil":(t)=>`链接有效期为 10 分钟，至 ${t}。家长确认后此页面会自动更新。`,
+    "expiredNote":"链接已过期（有效期 10 分钟）。请重新发送电子邮件以获取新链接。",
     "wait":"您可以重新发送",
     "approved":"您的父母已授权您的帐户。你可以继续！",
     "missing":"请输入家长/监护人姓名和电子邮件。",
@@ -13914,10 +13940,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"親/保護者のメールアドレス",
     "send":"リクエストの送信",
     "sending":"送信中...",
-    "sent":(email)=>`電子メールは ${email} に送信されました。保護者に受信箱を確認してリンクをクリックするよう依頼してください。リンクの有効期限は 7 日です。`,
+    "sent":(email)=>`電子メールは ${email} に送信されました。保護者に受信箱を確認してリンクをクリックするよう依頼してください。`,
     "resend":"メールを再送信する",
     "changeEmail":"メールアドレスを間違えた？修正する",
     "changeEmailHint":"保護者のメールアドレスを修正して送信をタップしてください。以前に送ったリンクは無効になります。",
+    "reviewing":"保護者の確認を待っています",
+    "validUntil":(t)=>`リンクの有効期限は 10 分間（${t} まで）です。保護者が確認すると、この画面は自動的に更新されます。`,
+    "expiredNote":"リンクの有効期限が切れました（有効期限は 10 分間）。メールを再送信して新しいリンクを受け取ってください。",
     "wait":"で再送信できます",
     "approved":"あなたの保護者があなたのアカウントを承認しました。続けられるよ！",
     "missing":"保護者の名前とメールアドレスを入力してください。",
@@ -13940,10 +13969,13 @@ const PROMPT14_MINOR_COPY = {
     "guardianEmail":"Электронная почта родителя/опекуна",
     "send":"Отправить запрос",
     "sending":"Отправка...",
-    "sent":(email)=>`Письмо отправлено на адрес ${email}. Попросите родителей проверить свой почтовый ящик и нажать на ссылку. Срок действия ссылки истекает через 7 дней.`,
+    "sent":(email)=>`Письмо отправлено на адрес ${email}. Попросите родителей проверить свой почтовый ящик и нажать на ссылку.`,
     "resend":"Отправить письмо повторно",
     "changeEmail":"Ошибка в адресе? Исправить",
     "changeEmailHint":"Исправь адрес родителя и нажми «Отправить»: ссылка, отправленная раньше, перестанет работать.",
+    "reviewing":"Ждём подтверждения от родителя",
+    "validUntil":(t)=>`Ссылка действует 10 минут, до ${t}. Этот экран обновится сам, когда родитель подтвердит.`,
+    "expiredNote":"Срок действия ссылки истёк (она действует 10 минут). Отправь письмо ещё раз, чтобы получить новую ссылку.",
     "wait":"Вы можете отправить повторно",
     "approved":"Ваш родитель авторизовал вашу учетную запись. Вы можете продолжать!",
     "missing":"Пожалуйста, введите имя родителя/опекуна и адрес электронной почты.",
@@ -22386,7 +22418,12 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
   // D-072: nome ed email già inviati restano nei campi, così un'email sbagliata si corregge senza riscrivere tutto.
   const [parentName, setParentName] = React.useState(userData?.guardian_name || userData?.guardianName || "");
   const consentStatus = userData?.parentalConsentStatus || userData?.parental_consent_status;
-  const [submitted, setSubmitted] = React.useState(consentStatus === "pending" && Boolean(userData?.guardian_email || userData?.guardianEmail));
+  // D-073: ricaricando l'app con una richiesta già inviata (in attesa o con il link scaduto) si torna alla schermata di
+  // attesa; nessun nuovo invio parte da solo, quindi il link mandato al genitore resta valido fino alla scadenza.
+  const [submitted, setSubmitted] = React.useState((consentStatus === "pending" || consentStatus === "expired") && Boolean(userData?.guardian_email || userData?.guardianEmail));
+  const [expiresAt, setExpiresAt] = React.useState(userData?.parentalConsentExpiresAt || userData?.parental_consent_expires_at || null);
+  const [linkExpired, setLinkExpired] = React.useState(consentStatus === "expired");
+  const completedRef = React.useRef(false);
   const [editingEmail, setEditingEmail] = React.useState(false);
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -22428,7 +22465,46 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
     }
     setEditingEmail(false);
     setSubmitted(true);
+    setExpiresAt(result.expires_at || null);
+    setLinkExpired(false);
     setResendIn(60);
+  };
+
+  const finishApproved = (user) => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    onComplete({
+      ...userData,
+      ...user,
+      isMinor: true,
+      parentalConsentStatus: "approved"
+    });
+  };
+
+  // D-073: mentre si aspetta il genitore la schermata controlla da sola lo stato ogni 10 secondi e al ritorno sull'app
+  // (sola lettura di /me): approvato → si prosegue, rifiutato → schermata del rifiuto, scaduto → avviso e reinvio.
+  React.useEffect(() => {
+    if (!submitted || denied) return undefined;
+    let cancelled = false;
+    const poll = async () => {
+      const user = await getCurrentUserFromBackend();
+      if (cancelled || !user) return;
+      const status = user.parental_consent_status || user.parentalConsentStatus;
+      if (status === "approved") { finishApproved(user); return; }
+      if (status === "denied") { setDenied(true); return; }
+      setLinkExpired(status === "expired");
+      if (user.parental_consent_expires_at) setExpiresAt(user.parental_consent_expires_at);
+    };
+    const timer = setInterval(poll, 10000);
+    const onVisible = () => { if (document.visibilityState === "visible") poll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  }, [submitted, denied]);
+
+  const formatLinkTime = (value) => {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return "";
+    try { return date.toLocaleTimeString(lang, { hour:"2-digit", minute:"2-digit" }); } catch (_) { return date.toTimeString().slice(0, 5); }
   };
 
   const checkApproval = async () => {
@@ -22437,19 +22513,20 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
     setChecking(false);
     const status = user?.parental_consent_status || user?.parentalConsentStatus;
     if (status === "approved") {
-      onComplete({
-        ...userData,
-        ...user,
-        isMinor: true,
-        parentalConsentStatus: "approved"
-      });
+      finishApproved(user);
       return;
     }
     if (status === "denied") {
       setDenied(true);
       return;
     }
-    setError(copy.pendingNote);
+    if (status === "expired") {
+      setLinkExpired(true);
+      setError("");
+      return;
+    }
+    if (user?.parental_consent_expires_at) setExpiresAt(user.parental_consent_expires_at);
+    setError(copy.reviewing);
   };
 
   if (denied) {
@@ -22488,8 +22565,11 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
         <p style={{fontSize:14,color:T.muted,lineHeight:1.6,marginBottom:8}}>
           {copy.sent(parentEmail)}
         </p>
-        <p style={{fontSize:13,color:T.muted,lineHeight:1.6,marginBottom:32}}>
-          {copy.pendingNote}
+        <p style={{fontSize:14,color:T.text,fontWeight:700,lineHeight:1.6,margin:"0 0 6px"}}>
+          {linkExpired ? "" : copy.reviewing}
+        </p>
+        <p style={{fontSize:13,color:linkExpired ? "#B91C1C" : T.muted,fontWeight:linkExpired ? 700 : 400,lineHeight:1.6,marginBottom:32}}>
+          {linkExpired ? copy.expiredNote : (expiresAt ? copy.validUntil(formatLinkTime(expiresAt)) : copy.pendingNote)}
         </p>
         {needsDocument && (
           <div style={{background:T.sel,borderRadius:12,padding:"12px 16px",marginBottom:24,textAlign:"left",width:"100%"}}>
