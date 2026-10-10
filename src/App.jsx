@@ -621,6 +621,7 @@ const normalizeOnboarding = (data) => {
     wearableConsent: Boolean(data.wearable_consent ?? data.wearableConsent),
     researchConsent: Boolean(data.research_consent ?? data.researchConsent ?? false),
     isMinor: Boolean(data.is_minor ?? data.isMinor),
+    guardianName: data.guardian_name ?? data.guardianName ?? null,
     guardianEmail: data.guardian_email ?? data.guardianEmail ?? null,
     parentalConsentStatus: data.parental_consent_status ?? data.parentalConsentStatus ?? "not_required",
     parentalConsentVerifiedAt: data.parental_consent_verified_at ?? data.parentalConsentVerifiedAt ?? null
@@ -790,7 +791,8 @@ const requestParentalConsentEmail = async ({ guardianName, guardianEmail, langua
       body: JSON.stringify({ guardianName, guardianEmail, language, minorName })
     });
     const data = await response.json().catch(() => ({}));
-    return response.ok ? { success:true, ...data } : { success:false, error:data.error || "request_failed" };
+    // D-072: con 429 il server dice tra quanti secondi si può rinviare (una richiesta ogni 60 s).
+    return response.ok ? { success:true, ...data } : { success:false, error:data.error || "request_failed", retryAfterSeconds:Number(data.retry_after_seconds) || 0 };
   } catch (error) {
     console.error("Parental consent request failed:", error);
     return { success:false, error:"network_error" };
@@ -13704,6 +13706,8 @@ const MINOR_COPY = {
     sending:"Invio in corso...",
     sent:email=>`Email inviata a ${email}. Chiedi al tuo genitore di controllare la posta e cliccare il link. Il link scade tra 7 giorni.`,
     resend:"Reinvia email",
+    changeEmail:"Email sbagliata? Correggila",
+    changeEmailHint:"Correggi l'email del genitore e premi Invia: il link inviato prima non varrà più.",
     wait:"Potrai reinviare tra",
     approved:"Il tuo genitore ha autorizzato il tuo account. Puoi continuare!",
     missing:"Inserisci nome ed email del genitore/tutore.",
@@ -13728,6 +13732,8 @@ const MINOR_COPY = {
     sending:"Sending...",
     sent:email=>`Email sent to ${email}. Ask your parent to check their inbox and click the link. The link expires in 7 days.`,
     resend:"Resend email",
+    changeEmail:"Wrong email? Fix it",
+    changeEmailHint:"Fix your parent's email and tap Send: the link sent before will stop working.",
     wait:"You can resend in",
     approved:"Your parent has authorised your account. You can continue!",
     missing:"Please enter parent/guardian name and email.",
@@ -13754,6 +13760,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"Envoi...",
     "sent":(email)=>`E-mail envoyé à ${email}. Demandez à vos parents de vérifier leur boîte de réception et de cliquer sur le lien. Le lien expire dans 7 jours.`,
     "resend":"Renvoyer l'e-mail",
+    "changeEmail":"E-mail erronée ? Corrige-la",
+    "changeEmailHint":"Corrige l'e-mail de ton parent et appuie sur Envoyer : le lien envoyé avant ne fonctionnera plus.",
     "wait":"Vous pouvez renvoyer",
     "approved":"Votre parent a autorisé votre compte. Vous pouvez continuer !",
     "missing":"Veuillez saisir le nom et l'adresse e-mail du parent/tuteur.",
@@ -13778,6 +13786,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"Envío...",
     "sent":(email)=>`Correo electrónico enviado a ${email}. Pídele a tus padres que revisen su bandeja de entrada y hagan clic en el enlace. El enlace caduca en 7 días.`,
     "resend":"Reenviar correo electrónico",
+    "changeEmail":"¿Correo equivocado? Corrígelo",
+    "changeEmailHint":"Corrige el correo de tu padre o madre y pulsa Enviar: el enlace enviado antes dejará de funcionar.",
     "wait":"Puedes reenviar en",
     "approved":"Tu padre ha autorizado tu cuenta. ¡Puedes continuar!",
     "missing":"Por favor ingrese el nombre y correo electrónico del padre/tutor.",
@@ -13802,6 +13812,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"Senden...",
     "sent":(email)=>`E-Mail an ${email} gesendet. Bitten Sie Ihre Eltern, ihren Posteingang zu überprüfen und auf den Link zu klicken. Der Link läuft in 7 Tagen ab.`,
     "resend":"E-Mail erneut senden",
+    "changeEmail":"Falsche E-Mail? Korrigieren",
+    "changeEmailHint":"Korrigiere die E-Mail deiner Eltern und tippe auf Senden: Der zuvor gesendete Link funktioniert dann nicht mehr.",
     "wait":"Sie können es erneut einsenden",
     "approved":"Dein Elternteil hat dein Konto autorisiert. Sie können fortfahren!",
     "missing":"Bitte geben Sie den Namen und die E-Mail-Adresse des Elternteils/Erziehungsberechtigten ein.",
@@ -13826,6 +13838,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"إرسال...",
     "sent":(email)=>`تم إرسال البريد الإلكتروني إلى ${email}. اطلب من والديك التحقق من البريد الوارد الخاص به والنقر على الرابط. تنتهي صلاحية الرابط خلال 7 أيام.`,
     "resend":"إعادة إرسال البريد الإلكتروني",
+    "changeEmail":"بريد إلكتروني خاطئ؟ صحّحه",
+    "changeEmailHint":"صحّح البريد الإلكتروني لوالدك واضغط إرسال: الرابط المرسل سابقًا لن يعمل بعد الآن.",
     "wait":"يمكنك إعادة الإرسال",
     "approved":"لقد سمح والدك بحسابك. يمكنك الاستمرار!",
     "missing":"الرجاء إدخال اسم ولي الأمر/الوصي والبريد الإلكتروني.",
@@ -13850,6 +13864,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"Enviando...",
     "sent":(email)=>`E-mail enviado para ${email}. Peça aos seus pais para verificar a caixa de entrada e clicar no link. O link expira em 7 dias.`,
     "resend":"Reenviar e-mail",
+    "changeEmail":"E-mail errado? Corrige",
+    "changeEmailHint":"Corrige o e-mail do teu pai ou mãe e toca em Enviar: o link enviado antes deixará de funcionar.",
     "wait":"Você pode reenviar em",
     "approved":"Seus pais autorizaram sua conta. Você pode continuar!",
     "missing":"Por favor, insira o nome e e-mail dos pais/responsáveis.",
@@ -13874,6 +13890,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"正在发送...",
     "sent":(email)=>`电子邮件已发送至 ${email}。请您的家长检查他们的收件箱并单击链接。该链接将在 7 天后过期。`,
     "resend":"重新发送电子邮件",
+    "changeEmail":"邮箱填错了？修改",
+    "changeEmailHint":"修改家长的电子邮件并点击发送：之前发送的链接将失效。",
     "wait":"您可以重新发送",
     "approved":"您的父母已授权您的帐户。你可以继续！",
     "missing":"请输入家长/监护人姓名和电子邮件。",
@@ -13898,6 +13916,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"送信中...",
     "sent":(email)=>`電子メールは ${email} に送信されました。保護者に受信箱を確認してリンクをクリックするよう依頼してください。リンクの有効期限は 7 日です。`,
     "resend":"メールを再送信する",
+    "changeEmail":"メールアドレスを間違えた？修正する",
+    "changeEmailHint":"保護者のメールアドレスを修正して送信をタップしてください。以前に送ったリンクは無効になります。",
     "wait":"で再送信できます",
     "approved":"あなたの保護者があなたのアカウントを承認しました。続けられるよ！",
     "missing":"保護者の名前とメールアドレスを入力してください。",
@@ -13922,6 +13942,8 @@ const PROMPT14_MINOR_COPY = {
     "sending":"Отправка...",
     "sent":(email)=>`Письмо отправлено на адрес ${email}. Попросите родителей проверить свой почтовый ящик и нажать на ссылку. Срок действия ссылки истекает через 7 дней.`,
     "resend":"Отправить письмо повторно",
+    "changeEmail":"Ошибка в адресе? Исправить",
+    "changeEmailHint":"Исправь адрес родителя и нажми «Отправить»: ссылка, отправленная раньше, перестанет работать.",
     "wait":"Вы можете отправить повторно",
     "approved":"Ваш родитель авторизовал вашу учетную запись. Вы можете продолжать!",
     "missing":"Пожалуйста, введите имя родителя/опекуна и адрес электронной почты.",
@@ -22361,8 +22383,11 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
   const { lang, t } = useT();
   const copy = getMinorCopy(lang);
   const [parentEmail, setParentEmail] = React.useState(userData?.guardian_email || userData?.guardianEmail || "");
-  const [parentName, setParentName] = React.useState("");
-  const [submitted, setSubmitted] = React.useState(false);
+  // D-072: nome ed email già inviati restano nei campi, così un'email sbagliata si corregge senza riscrivere tutto.
+  const [parentName, setParentName] = React.useState(userData?.guardian_name || userData?.guardianName || "");
+  const consentStatus = userData?.parentalConsentStatus || userData?.parental_consent_status;
+  const [submitted, setSubmitted] = React.useState(consentStatus === "pending" && Boolean(userData?.guardian_email || userData?.guardianEmail));
+  const [editingEmail, setEditingEmail] = React.useState(false);
   const [error, setError] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [checking, setChecking] = React.useState(false);
@@ -22393,9 +22418,15 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
     });
     setLoading(false);
     if (!result.success) {
+      if (result.error === "consent_request_too_soon" && result.retryAfterSeconds > 0) {
+        setResendIn(result.retryAfterSeconds);
+        setError(`${copy.wait} ${result.retryAfterSeconds}s`);
+        return;
+      }
       setError(result.error || "request_failed");
       return;
     }
+    setEditingEmail(false);
     setSubmitted(true);
     setResendIn(60);
   };
@@ -22480,6 +22511,12 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
         >
           {resendIn > 0 ? `${copy.wait} ${resendIn}s` : copy.resend}
         </button>
+        <button
+          onClick={() => { setSubmitted(false); setEditingEmail(true); setError(""); }}
+          style={{width:"100%",padding:"14px",borderRadius:16,border:"none",cursor:"pointer",background:"transparent",color:T.accentD,fontSize:14,fontWeight:700,marginTop:6,textDecoration:"underline"}}
+        >
+          {copy.changeEmail}
+        </button>
         {error && <p style={{fontSize:12,color:"#B91C1C",lineHeight:1.45,marginTop:12,fontWeight:700}}>{error}</p>}
       </div>
     );
@@ -22544,6 +22581,8 @@ const MinorScreen = ({userData, onComplete, onBack}) => {
             </p>
           </div>
         )}
+
+        {editingEmail && <p style={{fontSize:12,color:T.muted,lineHeight:1.5,marginBottom:12}}>{copy.changeEmailHint}</p>}
 
         {error && <p style={{fontSize:12,color:"#E24B4A",marginBottom:12}}>{error}</p>}
 
